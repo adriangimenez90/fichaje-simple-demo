@@ -120,12 +120,24 @@ import Layout from '../layouts/Layout.astro';
 			detail: string;
 		};
 
+		type ScheduledReport = {
+			id: string;
+			reportType: string;
+			frequency: string;
+			sendDay: string;
+			recipient: string;
+			format: string;
+			active: boolean;
+			createdAt: string;
+		};
+
 		const KEYS = {
 			session: 'fs_session',
 			timeEntries: 'fs_timeEntries',
 			vacations: 'fs_vacations',
 			incidents: 'fs_incidents',
 			holidays: 'fs_holidays',
+			scheduledReports: 'fs_scheduledReports',
 			audit: 'fs_audit',
 		} as const;
 
@@ -140,8 +152,8 @@ import Layout from '../layouts/Layout.astro';
 		];
 
 		const EMPLOYEE_VIEWS = [
-			{ id: 'inicio', label: 'Inicio', hint: 'Tu jornada de hoy' },
 			{ id: 'fichar', label: 'Fichar', hint: 'Entrada, pausas y salida' },
+			{ id: 'inicio', label: 'Inicio', hint: 'Tu jornada de hoy' },
 			{ id: 'calendario', label: 'Calendario', hint: 'Estados por día' },
 			{ id: 'historial', label: 'Historial', hint: 'Registros mensuales' },
 			{ id: 'vacaciones', label: 'Vacaciones', hint: 'Saldo y solicitudes' },
@@ -153,7 +165,8 @@ import Layout from '../layouts/Layout.astro';
 			{ id: 'incidencias', label: 'Incidencias', hint: 'Pendientes de revisar' },
 			{ id: 'vacaciones-admin', label: 'Vacaciones', hint: 'Aprobaciones y solapes' },
 			{ id: 'festivos', label: 'Festivos', hint: 'Calendario del centro' },
-			{ id: 'exportaciones', label: 'Exportaciones', hint: 'Informes simulados' },
+			{ id: 'informes', label: 'Informes', hint: 'Reportes y envíos simulados' },
+			{ id: 'exportaciones', label: 'Exportaciones', hint: 'Descarga manual' },
 			{ id: 'auditoria', label: 'Auditoría', hint: 'Actividad local' },
 			{ id: 'configuracion', label: 'Configuración', hint: 'Datos de demo' },
 		];
@@ -190,6 +203,7 @@ import Layout from '../layouts/Layout.astro';
 		let vacations: VacationRequest[] = [];
 		let incidents: Incident[] = [];
 		let holidays: Holiday[] = [];
+		let scheduledReports: ScheduledReport[] = [];
 		let auditLog: AuditEntry[] = [];
 
 		const shell = document.querySelector<HTMLDivElement>('#app-shell');
@@ -219,10 +233,11 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			loadDemoData();
-			activeView = session.role === 'administrador' ? 'dashboard' : 'inicio';
+			activeView = session.role === 'administrador' ? 'dashboard' : 'fichar';
 			renderShell();
 			renderPage();
 			bindGlobalEvents();
+			window.setInterval(updateLiveClock, 1000);
 			if (shell) shell.hidden = false;
 		}
 
@@ -290,6 +305,11 @@ import Layout from '../layouts/Layout.astro';
 				if (form.matches('#time-filter-form')) {
 					event.preventDefault();
 					applyTimeFilters(form);
+				}
+
+				if (form.matches('#report-schedule-form')) {
+					event.preventDefault();
+					saveScheduledReport(form);
 				}
 
 				if (form.matches('#history-filter-form')) {
@@ -372,12 +392,14 @@ import Layout from '../layouts/Layout.astro';
 				incidencias: renderAdminIncidents,
 				'vacaciones-admin': renderAdminVacations,
 				festivos: renderHolidays,
+				informes: renderReports,
 				exportaciones: renderExports,
 				auditoria: renderAudit,
 				configuracion: renderSettings,
 			};
 
 			content.innerHTML = viewMap[activeView]?.() || renderEmployeeHome();
+			updateLiveClock();
 		}
 
 		function renderEmployeeHome() {
@@ -399,6 +421,16 @@ import Layout from '../layouts/Layout.astro';
 
 			return `
 				${sectionTitle('Inicio', 'Resumen operativo de tu jornada y próximos permisos.')}
+				<section class="panel quick-punch-card">
+					<div>
+						<span class="meta-label">Fichaje rápido</span>
+						<strong>${status.label}</strong>
+						<p class="helper-text">Hora actual: <span class="live-clock">${currentTimeWithSeconds()}</span></p>
+					</div>
+					<button class="button button-primary" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
+						${punchActionLabel(entry)}
+					</button>
+				</section>
 				<div class="grid grid-3">
 					${metricCard('Estado actual', status.label, status.key)}
 					${metricCard('Tiempo trabajado hoy', formatMinutes(workedMinutes(entry)), 'correcto')}
@@ -451,8 +483,12 @@ import Layout from '../layouts/Layout.astro';
 								<span class="meta-label">Estado actual</span>
 								<strong>${status.label}</strong>
 							</div>
-							${pill(status.label, status.key)}
+							<div class="clock-card">
+								<span>Hora actual</span>
+								<strong class="live-clock">${currentTimeWithSeconds()}</strong>
+							</div>
 						</div>
+						<div>${pill(status.label, status.key)}</div>
 						<button class="button button-primary punch-button" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
 							<span>${actionLabel}</span>
 							<small>${actionHelp}</small>
@@ -868,10 +904,140 @@ import Layout from '../layouts/Layout.astro';
 			`;
 		}
 
+		function renderReports() {
+			const weeklyRows = buildHoursReport(7);
+			const monthlyRows = buildHoursReport(30);
+			const missingRows = buildMissingPunchReport();
+			const pendingIncidentRows = incidents
+				.filter((incident) => incident.status === 'pendiente')
+				.slice(0, 8)
+				.map((incident) => [
+					employeeName(incident.employeeId),
+					formatDate(incident.date),
+					escapeHtml(incident.type),
+					escapeHtml(incident.detail),
+					pill('Pendiente', 'pendiente'),
+				]);
+			const vacationRows = vacations
+				.filter((request) => request.status === 'aprobada' || request.status === 'pendiente')
+				.sort((a, b) => a.from.localeCompare(b.from))
+				.slice(0, 8)
+				.map((request) => [
+					employeeName(request.employeeId),
+					`${formatDate(request.from)} - ${formatDate(request.to)}`,
+					String(request.days),
+					pill(request.status),
+					escapeHtml(request.comment || 'Sin comentario'),
+				]);
+
+			return `
+				${sectionTitle('Informes', 'Previsualiza reportes de control horario y programa envíos simulados por email.')}
+				<section class="panel">
+					<div class="panel-heading">
+						<div>
+							<h2>Informes rápidos</h2>
+							<p class="helper-text">Estas tablas son una previsualización con datos ficticios guardados en el navegador.</p>
+						</div>
+					</div>
+					<div class="reports-grid">
+						${reportPreview(
+							'Reporte semanal de horas',
+							'Últimos 7 días naturales.',
+							['Empleado', 'Días con fichaje', 'Días sin fichaje', 'Horas registradas', 'Incidencias', 'Vacaciones', 'Estado'],
+							weeklyRows,
+						)}
+						${reportPreview(
+							'Reporte mensual de horas',
+							'Últimos 30 días naturales.',
+							['Empleado', 'Días con fichaje', 'Días sin fichaje', 'Horas registradas', 'Incidencias', 'Vacaciones', 'Estado'],
+							monthlyRows,
+						)}
+						${reportPreview(
+							'Empleados sin fichaje',
+							'Personas sin entrada registrada hoy.',
+							['Empleado', 'Fecha', 'Departamento', 'Estado', 'Acción sugerida'],
+							missingRows,
+						)}
+						${reportPreview(
+							'Incidencias pendientes',
+							'Ajustes y anomalías pendientes de revisar.',
+							['Empleado', 'Fecha', 'Tipo', 'Detalle', 'Estado'],
+							pendingIncidentRows,
+						)}
+						${reportPreview(
+							'Vacaciones aprobadas/pendientes',
+							'Próximas solicitudes con impacto en planificación.',
+							['Empleado', 'Rango', 'Días', 'Estado', 'Comentario'],
+							vacationRows,
+						)}
+					</div>
+				</section>
+				<section class="panel top-gap">
+					<div class="panel-heading">
+						<div>
+							<h2>Programar informe</h2>
+							<p class="helper-text">En producción estos informes se enviarían automáticamente por email.</p>
+						</div>
+					</div>
+					<form id="report-schedule-form" class="form-grid report-schedule-form">
+						<label class="field">
+							<span>Tipo de informe</span>
+							<select name="reportType">
+								<option value="Resumen semanal">Resumen semanal</option>
+								<option value="Resumen mensual">Resumen mensual</option>
+								<option value="Incidencias pendientes">Incidencias pendientes</option>
+								<option value="Fichajes incompletos">Fichajes incompletos</option>
+							</select>
+						</label>
+						<label class="field">
+							<span>Frecuencia</span>
+							<select name="frequency">
+								<option value="Semanal">Semanal</option>
+								<option value="Mensual">Mensual</option>
+							</select>
+						</label>
+						<label class="field">
+							<span>Día de envío</span>
+							<select name="sendDay">
+								<option value="Lunes">Lunes</option>
+								<option value="Martes">Martes</option>
+								<option value="Miércoles">Miércoles</option>
+								<option value="Jueves">Jueves</option>
+								<option value="Viernes">Viernes</option>
+								<option value="Día 1">Día 1</option>
+								<option value="Día 5">Día 5</option>
+								<option value="Día 10">Día 10</option>
+							</select>
+						</label>
+						<label class="field">
+							<span>Destinatario email</span>
+							<input type="email" name="recipient" value="responsable@sourcingdemo.es" required />
+						</label>
+						<label class="field">
+							<span>Formato</span>
+							<select name="format">
+								<option value="CSV">CSV</option>
+								<option value="PDF">PDF</option>
+								<option value="CSV + PDF">CSV + PDF</option>
+							</select>
+						</label>
+						<button class="button button-primary" type="submit">Guardar programación</button>
+					</form>
+				</section>
+				<section class="panel top-gap">
+					<h2>Informes programados</h2>
+					${renderScheduledReportsTable()}
+				</section>
+			`;
+		}
+
 		function renderExports() {
 			return `
-				${sectionTitle('Exportaciones', 'Genera CSV de fichajes, vacaciones, incidencias o auditoría.')}
+				${sectionTitle('Exportaciones', 'Descarga manual de datos concretos de la demo.')}
 				<section class="panel">
+					<p class="helper-text export-help">
+						Las exportaciones manuales permiten descargar datos concretos. Los informes programados enviarían resúmenes automáticos en producción.
+					</p>
 					<form id="export-form" class="form-grid admin-filters">
 						<label class="field">
 							<span>Tipo</span>
@@ -1112,35 +1278,38 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderVacationAdminDetail(request: VacationRequest) {
-			const overlapDays = dateRange(request.from, request.to).map((date) => {
-				const approved = vacations.filter(
-					(item) =>
-						item.id !== request.id &&
-						item.status === 'aprobada' &&
-						isDateWithin(date, item.from, item.to),
-				);
-				const pending = vacations.filter(
-					(item) =>
-						item.id !== request.id &&
-						item.status === 'pendiente' &&
-						isDateWithin(date, item.from, item.to),
-				);
-				return { date, approved, pending };
-			});
-			const approvedConflictDays = overlapDays.filter((day) => day.approved.length).length;
-			const pendingConflictDays = overlapDays.filter((day) => day.pending.length).length;
-			const overlapRows = overlapDays
-				.map(
-					(day) => `
-						<tr>
-							<td><strong>${formatDate(day.date)}</strong></td>
-							<td>${pill('Solicitud actual', 'pendiente')}</td>
-							<td>${day.approved.map((item) => employeeName(item.employeeId)).join(', ') || '<span class="muted-cell">Sin aprobadas</span>'}</td>
-							<td>${day.pending.map((item) => employeeName(item.employeeId)).join(', ') || '<span class="muted-cell">Sin pendientes</span>'}</td>
-						</tr>
-					`,
-				)
-				.join('');
+			const rangeDays = dateRange(request.from, request.to);
+			const approvedConflictEmployees = new Set(
+				vacations
+					.filter(
+						(item) =>
+							item.id !== request.id &&
+							item.employeeId !== request.employeeId &&
+							item.status === 'aprobada' &&
+							rangesOverlap(request.from, request.to, item.from, item.to),
+					)
+					.map((item) => item.employeeId),
+			);
+			const pendingConflictEmployees = new Set(
+				vacations
+					.filter(
+						(item) =>
+							item.id !== request.id &&
+							item.employeeId !== request.employeeId &&
+							item.status === 'pendiente' &&
+							rangesOverlap(request.from, request.to, item.from, item.to),
+					)
+					.map((item) => item.employeeId),
+			);
+			const comparisonRows = EMPLOYEES.map((employee) => `
+				<tr>
+					<th class="sticky-col">
+						<strong>${employee.name}</strong>
+						<span>${employee.department}</span>
+					</th>
+					${rangeDays.map((date) => renderVacationComparisonCell(employee.id, date, request)).join('')}
+				</tr>
+			`).join('');
 
 			return `
 				<div class="vacation-admin-summary">
@@ -1150,27 +1319,30 @@ import Layout from '../layouts/Layout.astro';
 						<p>${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días</p>
 						${pill(request.status)}
 					</div>
-					<div class="conflict-meter ${approvedConflictDays ? 'has-conflict' : ''}">
-						<strong>${approvedConflictDays}</strong>
-						<span>días con vacaciones aprobadas coincidentes</span>
+					<div class="conflict-meter ${approvedConflictEmployees.size ? 'has-conflict' : ''}">
+						<strong>${approvedConflictEmployees.size}</strong>
+						<span>empleados coinciden con vacaciones aprobadas</span>
 					</div>
-					<div class="conflict-meter ${pendingConflictDays ? 'has-warning' : ''}">
-						<strong>${pendingConflictDays}</strong>
-						<span>días con solicitudes pendientes coincidentes</span>
+					<div class="conflict-meter ${pendingConflictEmployees.size ? 'has-warning' : ''}">
+						<strong>${pendingConflictEmployees.size}</strong>
+						<span>empleados coinciden con solicitudes pendientes</span>
 					</div>
 				</div>
-				<p class="helper-text top-gap">La tabla separa vacaciones ya aprobadas de solicitudes pendientes para decidir con más contexto.</p>
-				<div class="table-wrap top-gap">
-					<table>
+				<div class="comparison-legend top-gap">
+					<span><i class="cell-actual"></i> Solicitud actual</span>
+					<span><i class="cell-approved"></i> Vacaciones aprobadas</span>
+					<span><i class="cell-pending"></i> Solicitud pendiente</span>
+					<span><i class="cell-free"></i> Libre</span>
+				</div>
+				<div class="table-wrap vacation-matrix-wrap top-gap">
+					<table class="vacation-matrix">
 						<thead>
 							<tr>
-								<th>Día</th>
-								<th>Solicitud actual</th>
-								<th>Vacaciones aprobadas</th>
-								<th>Vacaciones pendientes</th>
+								<th class="sticky-col">Empleado</th>
+								${rangeDays.map((date) => `<th>${formatDayHeader(date)}</th>`).join('')}
 							</tr>
 						</thead>
-						<tbody>${overlapRows}</tbody>
+						<tbody>${comparisonRows}</tbody>
 					</table>
 				</div>
 				<div class="form-grid top-gap">
@@ -1184,6 +1356,30 @@ import Layout from '../layouts/Layout.astro';
 					</div>
 				</div>
 			`;
+		}
+
+		function renderVacationComparisonCell(employeeId: string, date: string, request: VacationRequest) {
+			if (employeeId === request.employeeId && isDateWithin(date, request.from, request.to)) {
+				return `<td class="comparison-cell cell-actual">Actual</td>`;
+			}
+
+			const overlapping = vacations.find(
+				(item) =>
+					item.id !== request.id &&
+					item.employeeId === employeeId &&
+					item.status !== 'denegada' &&
+					isDateWithin(date, item.from, item.to),
+			);
+
+			if (overlapping?.status === 'aprobada') {
+				return `<td class="comparison-cell cell-approved">Aprobada</td>`;
+			}
+
+			if (overlapping?.status === 'pendiente') {
+				return `<td class="comparison-cell cell-pending">Pendiente</td>`;
+			}
+
+			return `<td class="comparison-cell cell-free">Libre</td>`;
 		}
 
 		function renderTimesheetTable(rows: TimeEntry[]) {
@@ -1219,6 +1415,100 @@ import Layout from '../layouts/Layout.astro';
 					</table>
 				</div>
 			`;
+		}
+
+		function reportPreview(title: string, description: string, headers: string[], rows: (string | number)[][]) {
+			return `
+				<article class="report-card">
+					<div class="report-card-head">
+						<h3>${title}</h3>
+						<p>${description}</p>
+					</div>
+					${renderSimpleTable(headers, rows)}
+				</article>
+			`;
+		}
+
+		function renderSimpleTable(headers: string[], rows: (string | number)[][]) {
+			if (!rows.length) return emptyState('No hay datos para este informe con la demo actual.');
+
+			return `
+				<div class="table-wrap report-table-wrap">
+					<table class="report-table">
+						<thead>
+							<tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr>
+						</thead>
+						<tbody>
+							${rows
+								.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`)
+								.join('')}
+						</tbody>
+					</table>
+				</div>
+			`;
+		}
+
+		function buildHoursReport(days: number) {
+			const to = todayIso();
+			const from = addDaysIso(to, -(days - 1));
+			const expectedDays = dateRange(from, to).filter(
+				(date) => !isWeekend(date) && !holidays.some((holiday) => holiday.date === date),
+			).length;
+
+			return EMPLOYEES.map((employee) => {
+				const entries = timeEntries.filter(
+					(entry) => entry.employeeId === employee.id && dateInRange(entry.date, from, to),
+				);
+				const daysWithEntry = new Set(entries.map((entry) => entry.date)).size;
+				const vacationDays = countVacationDaysInRange(employee.id, from, to);
+				const employeeIncidents = incidents.filter(
+					(incident) => incident.employeeId === employee.id && dateInRange(incident.date, from, to),
+				).length;
+				const daysWithoutEntry = Math.max(expectedDays - daysWithEntry - vacationDays, 0);
+				const hours = formatMinutes(entries.reduce((sum, entry) => sum + workedMinutes(entry), 0));
+				const status =
+					employeeIncidents > 0
+						? pill('Revisar', 'incidencia')
+						: daysWithoutEntry > 2
+							? pill('Atención', 'pendiente')
+							: pill('Correcto', 'correcto');
+
+				return [
+					employee.name,
+					String(daysWithEntry),
+					String(daysWithoutEntry),
+					hours,
+					String(employeeIncidents),
+					String(vacationDays),
+					status,
+				];
+			});
+		}
+
+		function buildMissingPunchReport() {
+			const today = todayIso();
+			return EMPLOYEES.filter((employee) => !findEntry(employee.id, today)?.start).map((employee) => [
+				employee.name,
+				formatDate(today),
+				employee.department,
+				pill('Sin fichaje', 'sin fichaje'),
+				'Enviar recordatorio',
+			]);
+		}
+
+		function renderScheduledReportsTable() {
+			const rows = scheduledReports
+				.slice()
+				.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+				.map((report) => [
+					escapeHtml(report.reportType),
+					escapeHtml(`${report.frequency} · ${report.sendDay}`),
+					escapeHtml(report.recipient),
+					escapeHtml(report.format),
+					report.active ? pill('Activo', 'correcto') : pill('Inactivo', 'sin fichaje'),
+				]);
+
+			return renderSimpleTable(['Tipo', 'Frecuencia', 'Destinatario', 'Formato', 'Estado'], rows);
 		}
 
 		function performPunch() {
@@ -1371,6 +1661,34 @@ import Layout from '../layouts/Layout.astro';
 			addAudit('Festivo añadido', `${name} en ${center} (${formatDate(date)}).`);
 			saveAll();
 			showToast('Festivo añadido al calendario.');
+			renderPage();
+		}
+
+		function saveScheduledReport(form: HTMLFormElement) {
+			const formData = new FormData(form);
+			const report: ScheduledReport = {
+				id: uniqueId('report'),
+				reportType: String(formData.get('reportType') || 'Resumen semanal'),
+				frequency: String(formData.get('frequency') || 'Semanal'),
+				sendDay: String(formData.get('sendDay') || 'Lunes'),
+				recipient: String(formData.get('recipient') || 'responsable@sourcingdemo.es').trim(),
+				format: String(formData.get('format') || 'CSV'),
+				active: true,
+				createdAt: new Date().toISOString(),
+			};
+
+			if (!report.recipient) {
+				showToast('Indica un destinatario para programar el informe.');
+				return;
+			}
+
+			scheduledReports.unshift(report);
+			addAudit(
+				'Informe programado',
+				`${report.reportType} ${report.frequency.toLowerCase()} para ${report.recipient} en formato ${report.format}.`,
+			);
+			saveAll();
+			showToast('Programación guardada. En producción se enviaría automáticamente por email.');
 			renderPage();
 		}
 
@@ -1538,6 +1856,7 @@ import Layout from '../layouts/Layout.astro';
 			vacations = readCollection(KEYS.vacations, defaults.vacations);
 			incidents = readCollection(KEYS.incidents, defaults.incidents);
 			holidays = readCollection(KEYS.holidays, defaults.holidays);
+			scheduledReports = readCollection(KEYS.scheduledReports, defaults.scheduledReports);
 			auditLog = readCollection(KEYS.audit, defaults.auditLog);
 			saveAll();
 		}
@@ -1548,6 +1867,7 @@ import Layout from '../layouts/Layout.astro';
 			vacations = defaults.vacations;
 			incidents = defaults.incidents;
 			holidays = defaults.holidays;
+			scheduledReports = defaults.scheduledReports;
 			auditLog = defaults.auditLog;
 			addAudit('Demo restablecida', 'Se restauraron los datos ficticios iniciales.');
 			saveAll();
@@ -1686,6 +2006,7 @@ import Layout from '../layouts/Layout.astro';
 				vacations: vacationsSeed,
 				incidents: incidentsSeed,
 				holidays: holidaysSeed,
+				scheduledReports: [],
 				auditLog: auditSeed,
 			};
 		}
@@ -1695,6 +2016,7 @@ import Layout from '../layouts/Layout.astro';
 			localStorage.setItem(KEYS.vacations, JSON.stringify(vacations));
 			localStorage.setItem(KEYS.incidents, JSON.stringify(incidents));
 			localStorage.setItem(KEYS.holidays, JSON.stringify(holidays));
+			localStorage.setItem(KEYS.scheduledReports, JSON.stringify(scheduledReports));
 			localStorage.setItem(KEYS.audit, JSON.stringify(auditLog));
 		}
 
@@ -1896,11 +2218,29 @@ import Layout from '../layouts/Layout.astro';
 			return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 		}
 
+		function currentTimeWithSeconds() {
+			const now = new Date();
+			return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+		}
+
+		function updateLiveClock() {
+			document.querySelectorAll<HTMLElement>('.live-clock').forEach((element) => {
+				element.textContent = currentTimeWithSeconds();
+			});
+		}
+
 		function formatDate(date: string) {
 			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
 				day: '2-digit',
 				month: '2-digit',
 				year: 'numeric',
+			});
+		}
+
+		function formatDayHeader(date: string) {
+			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
+				day: '2-digit',
+				month: '2-digit',
 			});
 		}
 
@@ -1962,8 +2302,38 @@ import Layout from '../layouts/Layout.astro';
 			return date >= from && date <= to;
 		}
 
+		function rangesOverlap(fromA: string, toA: string, fromB: string, toB: string) {
+			return fromA <= toB && fromB <= toA;
+		}
+
 		function dateInRange(date: string, from: string, to: string) {
 			return (!from || date >= from) && (!to || date <= to);
+		}
+
+		function countVacationDaysInRange(employeeId: string, from: string, to: string) {
+			return vacations
+				.filter(
+					(request) =>
+						request.employeeId === employeeId &&
+						request.status === 'aprobada' &&
+						rangesOverlap(from, to, request.from, request.to),
+				)
+				.reduce((sum, request) => {
+					return (
+						sum +
+						dateRange(maxDate(from, request.from), minDate(to, request.to)).filter(
+							(date) => !isWeekend(date) && !holidays.some((holiday) => holiday.date === date),
+						).length
+					);
+				}, 0);
+		}
+
+		function minDate(a: string, b: string) {
+			return a < b ? a : b;
+		}
+
+		function maxDate(a: string, b: string) {
+			return a > b ? a : b;
 		}
 
 		function uniqueId(prefix: string) {

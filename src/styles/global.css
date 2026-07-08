@@ -70,7 +70,7 @@ a {
 	border-radius: 8px;
 	background: var(--primary);
 	color: #ffffff;
-	font-weight: 800;
+	font-weight: 750;
 	letter-spacing: 0;
 }
 
@@ -78,7 +78,7 @@ a {
 	margin: 0 0 4px;
 	color: var(--primary-dark);
 	font-size: 0.75rem;
-	font-weight: 800;
+	font-weight: 700;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 }
@@ -87,7 +87,7 @@ a {
 	display: block;
 	color: var(--muted);
 	font-size: 0.84rem;
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .demo-badge {
@@ -100,7 +100,7 @@ a {
 	color: var(--primary-dark);
 	padding: 4px 10px;
 	font-size: 0.78rem;
-	font-weight: 900;
+	font-weight: 750;
 	text-transform: uppercase;
 }
 
@@ -113,7 +113,7 @@ a {
 	border: 1px solid transparent;
 	border-radius: 8px;
 	padding: 10px 14px;
-	font-weight: 800;
+	font-weight: 700;
 	text-decoration: none;
 	transition:
 		background 160ms ease,
@@ -265,7 +265,7 @@ textarea:focus-visible {
 	display: block;
 	color: var(--muted);
 	font-size: 0.8rem;
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .login-panel {
@@ -287,7 +287,7 @@ textarea:focus-visible {
 	gap: 6px;
 	color: var(--muted);
 	font-size: 0.9rem;
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .login-form input,
@@ -379,7 +379,7 @@ textarea:focus-visible {
 	display: block;
 	color: var(--muted);
 	font-size: 0.78rem;
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .sidebar {
@@ -557,7 +557,7 @@ textarea:focus-visible {
 	display: block;
 	color: var(--muted);
 	font-size: 0.82rem;
-	font-weight: 800;
+	font-weight: 650;
 }
 
 .metric-card strong {
@@ -606,7 +606,7 @@ textarea:focus-visible {
 
 .summary-row span {
 	color: var(--muted);
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .summary-row strong {
@@ -641,7 +641,7 @@ textarea:focus-visible {
 	background: var(--surface-strong);
 	color: var(--muted);
 	font-size: 0.78rem;
-	font-weight: 900;
+	font-weight: 750;
 	text-transform: uppercase;
 }
 
@@ -677,6 +677,28 @@ textarea:focus-visible {
 	color: var(--muted);
 }
 
+.quick-punch-card {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 16px;
+	border-color: #c4e4dc;
+	background:
+		linear-gradient(135deg, #ffffff, #f1fbf7),
+		#ffffff;
+}
+
+.quick-punch-card strong {
+	display: block;
+	font-size: 1.45rem;
+	line-height: 1.15;
+}
+
+.quick-punch-card .button {
+	min-width: 210px;
+}
+
 .punch-layout {
 	grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
 	align-items: start;
@@ -704,14 +726,35 @@ textarea:focus-visible {
 	line-height: 1.1;
 }
 
+.clock-card {
+	display: grid;
+	min-width: 176px;
+	border: 1px solid #c4e4dc;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.82);
+	padding: 12px;
+	text-align: right;
+}
+
+.clock-card span {
+	color: var(--muted);
+	font-size: 0.76rem;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.clock-card strong {
+	font-variant-numeric: tabular-nums;
+}
+
 .punch-button {
 	display: grid;
 	width: 100%;
-	min-height: 132px;
+	min-height: 148px;
 	align-content: center;
 	gap: 6px;
 	border-radius: 8px;
-	font-size: 1.55rem;
+	font-size: 1.75rem;
 }
 
 .punch-button small {
@@ -976,7 +1019,102 @@ textarea:focus-visible {
 
 .muted-cell {
 	color: var(--muted);
-	font-weight: 700;
+	font-weight: 600;
+}
+
+.comparison-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.comparison-legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: #ffffff;
+	padding: 6px 10px;
+	color: var(--muted-strong);
+	font-size: 0.82rem;
+	font-weight: 650;
+}
+
+.comparison-legend i {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border-radius: 4px;
+}
+
+.vacation-matrix-wrap {
+	max-width: 100%;
+}
+
+.vacation-matrix {
+	min-width: max-content;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+
+.vacation-matrix th,
+.vacation-matrix td {
+	min-width: 96px;
+	padding: 10px;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.vacation-matrix thead th {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+
+.vacation-matrix .sticky-col {
+	position: sticky;
+	left: 0;
+	z-index: 3;
+	min-width: 210px;
+	max-width: 240px;
+	background: #f7faf9;
+	text-align: left;
+	white-space: normal;
+	box-shadow: 1px 0 0 var(--line);
+}
+
+.vacation-matrix .sticky-col span {
+	display: block;
+	color: var(--muted);
+	font-size: 0.78rem;
+	font-weight: 500;
+}
+
+.comparison-cell {
+	border-radius: 0;
+	font-size: 0.82rem;
+	font-weight: 650;
+}
+
+.cell-actual {
+	background: #dff3ee;
+	color: var(--primary-dark);
+}
+
+.cell-approved {
+	background: #e1f1ff;
+	color: var(--accent);
+}
+
+.cell-pending {
+	background: #fff3cf;
+	color: var(--pending);
+}
+
+.cell-free {
+	background: #f6f8f8;
+	color: var(--muted);
 }
 
 .history-summary {
@@ -984,6 +1122,69 @@ textarea:focus-visible {
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 12px;
 	margin-top: 16px;
+}
+
+.panel-heading {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 14px;
+}
+
+.reports-grid {
+	display: grid;
+	gap: 14px;
+}
+
+.report-card {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 14px;
+	box-shadow: 0 4px 14px rgba(23, 33, 31, 0.04);
+}
+
+.report-card-head {
+	margin-bottom: 10px;
+}
+
+.report-card h3 {
+	margin: 0;
+	font-size: 1rem;
+}
+
+.report-card p {
+	margin: 3px 0 0;
+	color: var(--muted);
+	font-size: 0.88rem;
+}
+
+.report-table-wrap table,
+.report-table {
+	min-width: 720px;
+}
+
+.report-table th,
+.report-table td {
+	padding: 10px 12px;
+}
+
+.report-schedule-form {
+	grid-template-columns: repeat(3, minmax(180px, 1fr));
+	align-items: end;
+}
+
+.report-schedule-form .button {
+	min-height: 45px;
+}
+
+.export-help {
+	margin-bottom: 16px;
+	border: 1px solid #d6e5e1;
+	border-radius: 8px;
+	background: var(--surface-soft);
+	padding: 11px 12px;
 }
 
 .table-wrap {
@@ -1005,13 +1206,14 @@ td {
 	border-bottom: 1px solid var(--line);
 	text-align: left;
 	vertical-align: top;
+	line-height: 1.35;
 }
 
 th {
 	background: #f7faf9;
 	color: var(--muted);
 	font-size: 0.78rem;
-	font-weight: 900;
+	font-weight: 700;
 	text-transform: uppercase;
 }
 
@@ -1320,11 +1522,28 @@ tr:last-child td {
 		grid-template-columns: 1fr;
 	}
 
+	.quick-punch-card {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.quick-punch-card .button {
+		min-width: 0;
+	}
+
 	.punch-kpis,
 	.day-detail-grid,
 	.vacation-balance-grid,
 	.history-summary {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.report-schedule-form {
+		grid-template-columns: 1fr;
+	}
+
+	.vacation-matrix .sticky-col {
+		min-width: 176px;
 	}
 }
 
@@ -1362,6 +1581,18 @@ tr:last-child td {
 
 	.button {
 		width: 100%;
+	}
+
+	.section-title {
+		margin-bottom: 12px;
+	}
+
+	.section-title p {
+		font-size: 0.9rem;
+	}
+
+	.section-title .demo-banner {
+		display: none;
 	}
 
 	.summary-row,
@@ -1403,8 +1634,18 @@ tr:last-child td {
 	}
 
 	.punch-button {
-		min-height: 112px;
-		font-size: 1.35rem;
+		min-height: 132px;
+		font-size: 1.45rem;
+	}
+
+	.punch-status-row {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.clock-card {
+		min-width: 0;
+		text-align: left;
 	}
 
 	.punch-kpis,
@@ -1412,6 +1653,21 @@ tr:last-child td {
 	.vacation-balance-grid,
 	.history-summary {
 		grid-template-columns: 1fr;
+	}
+
+	.report-card {
+		padding: 12px;
+	}
+
+	.vacation-matrix th,
+	.vacation-matrix td {
+		min-width: 82px;
+		padding: 8px;
+		font-size: 0.78rem;
+	}
+
+	.vacation-matrix .sticky-col {
+		min-width: 150px;
 	}
 
 	.mobile-nav {
