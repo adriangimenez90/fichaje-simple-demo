@@ -56,22 +56,35 @@ a {
 	color: inherit;
 }
 
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+}
+
 .brand-lockup {
 	display: flex;
 	align-items: center;
 	gap: 12px;
 }
 
-.brand-mark {
-	display: inline-grid;
+.brand-logo {
+	display: block;
+	width: min(360px, 72vw);
+	height: auto;
+	object-fit: contain;
+}
+
+.brand-icon {
+	display: block;
 	width: 42px;
 	height: 42px;
-	place-items: center;
+	flex: 0 0 auto;
 	border-radius: 8px;
-	background: var(--primary);
-	color: #ffffff;
-	font-weight: 750;
-	letter-spacing: 0;
+	object-fit: contain;
 }
 
 .eyebrow {
@@ -1663,6 +1676,15 @@ tr:last-child td {
 
 	.login-brand h1 {
 		font-size: 2.45rem;
+	}
+
+	.brand-logo {
+		width: min(280px, 78vw);
+	}
+
+	.brand-icon {
+		width: 36px;
+		height: 36px;
 	}
 
 	.demo-warning,
