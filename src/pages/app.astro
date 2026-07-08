@@ -1,0 +1,1837 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="FichajeSimple | Aplicación">
+	<div id="app-shell" class="app-shell" hidden>
+		<header class="app-header">
+			<div class="header-left">
+				<div class="brand-lockup" aria-label="FichajeSimple">
+					<span class="brand-mark" aria-hidden="true">FS</span>
+					<div>
+						<strong>FichajeSimple</strong>
+						<span class="muted-line">Sourcing Demo S.L. · Valencia</span>
+					</div>
+				</div>
+				<div class="company-chip">
+					<span>Empresa demo</span>
+					<strong>Sourcing Demo S.L.</strong>
+				</div>
+			</div>
+
+			<div class="header-actions">
+				<div id="user-chip" class="user-chip"></div>
+				<button id="reset-demo" class="button button-ghost button-small" type="button">
+					Restablecer demo
+				</button>
+				<button id="logout" class="button button-secondary button-small" type="button">
+					Cerrar sesión
+				</button>
+			</div>
+		</header>
+
+		<aside class="sidebar" aria-label="Navegación principal">
+			<nav id="sidebar-nav" class="sidebar-nav"></nav>
+		</aside>
+
+		<main id="app-main" class="app-main" tabindex="-1">
+			<div id="app-content"></div>
+		</main>
+
+		<nav id="mobile-nav" class="mobile-nav" aria-label="Navegación móvil"></nav>
+	</div>
+
+	<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+	<script>
+		type Role = 'administrador' | 'empleado';
+		type EntryStatus = 'correcto' | 'incidencia' | 'pendiente' | 'sin fichaje';
+		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada';
+		type IncidentStatus = 'pendiente' | 'revisada';
+
+		type Session = {
+			id: string;
+			email: string;
+			name: string;
+			role: Role;
+			employeeId?: string;
+		};
+
+		type Employee = {
+			id: string;
+			name: string;
+			department: string;
+			vacationDays: number;
+		};
+
+		type TimeBreak = {
+			start: string;
+			end?: string;
+		};
+
+		type TimeEntry = {
+			id: string;
+			employeeId: string;
+			date: string;
+			start?: string;
+			breaks: TimeBreak[];
+			end?: string;
+			status: EntryStatus;
+			notes?: string;
+		};
+
+		type VacationRequest = {
+			id: string;
+			employeeId: string;
+			from: string;
+			to: string;
+			days: number;
+			status: VacationStatus;
+			comment?: string;
+			denialReason?: string;
+			createdAt: string;
+			decidedAt?: string;
+		};
+
+		type Incident = {
+			id: string;
+			employeeId: string;
+			date: string;
+			type: string;
+			detail: string;
+			status: IncidentStatus;
+			createdAt: string;
+			reviewedAt?: string;
+		};
+
+		type Holiday = {
+			id: string;
+			date: string;
+			name: string;
+			center: string;
+		};
+
+		type AuditEntry = {
+			id: string;
+			at: string;
+			user: string;
+			action: string;
+			detail: string;
+		};
+
+		const KEYS = {
+			session: 'fs_session',
+			timeEntries: 'fs_timeEntries',
+			vacations: 'fs_vacations',
+			incidents: 'fs_incidents',
+			holidays: 'fs_holidays',
+			audit: 'fs_audit',
+		} as const;
+
+		const EMPLOYEES: Employee[] = [
+			{ id: 'ana', name: 'Ana Martínez', department: 'Administración', vacationDays: 22 },
+			{ id: 'carlos', name: 'Carlos Gómez', department: 'Operaciones', vacationDays: 22 },
+			{ id: 'laura', name: 'Laura Pérez', department: 'Responsable', vacationDays: 22 },
+			{ id: 'miguel', name: 'Miguel Torres', department: 'Almacén', vacationDays: 22 },
+			{ id: 'sara', name: 'Sara Navarro', department: 'Logística', vacationDays: 22 },
+			{ id: 'javier', name: 'Javier Ruiz', department: 'Reparto', vacationDays: 22 },
+			{ id: 'marta', name: 'Marta Soler', department: 'Atención al cliente', vacationDays: 22 },
+		];
+
+		const EMPLOYEE_VIEWS = [
+			{ id: 'inicio', label: 'Inicio' },
+			{ id: 'fichar', label: 'Fichar' },
+			{ id: 'calendario', label: 'Calendario' },
+			{ id: 'historial', label: 'Historial' },
+			{ id: 'vacaciones', label: 'Vacaciones' },
+		];
+
+		const ADMIN_VIEWS = [
+			{ id: 'dashboard', label: 'Dashboard' },
+			{ id: 'fichajes', label: 'Fichajes' },
+			{ id: 'incidencias', label: 'Incidencias' },
+			{ id: 'vacaciones-admin', label: 'Vacaciones' },
+			{ id: 'festivos', label: 'Festivos' },
+			{ id: 'exportaciones', label: 'Exportaciones' },
+			{ id: 'auditoria', label: 'Auditoría' },
+			{ id: 'configuracion', label: 'Configuración' },
+		];
+
+		const STATUS_LABELS: Record<string, string> = {
+			correcto: 'Correcto',
+			incidencia: 'Incidencia',
+			pendiente: 'Pendiente',
+			'sin fichaje': 'Sin fichaje',
+			festivo: 'Festivo',
+			vacaciones: 'Vacaciones',
+			'fin de semana': 'Fin de semana',
+			aprobada: 'Aprobada',
+			denegada: 'Denegada',
+			revisada: 'Revisada',
+			trabajando: 'Trabajando',
+			pausa: 'En pausa',
+		};
+
+		let session: Session;
+		let activeView = 'inicio';
+		let calendarCursor = new Date();
+		let selectedCalendarDay = todayIso();
+		let selectedVacationId = '';
+		let historyMonth = todayIso().slice(0, 7);
+		let timeFilters = {
+			employeeId: 'all',
+			from: startOfMonthIso(new Date()),
+			to: todayIso(),
+			status: 'all',
+		};
+
+		let timeEntries: TimeEntry[] = [];
+		let vacations: VacationRequest[] = [];
+		let incidents: Incident[] = [];
+		let holidays: Holiday[] = [];
+		let auditLog: AuditEntry[] = [];
+
+		const shell = document.querySelector<HTMLDivElement>('#app-shell');
+		const content = document.querySelector<HTMLDivElement>('#app-content');
+		const sidebarNav = document.querySelector<HTMLElement>('#sidebar-nav');
+		const mobileNav = document.querySelector<HTMLElement>('#mobile-nav');
+		const userChip = document.querySelector<HTMLElement>('#user-chip');
+		const toast = document.querySelector<HTMLElement>('#toast');
+
+		init();
+
+		function init() {
+			const rawSession = localStorage.getItem(KEYS.session);
+
+			if (!rawSession) {
+				window.location.href = '/';
+				return;
+			}
+
+			try {
+				session = JSON.parse(rawSession) as Session;
+			} catch {
+				localStorage.removeItem(KEYS.session);
+				window.location.href = '/';
+				return;
+			}
+
+			loadDemoData();
+			activeView = session.role === 'administrador' ? 'dashboard' : 'inicio';
+			renderShell();
+			renderPage();
+			bindGlobalEvents();
+			if (shell) shell.hidden = false;
+		}
+
+		function bindGlobalEvents() {
+			document.querySelector('#logout')?.addEventListener('click', () => {
+				localStorage.removeItem(KEYS.session);
+				window.location.href = '/';
+			});
+
+			document.querySelector('#reset-demo')?.addEventListener('click', () => {
+				resetDemoData();
+				showToast('Demo restablecida con datos ficticios iniciales.');
+			});
+
+			document.addEventListener('click', (event) => {
+				const target = event.target as HTMLElement;
+				const viewButton = target.closest<HTMLElement>('[data-view]');
+				const actionButton = target.closest<HTMLElement>('[data-action]');
+
+				if (viewButton) {
+					activeView = viewButton.dataset.view || activeView;
+					renderPage();
+					renderNav();
+					document.querySelector<HTMLElement>('#app-main')?.focus();
+					return;
+				}
+
+				if (!actionButton) return;
+
+				const action = actionButton.dataset.action;
+
+				if (action === 'punch') performPunch();
+				if (action === 'quick-pause') addQuickPause(Number(actionButton.dataset.minutes || 15));
+				if (action === 'toggle-manual') toggleManualForm();
+				if (action === 'calendar-prev') changeCalendarMonth(-1);
+				if (action === 'calendar-next') changeCalendarMonth(1);
+				if (action === 'calendar-day') selectCalendarDay(actionButton.dataset.date || todayIso());
+				if (action === 'review-incident') reviewIncident(actionButton.dataset.id || '');
+				if (action === 'select-vacation') selectVacation(actionButton.dataset.id || '');
+				if (action === 'approve-vacation') resolveVacation('aprobada');
+				if (action === 'deny-vacation') resolveVacation('denegada');
+				if (action === 'export-timesheets') exportTimesheets();
+				if (action === 'simulate-pdf') showToast('PDF simulado listo. En producción se generaría un documento firmado.');
+				if (action === 'export-generic') exportGeneric();
+			});
+
+			document.addEventListener('submit', (event) => {
+				const form = event.target as HTMLFormElement;
+
+				if (form.matches('#manual-form')) {
+					event.preventDefault();
+					saveManualAdjustment(form);
+				}
+
+				if (form.matches('#vacation-request-form')) {
+					event.preventDefault();
+					saveVacationRequest(form);
+				}
+
+				if (form.matches('#holiday-form')) {
+					event.preventDefault();
+					saveHoliday(form);
+				}
+
+				if (form.matches('#time-filter-form')) {
+					event.preventDefault();
+					applyTimeFilters(form);
+				}
+
+				if (form.matches('#history-filter-form')) {
+					event.preventDefault();
+					const formData = new FormData(form);
+					historyMonth = String(formData.get('month') || historyMonth);
+					renderPage();
+				}
+			});
+		}
+
+		function renderShell() {
+			if (userChip) {
+				userChip.innerHTML = `
+					<span>${session.role === 'administrador' ? 'Administrador' : 'Empleado'}</span>
+					<strong>${escapeHtml(session.name)}</strong>
+				`;
+			}
+			renderNav();
+		}
+
+		function renderNav() {
+			const views = getViews();
+			const html = views
+				.map(
+					(view) => `
+						<button
+							class="button nav-button"
+							type="button"
+							data-view="${view.id}"
+							aria-current="${activeView === view.id ? 'page' : 'false'}"
+						>
+							${view.label}
+						</button>
+					`,
+				)
+				.join('');
+
+			if (sidebarNav) sidebarNav.innerHTML = html;
+			if (mobileNav) mobileNav.innerHTML = html;
+		}
+
+		function renderPage() {
+			if (!content) return;
+
+			const viewMap: Record<string, () => string> = {
+				inicio: renderEmployeeHome,
+				fichar: renderPunchClock,
+				calendario: renderCalendar,
+				historial: renderHistory,
+				vacaciones: renderEmployeeVacations,
+				dashboard: renderAdminDashboard,
+				fichajes: renderAdminTimesheets,
+				incidencias: renderAdminIncidents,
+				'vacaciones-admin': renderAdminVacations,
+				festivos: renderHolidays,
+				exportaciones: renderExports,
+				auditoria: renderAudit,
+				configuracion: renderSettings,
+			};
+
+			content.innerHTML = viewMap[activeView]?.() || renderEmployeeHome();
+		}
+
+		function renderEmployeeHome() {
+			const employee = currentEmployee();
+			const entry = todayEntry(employee.id);
+			const status = currentWorkStatus(entry);
+			const upcoming = vacations
+				.filter(
+					(request) =>
+						request.employeeId === employee.id &&
+						request.to >= todayIso() &&
+						(request.status === 'aprobada' || request.status === 'pendiente'),
+				)
+				.sort((a, b) => a.from.localeCompare(b.from))
+				.slice(0, 3);
+			const todayIncidents = incidents.filter(
+				(incident) => incident.employeeId === employee.id && incident.date === todayIso(),
+			);
+
+			return `
+				${sectionTitle('Inicio', 'Resumen operativo de tu jornada y próximos permisos.')}
+				<div class="grid grid-3">
+					${metricCard('Estado actual', status.label, status.key)}
+					${metricCard('Tiempo trabajado hoy', formatMinutes(workedMinutes(entry)), 'correcto')}
+					${metricCard('Incidencias de hoy', String(todayIncidents.length), todayIncidents.length ? 'incidencia' : 'correcto')}
+				</div>
+				<div class="grid grid-2 top-gap">
+					<section class="panel">
+						<h2>Resumen de hoy</h2>
+						<div class="summary-list">
+							${summaryRow('Entrada', entry?.start || 'Sin registrar')}
+							${summaryRow('Pausas', formatBreaks(entry))}
+							${summaryRow('Salida', entry?.end || 'Sin registrar')}
+							${summaryRow('Estado', pill(status.label, status.key))}
+							${summaryRow('Incidencias', todayIncidents.length ? todayIncidents.map((item) => escapeHtml(item.type)).join(', ') : 'Sin incidencias')}
+						</div>
+					</section>
+					<section class="panel">
+						<h2>Próximas vacaciones</h2>
+						${upcoming.length ? upcoming
+							.map(
+								(request) => `
+									<div class="stat-row">
+										<div>
+											<strong>${formatDate(request.from)} - ${formatDate(request.to)}</strong>
+											<span>${request.days} días · ${escapeHtml(request.comment || 'Sin comentario')}</span>
+										</div>
+										${pill(request.status)}
+									</div>
+								`,
+							)
+							.join('') : emptyState('No tienes vacaciones próximas aprobadas o pendientes.')}
+					</section>
+				</div>
+			`;
+		}
+
+		function renderPunchClock() {
+			const employee = currentEmployee();
+			const entry = todayEntry(employee.id);
+			const status = currentWorkStatus(entry);
+			const actionLabel = punchActionLabel(entry);
+
+			return `
+				${sectionTitle('Fichar', 'Registra entradas, pausas, salidas y ajustes manuales.')}
+				<div class="grid grid-2">
+					<section class="panel">
+						<h2>Acción principal</h2>
+						<button class="button button-primary big-action" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
+							${actionLabel}
+						</button>
+						<div class="summary-list top-gap">
+							${summaryRow('Estado', pill(status.label, status.key))}
+							${summaryRow('Entrada', entry?.start || 'Sin registrar')}
+							${summaryRow('Pausas', formatBreaks(entry))}
+							${summaryRow('Salida', entry?.end || 'Sin registrar')}
+						</div>
+					</section>
+					<section class="panel">
+						<h2>Acciones rápidas</h2>
+						<div class="tab-actions">
+							<button class="button button-secondary" type="button" data-action="quick-pause" data-minutes="15">
+								Pausa 15 min
+							</button>
+							<button class="button button-secondary" type="button" data-action="quick-pause" data-minutes="30">
+								Pausa 30 min
+							</button>
+							<button class="button button-ghost" type="button" data-action="toggle-manual">
+								Registrar ajuste manual
+							</button>
+						</div>
+						<div id="manual-adjustment" class="manual-box hidden">
+							${manualAdjustmentForm()}
+						</div>
+					</section>
+				</div>
+			`;
+		}
+
+		function renderCalendar() {
+			const employee = currentEmployee();
+			const year = calendarCursor.getFullYear();
+			const month = calendarCursor.getMonth();
+			const first = new Date(year, month, 1);
+			const startOffset = (first.getDay() + 6) % 7;
+			const start = new Date(year, month, 1 - startOffset);
+			const cells = Array.from({ length: 42 }, (_, index) => {
+				const date = new Date(start);
+				date.setDate(start.getDate() + index);
+				const iso = isoFromDate(date);
+				const dayStatus = statusForDay(employee.id, iso);
+				const isCurrentMonth = date.getMonth() === month;
+				return `
+					<button
+						class="calendar-day status-${statusClass(dayStatus)} ${isCurrentMonth ? '' : 'is-muted'} ${selectedCalendarDay === iso ? 'is-selected' : ''}"
+						type="button"
+						data-action="calendar-day"
+						data-date="${iso}"
+					>
+						<strong>${date.getDate()}</strong>
+						<span>${STATUS_LABELS[dayStatus] || dayStatus}</span>
+					</button>
+				`;
+			}).join('');
+
+			return `
+				${sectionTitle('Calendario', 'Vista mensual con estados de fichaje, vacaciones y festivos.')}
+				<section class="panel">
+					<div class="calendar-toolbar">
+						<button class="button button-secondary button-small" type="button" data-action="calendar-prev">Mes anterior</button>
+						<h2>${calendarCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
+						<button class="button button-secondary button-small" type="button" data-action="calendar-next">Mes siguiente</button>
+					</div>
+					<div class="calendar-grid" aria-label="Calendario mensual">
+						${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day) => `<div class="calendar-head">${day}</div>`).join('')}
+						${cells}
+					</div>
+					<div class="top-gap">
+						${renderDayDetail(employee.id, selectedCalendarDay)}
+					</div>
+				</section>
+			`;
+		}
+
+		function renderHistory() {
+			const employee = currentEmployee();
+			const rows = timeEntries
+				.filter((entry) => entry.employeeId === employee.id && entry.date.startsWith(historyMonth))
+				.sort((a, b) => b.date.localeCompare(a.date));
+
+			return `
+				${sectionTitle('Historial', 'Consulta tus fichajes por mes y revisa cada día.')}
+				<section class="panel">
+					<form id="history-filter-form" class="form-grid compact-form">
+						<label class="field">
+							<span>Mes</span>
+							<input type="month" name="month" value="${historyMonth}" />
+						</label>
+						<button class="button button-secondary" type="submit">Filtrar</button>
+					</form>
+				</section>
+				<section class="panel top-gap">
+					<h2>Fichajes del mes</h2>
+					${rows.length ? rows
+						.map(
+							(entry) => `
+								<details class="record-detail">
+									<summary>
+										<span>${formatDate(entry.date)}</span>
+										${pill(entry.status)}
+									</summary>
+									${renderDayDetail(employee.id, entry.date)}
+								</details>
+							`,
+						)
+						.join('') : emptyState('No hay fichajes para el mes seleccionado.')}
+				</section>
+			`;
+		}
+
+		function renderEmployeeVacations() {
+			const employee = currentEmployee();
+			const balance = vacationBalance(employee.id);
+			const requests = vacations
+				.filter((request) => request.employeeId === employee.id)
+				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+			return `
+				${sectionTitle('Vacaciones', 'Solicita días y revisa el estado de tus permisos.')}
+				<div class="grid grid-4">
+					${metricCard('Disponibles', String(balance.available), 'correcto')}
+					${metricCard('Usados', String(balance.used), 'vacaciones')}
+					${metricCard('Pendientes', String(balance.pending), 'pendiente')}
+					${metricCard('Denegados', String(balance.denied), 'incidencia')}
+				</div>
+				<div class="grid grid-2 top-gap">
+					<section class="panel">
+						<h2>Nueva solicitud</h2>
+						<form id="vacation-request-form" class="form-grid">
+							<label class="field">
+								<span>Fecha desde</span>
+								<input type="date" name="from" required />
+							</label>
+							<label class="field">
+								<span>Fecha hasta</span>
+								<input type="date" name="to" required />
+							</label>
+							<label class="field">
+								<span>Comentario opcional</span>
+								<textarea name="comment" placeholder="Ej. Viaje familiar"></textarea>
+							</label>
+							<button class="button button-primary" type="submit">Solicitar vacaciones</button>
+						</form>
+					</section>
+					<section class="panel">
+						<h2>Mis solicitudes</h2>
+						${requests.length ? requests.map(renderVacationRow).join('') : emptyState('Aún no has solicitado vacaciones.')}
+					</section>
+				</div>
+			`;
+		}
+
+		function renderAdminDashboard() {
+			const today = todayIso();
+			const statuses = EMPLOYEES.map((employee) => ({
+				employee,
+				entry: findEntry(employee.id, today),
+			}));
+			const workingNow = statuses.filter(({ entry }) => currentWorkStatus(entry).key === 'trabajando').length;
+			const inPause = statuses.filter(({ entry }) => currentWorkStatus(entry).key === 'pausa').length;
+			const missing = statuses.filter(({ entry }) => !entry?.start).length;
+			const pendingIncidents = incidents.filter((incident) => incident.status === 'pendiente').length;
+			const pendingVacations = vacations.filter((request) => request.status === 'pendiente').length;
+
+			return `
+				${sectionTitle('Dashboard', 'Estado de hoy para Sourcing Demo S.L.')}
+				<div class="grid grid-3">
+					${metricCard('Empleados activos', String(EMPLOYEES.length), 'correcto')}
+					${metricCard('Trabajando ahora', String(workingNow), 'trabajando')}
+					${metricCard('En pausa', String(inPause), 'pausa')}
+					${metricCard('Sin fichar hoy', String(missing), missing ? 'pendiente' : 'correcto')}
+					${metricCard('Incidencias pendientes', String(pendingIncidents), pendingIncidents ? 'incidencia' : 'correcto')}
+					${metricCard('Vacaciones pendientes', String(pendingVacations), pendingVacations ? 'pendiente' : 'correcto')}
+				</div>
+				<section class="panel top-gap">
+					<h2>Estado de hoy por empleado</h2>
+					<div class="table-wrap">
+						<table>
+							<thead>
+								<tr>
+									<th>Empleado</th>
+									<th>Departamento</th>
+									<th>Entrada</th>
+									<th>Pausas</th>
+									<th>Salida</th>
+									<th>Estado</th>
+								</tr>
+							</thead>
+							<tbody>
+								${statuses.map(({ employee, entry }) => `
+									<tr>
+										<td><strong>${employee.name}</strong></td>
+										<td>${employee.department}</td>
+										<td>${entry?.start || 'Sin registrar'}</td>
+										<td>${formatBreaks(entry)}</td>
+										<td>${entry?.end || 'Sin registrar'}</td>
+										<td>${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}</td>
+									</tr>
+								`).join('')}
+							</tbody>
+						</table>
+					</div>
+				</section>
+			`;
+		}
+
+		function renderAdminTimesheets() {
+			const rows = filteredTimeEntries();
+
+			return `
+				${sectionTitle('Fichajes', 'Filtra registros y exporta CSV con límites de demo.')}
+				<section class="panel">
+					<form id="time-filter-form" class="form-grid admin-filters">
+						<label class="field">
+							<span>Empleado</span>
+							<select name="employeeId">
+								<option value="all" ${timeFilters.employeeId === 'all' ? 'selected' : ''}>Todos los empleados</option>
+								${EMPLOYEES.map((employee) => `
+									<option value="${employee.id}" ${timeFilters.employeeId === employee.id ? 'selected' : ''}>${employee.name}</option>
+								`).join('')}
+							</select>
+						</label>
+						<label class="field">
+							<span>Fecha desde</span>
+							<input type="date" name="from" value="${timeFilters.from}" />
+						</label>
+						<label class="field">
+							<span>Fecha hasta</span>
+							<input type="date" name="to" value="${timeFilters.to}" />
+						</label>
+						<label class="field">
+							<span>Estado</span>
+							<select name="status">
+								<option value="all" ${timeFilters.status === 'all' ? 'selected' : ''}>Todos</option>
+								<option value="correcto" ${timeFilters.status === 'correcto' ? 'selected' : ''}>Correcto</option>
+								<option value="incidencia" ${timeFilters.status === 'incidencia' ? 'selected' : ''}>Incidencia</option>
+								<option value="pendiente" ${timeFilters.status === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+							</select>
+						</label>
+						<div class="table-actions">
+							<button class="button button-secondary" type="submit">Aplicar filtros</button>
+							<button class="button button-primary" type="button" data-action="export-timesheets">Exportar CSV</button>
+						</div>
+					</form>
+				</section>
+				<section class="panel top-gap">
+					<h2>Registros encontrados</h2>
+					${renderTimesheetTable(rows)}
+				</section>
+			`;
+		}
+
+		function renderAdminIncidents() {
+			const rows = incidents.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+			return `
+				${sectionTitle('Incidencias', 'Revisa ajustes manuales, olvidos y correcciones.')}
+				<section class="panel">
+					${rows.length ? `
+						<div class="table-wrap">
+							<table>
+								<thead>
+									<tr>
+										<th>Fecha</th>
+										<th>Empleado</th>
+										<th>Tipo</th>
+										<th>Detalle</th>
+										<th>Estado</th>
+										<th>Acción</th>
+									</tr>
+								</thead>
+								<tbody>
+									${rows.map((incident) => `
+										<tr>
+											<td>${formatDate(incident.date)}</td>
+											<td>${employeeName(incident.employeeId)}</td>
+											<td>${escapeHtml(incident.type)}</td>
+											<td>${escapeHtml(incident.detail)}</td>
+											<td>${pill(incident.status)}</td>
+											<td>
+												<button
+													class="button button-secondary button-small"
+													type="button"
+													data-action="review-incident"
+													data-id="${incident.id}"
+													${incident.status === 'revisada' ? 'disabled' : ''}
+												>
+													Marcar revisada
+												</button>
+											</td>
+										</tr>
+									`).join('')}
+								</tbody>
+							</table>
+						</div>
+					` : emptyState('No hay incidencias registradas.')}
+				</section>
+			`;
+		}
+
+		function renderAdminVacations() {
+			const sorted = vacations.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+			const selected =
+				vacations.find((request) => request.id === selectedVacationId) ||
+				vacations.find((request) => request.status === 'pendiente') ||
+				vacations[0];
+			selectedVacationId = selected?.id || '';
+
+			return `
+				${sectionTitle('Vacaciones', 'Aprueba, deniega y compara coincidencias entre empleados.')}
+				<div class="grid grid-2">
+					<section class="panel">
+						<h2>Solicitudes</h2>
+						${sorted.length ? sorted.map((request) => `
+							<button
+								class="vacation-select ${selected?.id === request.id ? 'is-active' : ''}"
+								type="button"
+								data-action="select-vacation"
+								data-id="${request.id}"
+							>
+								<span>
+									<strong>${employeeName(request.employeeId)}</strong>
+									${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días
+								</span>
+								${pill(request.status)}
+							</button>
+						`).join('') : emptyState('No hay solicitudes de vacaciones.')}
+					</section>
+					<section class="panel">
+						<h2>Detalle y coincidencias</h2>
+						${selected ? renderVacationAdminDetail(selected) : emptyState('Selecciona una solicitud.')}
+					</section>
+				</div>
+			`;
+		}
+
+		function renderHolidays() {
+			const sorted = holidays.slice().sort((a, b) => a.date.localeCompare(b.date));
+
+			return `
+				${sectionTitle('Festivos', 'Mantén el calendario local del centro de Valencia.')}
+				<div class="grid grid-2">
+					<section class="panel">
+						<h2>Festivos configurados</h2>
+						${sorted.map((holiday) => `
+							<div class="stat-row">
+								<div>
+									<strong>${formatDate(holiday.date)}</strong>
+									<span>${escapeHtml(holiday.name)} · ${escapeHtml(holiday.center)}</span>
+								</div>
+								${pill('Festivo', 'festivo')}
+							</div>
+						`).join('')}
+					</section>
+					<section class="panel">
+						<h2>Añadir festivo</h2>
+						<form id="holiday-form" class="form-grid">
+							<label class="field">
+								<span>Fecha</span>
+								<input type="date" name="date" required />
+							</label>
+							<label class="field">
+								<span>Nombre</span>
+								<input type="text" name="name" placeholder="Fiesta local" required />
+							</label>
+							<label class="field">
+								<span>Centro</span>
+								<input type="text" name="center" value="Valencia" required />
+							</label>
+							<button class="button button-primary" type="submit">Guardar festivo</button>
+						</form>
+					</section>
+				</div>
+			`;
+		}
+
+		function renderExports() {
+			return `
+				${sectionTitle('Exportaciones', 'Genera CSV de fichajes, vacaciones, incidencias o auditoría.')}
+				<section class="panel">
+					<form id="export-form" class="form-grid admin-filters">
+						<label class="field">
+							<span>Tipo</span>
+							<select name="type">
+								<option value="fichajes">Fichajes</option>
+								<option value="vacaciones">Vacaciones</option>
+								<option value="incidencias">Incidencias</option>
+								<option value="auditoria">Auditoría</option>
+							</select>
+						</label>
+						<label class="field">
+							<span>Empleado</span>
+							<select name="employeeId">
+								<option value="all">Todos los empleados</option>
+								${EMPLOYEES.map((employee) => `<option value="${employee.id}">${employee.name}</option>`).join('')}
+							</select>
+						</label>
+						<label class="field">
+							<span>Fecha desde</span>
+							<input type="date" name="from" value="${startOfMonthIso(new Date())}" />
+						</label>
+						<label class="field">
+							<span>Fecha hasta</span>
+							<input type="date" name="to" value="${todayIso()}" />
+						</label>
+						<div class="table-actions">
+							<button class="button button-primary" type="button" data-action="export-generic">Exportar CSV</button>
+							<button class="button button-secondary" type="button" data-action="simulate-pdf">Simular PDF</button>
+						</div>
+					</form>
+				</section>
+			`;
+		}
+
+		function renderAudit() {
+			const rows = auditLog.slice().sort((a, b) => b.at.localeCompare(a.at));
+
+			return `
+				${sectionTitle('Auditoría', 'Registro local de acciones realizadas en la demo.')}
+				<section class="panel">
+					${rows.length ? `
+						<div class="table-wrap">
+							<table>
+								<thead>
+									<tr>
+										<th>Fecha y hora</th>
+										<th>Usuario</th>
+										<th>Acción</th>
+										<th>Detalle</th>
+									</tr>
+								</thead>
+								<tbody>
+									${rows.map((entry) => `
+										<tr>
+											<td>${formatDateTime(entry.at)}</td>
+											<td>${escapeHtml(entry.user)}</td>
+											<td>${escapeHtml(entry.action)}</td>
+											<td>${escapeHtml(entry.detail)}</td>
+										</tr>
+									`).join('')}
+								</tbody>
+							</table>
+						</div>
+					` : emptyState('Aún no hay entradas de auditoría.')}
+				</section>
+			`;
+		}
+
+		function renderSettings() {
+			return `
+				${sectionTitle('Configuración', 'Datos de empresa, usuarios demo y almacenamiento local.')}
+				<div class="grid grid-2">
+					<section class="panel">
+						<h2>Empresa</h2>
+						<div class="summary-list">
+							${summaryRow('Razón social', 'Sourcing Demo S.L.')}
+							${summaryRow('Centro', 'Valencia')}
+							${summaryRow('Modo de datos', 'Ficticio, localStorage')}
+							${summaryRow('Backend', 'No configurado')}
+						</div>
+					</section>
+					<section class="panel">
+						<h2>Usuarios demo</h2>
+						<div class="summary-list">
+							${summaryRow('Administrador', 'admin.demo@fichajesimple.es / 1234')}
+							${summaryRow('Empleado Ana', 'ana.demo@fichajesimple.es / 1234')}
+							${summaryRow('Empleado Miguel', 'miguel.demo@fichajesimple.es / 1234')}
+						</div>
+					</section>
+				</div>
+				<section class="panel top-gap">
+					<h2>Persistencia</h2>
+					<p class="helper-text">
+						La sesión, fichajes, vacaciones, incidencias, festivos y auditoría se guardan únicamente en el navegador.
+					</p>
+				</section>
+			`;
+		}
+
+		function sectionTitle(title: string, description: string) {
+			return `
+				<div class="section-title">
+					<div>
+						<p class="eyebrow">FichajeSimple</p>
+						<h1>${title}</h1>
+						<p>${description}</p>
+					</div>
+				</div>
+			`;
+		}
+
+		function metricCard(label: string, value: string, status = 'correcto') {
+			return `
+				<div class="metric-card">
+					<span>${label}</span>
+					<strong>${value}</strong>
+					<div class="top-gap-small">${pill(STATUS_LABELS[status] || status, status)}</div>
+				</div>
+			`;
+		}
+
+		function summaryRow(label: string, value: string) {
+			return `
+				<div class="summary-row">
+					<span>${label}</span>
+					<strong>${value}</strong>
+				</div>
+			`;
+		}
+
+		function emptyState(message: string) {
+			return `<div class="empty-state">${message}</div>`;
+		}
+
+		function pill(label: string, status = label.toLowerCase()) {
+			return `<span class="status-pill status-${statusClass(status)}">${STATUS_LABELS[label] || label}</span>`;
+		}
+
+		function manualAdjustmentForm() {
+			return `
+				<form id="manual-form" class="form-grid top-gap">
+					<label class="field">
+						<span>Tipo</span>
+						<select name="type" required>
+							<option value="Entrada olvidada">Entrada olvidada</option>
+							<option value="Salida olvidada">Salida olvidada</option>
+							<option value="Pausa olvidada">Pausa olvidada</option>
+							<option value="Corrección de hora">Corrección de hora</option>
+						</select>
+					</label>
+					<label class="field">
+						<span>Fecha</span>
+						<input type="date" name="date" value="${todayIso()}" required />
+					</label>
+					<label class="field">
+						<span>Hora</span>
+						<input type="time" name="time" value="${currentTime()}" required />
+					</label>
+					<label class="field">
+						<span>Motivo obligatorio</span>
+						<textarea name="reason" required placeholder="Describe el motivo del ajuste"></textarea>
+					</label>
+					<button class="button button-primary" type="submit">Guardar ajuste</button>
+				</form>
+			`;
+		}
+
+		function renderDayDetail(employeeId: string, date: string) {
+			const entry = findEntry(employeeId, date);
+			const holiday = holidays.find((item) => item.date === date);
+			const vacation = vacations.find(
+				(request) =>
+					request.employeeId === employeeId &&
+					request.status !== 'denegada' &&
+					isDateWithin(date, request.from, request.to),
+			);
+			const dayIncidents = incidents.filter(
+				(incident) => incident.employeeId === employeeId && incident.date === date,
+			);
+
+			return `
+				<div class="day-detail">
+					<h3>${formatDate(date)}</h3>
+					<div class="summary-list">
+						${summaryRow('Estado', pill(STATUS_LABELS[statusForDay(employeeId, date)] || statusForDay(employeeId, date), statusForDay(employeeId, date)))}
+						${summaryRow('Entrada', entry?.start || 'Sin registrar')}
+						${summaryRow('Pausas', formatBreaks(entry))}
+						${summaryRow('Salida', entry?.end || 'Sin registrar')}
+						${summaryRow('Tiempo trabajado', formatMinutes(workedMinutes(entry)))}
+						${summaryRow('Festivo', holiday ? escapeHtml(holiday.name) : 'No')}
+						${summaryRow('Vacaciones', vacation ? `${formatDate(vacation.from)} - ${formatDate(vacation.to)} (${vacation.status})` : 'No')}
+						${summaryRow('Incidencias', dayIncidents.length ? dayIncidents.map((item) => escapeHtml(item.type)).join(', ') : 'Sin incidencias')}
+					</div>
+				</div>
+			`;
+		}
+
+		function renderVacationRow(request: VacationRequest) {
+			return `
+				<div class="stat-row">
+					<div>
+						<strong>${formatDate(request.from)} - ${formatDate(request.to)}</strong>
+						<span>${request.days} días · ${escapeHtml(request.comment || 'Sin comentario')}</span>
+					</div>
+					${pill(request.status)}
+				</div>
+			`;
+		}
+
+		function renderVacationAdminDetail(request: VacationRequest) {
+			const overlapRows = dateRange(request.from, request.to)
+				.map((date) => {
+					const approved = vacations.filter(
+						(item) =>
+							item.id !== request.id &&
+							item.status === 'aprobada' &&
+							isDateWithin(date, item.from, item.to),
+					);
+					const pending = vacations.filter(
+						(item) =>
+							item.id !== request.id &&
+							item.status === 'pendiente' &&
+							isDateWithin(date, item.from, item.to),
+					);
+					return `
+						<tr>
+							<td>${formatDate(date)}</td>
+							<td>${employeeName(request.employeeId)}</td>
+							<td>${approved.map((item) => employeeName(item.employeeId)).join(', ') || 'Sin aprobadas'}</td>
+							<td>${pending.map((item) => employeeName(item.employeeId)).join(', ') || 'Sin pendientes'}</td>
+						</tr>
+					`;
+				})
+				.join('');
+
+			return `
+				<div class="summary-list">
+					${summaryRow('Empleado', employeeName(request.employeeId))}
+					${summaryRow('Periodo', `${formatDate(request.from)} - ${formatDate(request.to)}`)}
+					${summaryRow('Días solicitados', String(request.days))}
+					${summaryRow('Estado', pill(request.status))}
+					${summaryRow('Comentario', escapeHtml(request.comment || 'Sin comentario'))}
+				</div>
+				<div class="table-wrap top-gap">
+					<table>
+						<thead>
+							<tr>
+								<th>Día</th>
+								<th>Solicitud actual</th>
+								<th>Vacaciones aprobadas</th>
+								<th>Vacaciones pendientes</th>
+							</tr>
+						</thead>
+						<tbody>${overlapRows}</tbody>
+					</table>
+				</div>
+				<div class="form-grid top-gap">
+					<label class="field">
+						<span>Motivo de denegación</span>
+						<textarea id="denial-reason" placeholder="Obligatorio solo si se deniega">${escapeHtml(request.denialReason || '')}</textarea>
+					</label>
+					<div class="tab-actions">
+						<button class="button button-primary" type="button" data-action="approve-vacation" ${request.status !== 'pendiente' ? 'disabled' : ''}>Aprobar</button>
+						<button class="button button-danger" type="button" data-action="deny-vacation" ${request.status !== 'pendiente' ? 'disabled' : ''}>Denegar</button>
+					</div>
+				</div>
+			`;
+		}
+
+		function renderTimesheetTable(rows: TimeEntry[]) {
+			if (!rows.length) return emptyState('No hay registros con esos filtros.');
+
+			return `
+				<div class="table-wrap">
+					<table>
+						<thead>
+							<tr>
+								<th>Fecha</th>
+								<th>Empleado</th>
+								<th>Entrada</th>
+								<th>Pausas</th>
+								<th>Salida</th>
+								<th>Tiempo</th>
+								<th>Estado</th>
+							</tr>
+						</thead>
+						<tbody>
+							${rows.map((entry) => `
+								<tr>
+									<td>${formatDate(entry.date)}</td>
+									<td>${employeeName(entry.employeeId)}</td>
+									<td>${entry.start || 'Sin registrar'}</td>
+									<td>${formatBreaks(entry)}</td>
+									<td>${entry.end || 'Sin registrar'}</td>
+									<td>${formatMinutes(workedMinutes(entry))}</td>
+									<td>${pill(entry.status)}</td>
+								</tr>
+							`).join('')}
+						</tbody>
+					</table>
+				</div>
+			`;
+		}
+
+		function performPunch() {
+			const employee = currentEmployee();
+			const now = currentTime();
+			let entry = todayEntry(employee.id);
+
+			if (!entry) {
+				entry = {
+					id: uniqueId('entry'),
+					employeeId: employee.id,
+					date: todayIso(),
+					start: now,
+					breaks: [],
+					status: 'correcto',
+				};
+				timeEntries.push(entry);
+				addAudit('Fichaje de entrada', `${employee.name} registró entrada a las ${now}`);
+			} else if (activeBreak(entry)) {
+				const lastBreak = activeBreak(entry);
+				if (lastBreak) lastBreak.end = now;
+				addAudit('Fin de pausa', `${employee.name} volvió de pausa a las ${now}`);
+			} else if (entry.breaks.length === 0) {
+				entry.breaks.push({ start: now });
+				addAudit('Inicio de pausa', `${employee.name} inició pausa a las ${now}`);
+			} else {
+				entry.end = now;
+				entry.status = entry.status === 'incidencia' ? 'incidencia' : 'correcto';
+				addAudit('Fichaje de salida', `${employee.name} registró salida a las ${now}`);
+			}
+
+			saveAll();
+			renderPage();
+		}
+
+		function addQuickPause(minutes: number) {
+			const employee = currentEmployee();
+			const entry = todayEntry(employee.id);
+
+			if (!entry?.start || entry.end || activeBreak(entry)) {
+				showToast('La pausa rápida requiere una jornada activa sin pausa abierta.');
+				return;
+			}
+
+			const start = currentTime();
+			const end = addMinutesToTime(start, minutes);
+			entry.breaks.push({ start, end });
+			addAudit('Pausa rápida', `${employee.name} registró una pausa de ${minutes} minutos.`);
+			saveAll();
+			renderPage();
+		}
+
+		function toggleManualForm() {
+			document.querySelector('#manual-adjustment')?.classList.toggle('hidden');
+		}
+
+		function saveManualAdjustment(form: HTMLFormElement) {
+			const employee = currentEmployee();
+			const formData = new FormData(form);
+			const type = String(formData.get('type') || '');
+			const date = String(formData.get('date') || todayIso());
+			const time = String(formData.get('time') || currentTime());
+			const reason = String(formData.get('reason') || '').trim();
+
+			if (!reason) {
+				showToast('El motivo es obligatorio para guardar el ajuste.');
+				return;
+			}
+
+			let entry = findEntry(employee.id, date);
+			if (!entry) {
+				entry = {
+					id: uniqueId('entry'),
+					employeeId: employee.id,
+					date,
+					breaks: [],
+					status: 'incidencia',
+				};
+				timeEntries.push(entry);
+			}
+			entry.status = 'incidencia';
+			entry.notes = `${type} a las ${time}: ${reason}`;
+
+			incidents.push({
+				id: uniqueId('incident'),
+				employeeId: employee.id,
+				date,
+				type,
+				detail: `${time} · ${reason}`,
+				status: 'pendiente',
+				createdAt: new Date().toISOString(),
+			});
+			addAudit('Ajuste manual', `${employee.name}: ${type} el ${formatDate(date)} a las ${time}.`);
+			saveAll();
+			showToast('Ajuste guardado y enviado a incidencias.');
+			renderPage();
+		}
+
+		function saveVacationRequest(form: HTMLFormElement) {
+			const employee = currentEmployee();
+			const formData = new FormData(form);
+			const from = String(formData.get('from') || '');
+			const to = String(formData.get('to') || '');
+			const comment = String(formData.get('comment') || '').trim();
+
+			if (!from || !to || from > to) {
+				showToast('Revisa las fechas de la solicitud.');
+				return;
+			}
+
+			const request: VacationRequest = {
+				id: uniqueId('vac'),
+				employeeId: employee.id,
+				from,
+				to,
+				days: businessDaysBetween(from, to),
+				status: 'pendiente',
+				comment,
+				createdAt: new Date().toISOString(),
+			};
+
+			vacations.push(request);
+			addAudit('Solicitud de vacaciones', `${employee.name} solicitó ${request.days} días.`);
+			saveAll();
+			showToast('Solicitud creada. En producción se enviaría un correo al responsable.');
+			renderPage();
+		}
+
+		function saveHoliday(form: HTMLFormElement) {
+			const formData = new FormData(form);
+			const date = String(formData.get('date') || '');
+			const name = String(formData.get('name') || '').trim();
+			const center = String(formData.get('center') || 'Valencia').trim();
+
+			if (!date || !name || !center) {
+				showToast('Completa fecha, nombre y centro.');
+				return;
+			}
+
+			holidays.push({ id: uniqueId('holiday'), date, name, center });
+			addAudit('Festivo añadido', `${name} en ${center} (${formatDate(date)}).`);
+			saveAll();
+			showToast('Festivo añadido al calendario.');
+			renderPage();
+		}
+
+		function applyTimeFilters(form: HTMLFormElement) {
+			const formData = new FormData(form);
+			timeFilters = {
+				employeeId: String(formData.get('employeeId') || 'all'),
+				from: String(formData.get('from') || startOfMonthIso(new Date())),
+				to: String(formData.get('to') || todayIso()),
+				status: String(formData.get('status') || 'all'),
+			};
+			renderPage();
+		}
+
+		function reviewIncident(id: string) {
+			const incident = incidents.find((item) => item.id === id);
+			if (!incident || incident.status === 'revisada') return;
+
+			incident.status = 'revisada';
+			incident.reviewedAt = new Date().toISOString();
+			addAudit('Incidencia revisada', `${employeeName(incident.employeeId)} · ${incident.type}`);
+			saveAll();
+			showToast('Incidencia marcada como revisada.');
+			renderPage();
+		}
+
+		function selectVacation(id: string) {
+			selectedVacationId = id;
+			renderPage();
+		}
+
+		function resolveVacation(status: VacationStatus) {
+			const request = vacations.find((item) => item.id === selectedVacationId);
+			if (!request || request.status !== 'pendiente') return;
+
+			if (status === 'denegada') {
+				const reason = document.querySelector<HTMLTextAreaElement>('#denial-reason')?.value.trim() || '';
+				if (!reason) {
+					showToast('El motivo es obligatorio para denegar una solicitud.');
+					return;
+				}
+				request.denialReason = reason;
+			}
+
+			request.status = status;
+			request.decidedAt = new Date().toISOString();
+			addAudit(
+				status === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones denegadas',
+				`${employeeName(request.employeeId)} · ${formatDate(request.from)} - ${formatDate(request.to)}`,
+			);
+			saveAll();
+			showToast('Solicitud actualizada. Email simulado enviado al empleado.');
+			renderPage();
+		}
+
+		function changeCalendarMonth(offset: number) {
+			calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + offset, 1);
+			selectedCalendarDay = isoFromDate(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), 1));
+			renderPage();
+		}
+
+		function selectCalendarDay(date: string) {
+			selectedCalendarDay = date;
+			renderPage();
+		}
+
+		function exportTimesheets() {
+			const totalDays = diffDays(timeFilters.from, timeFilters.to) + 1;
+			if (timeFilters.employeeId === 'all' && totalDays > 31) {
+				showToast('Para todos los empleados el máximo es 31 días. Solicita una exportación avanzada.');
+				return;
+			}
+			if (timeFilters.employeeId !== 'all' && totalDays > 92) {
+				showToast('Para un empleado concreto el máximo es 3 meses. Solicita una exportación avanzada.');
+				return;
+			}
+
+			const rows = filteredTimeEntries().map((entry) => ({
+				fecha: entry.date,
+				empleado: employeeName(entry.employeeId),
+				entrada: entry.start || '',
+				pausas: formatBreaks(entry),
+				salida: entry.end || '',
+				tiempo: formatMinutes(workedMinutes(entry)),
+				estado: entry.status,
+			}));
+
+			downloadCsv('fichajes-demo.csv', rows);
+			addAudit('Exportación CSV', `Fichajes exportados (${rows.length} registros).`);
+			saveAll();
+			showToast('CSV de fichajes descargado.');
+		}
+
+		function exportGeneric() {
+			const form = document.querySelector<HTMLFormElement>('#export-form');
+			if (!form) return;
+
+			const formData = new FormData(form);
+			const type = String(formData.get('type') || 'fichajes');
+			const employeeId = String(formData.get('employeeId') || 'all');
+			const from = String(formData.get('from') || '1900-01-01');
+			const to = String(formData.get('to') || '2999-12-31');
+			let rows: Record<string, string | number>[] = [];
+
+			if (type === 'fichajes') {
+				rows = timeEntries
+					.filter((entry) => dateInRange(entry.date, from, to))
+					.filter((entry) => employeeId === 'all' || entry.employeeId === employeeId)
+					.map((entry) => ({
+						fecha: entry.date,
+						empleado: employeeName(entry.employeeId),
+						entrada: entry.start || '',
+						salida: entry.end || '',
+						estado: entry.status,
+					}));
+			}
+
+			if (type === 'vacaciones') {
+				rows = vacations
+					.filter((request) => dateInRange(request.from, from, to))
+					.filter((request) => employeeId === 'all' || request.employeeId === employeeId)
+					.map((request) => ({
+						desde: request.from,
+						hasta: request.to,
+						empleado: employeeName(request.employeeId),
+						dias: request.days,
+						estado: request.status,
+					}));
+			}
+
+			if (type === 'incidencias') {
+				rows = incidents
+					.filter((incident) => dateInRange(incident.date, from, to))
+					.filter((incident) => employeeId === 'all' || incident.employeeId === employeeId)
+					.map((incident) => ({
+						fecha: incident.date,
+						empleado: employeeName(incident.employeeId),
+						tipo: incident.type,
+						estado: incident.status,
+						detalle: incident.detail,
+					}));
+			}
+
+			if (type === 'auditoria') {
+				rows = auditLog
+					.filter((entry) => dateInRange(entry.at.slice(0, 10), from, to))
+					.map((entry) => ({
+						fecha: formatDateTime(entry.at),
+						usuario: entry.user,
+						accion: entry.action,
+						detalle: entry.detail,
+					}));
+			}
+
+			downloadCsv(`${type}-demo.csv`, rows);
+			addAudit('Exportación CSV', `${type} exportado (${rows.length} registros).`);
+			saveAll();
+			showToast('CSV descargado.');
+		}
+
+		function loadDemoData() {
+			const defaults = createDefaults();
+			timeEntries = readCollection(KEYS.timeEntries, defaults.timeEntries);
+			vacations = readCollection(KEYS.vacations, defaults.vacations);
+			incidents = readCollection(KEYS.incidents, defaults.incidents);
+			holidays = readCollection(KEYS.holidays, defaults.holidays);
+			auditLog = readCollection(KEYS.audit, defaults.auditLog);
+			saveAll();
+		}
+
+		function resetDemoData() {
+			const defaults = createDefaults();
+			timeEntries = defaults.timeEntries;
+			vacations = defaults.vacations;
+			incidents = defaults.incidents;
+			holidays = defaults.holidays;
+			auditLog = defaults.auditLog;
+			addAudit('Demo restablecida', 'Se restauraron los datos ficticios iniciales.');
+			saveAll();
+			renderPage();
+		}
+
+		function createDefaults() {
+			const today = todayIso();
+			const timeEntriesSeed: TimeEntry[] = [];
+			const incidentsSeed: Incident[] = [];
+
+			EMPLOYEES.forEach((employee, employeeIndex) => {
+				for (let offset = 1; offset <= 12; offset += 1) {
+					const date = addDaysIso(today, -offset);
+					if (isWeekend(date)) continue;
+					const hasIncident = employee.id === 'carlos' && offset === 2;
+					timeEntriesSeed.push({
+						id: uniqueId(`seed-${employee.id}-${offset}`),
+						employeeId: employee.id,
+						date,
+						start: employeeIndex % 2 === 0 ? '08:45' : '09:05',
+						breaks: [{ start: '11:15', end: employeeIndex % 2 === 0 ? '11:32' : '11:25' }],
+						end: hasIncident ? undefined : employeeIndex % 2 === 0 ? '17:02' : '17:20',
+						status: hasIncident ? 'incidencia' : 'correcto',
+						notes: hasIncident ? 'Salida pendiente de revisar' : undefined,
+					});
+				}
+			});
+
+			timeEntriesSeed.push(
+				{ id: uniqueId('today-ana'), employeeId: 'ana', date: today, start: '08:52', breaks: [{ start: '11:20', end: '11:35' }], status: 'correcto' },
+				{ id: uniqueId('today-laura'), employeeId: 'laura', date: today, start: '08:40', breaks: [], status: 'correcto' },
+				{ id: uniqueId('today-miguel'), employeeId: 'miguel', date: today, start: '09:00', breaks: [{ start: '10:55' }], status: 'pendiente', notes: 'Pausa abierta' },
+				{ id: uniqueId('today-sara'), employeeId: 'sara', date: today, start: '09:10', breaks: [], status: 'correcto' },
+				{ id: uniqueId('today-marta'), employeeId: 'marta', date: today, start: '08:55', breaks: [{ start: '12:10', end: '12:30' }], end: '16:58', status: 'correcto' },
+			);
+
+			incidentsSeed.push(
+				{
+					id: uniqueId('incident-carlos'),
+					employeeId: 'carlos',
+					date: addDaysIso(today, -2),
+					type: 'Salida olvidada',
+					detail: 'El empleado no registró salida.',
+					status: 'pendiente',
+					createdAt: new Date().toISOString(),
+				},
+				{
+					id: uniqueId('incident-miguel'),
+					employeeId: 'miguel',
+					date: today,
+					type: 'Pausa abierta',
+					detail: 'Pausa iniciada a las 10:55 pendiente de cierre.',
+					status: 'pendiente',
+					createdAt: new Date().toISOString(),
+				},
+			);
+
+			const vacationsSeed: VacationRequest[] = [
+				{
+					id: uniqueId('vac-ana-approved'),
+					employeeId: 'ana',
+					from: addDaysIso(today, 12),
+					to: addDaysIso(today, 14),
+					days: businessDaysBetween(addDaysIso(today, 12), addDaysIso(today, 14)),
+					status: 'aprobada',
+					comment: 'Viaje familiar',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+				},
+				{
+					id: uniqueId('vac-ana-pending'),
+					employeeId: 'ana',
+					from: addDaysIso(today, 28),
+					to: addDaysIso(today, 29),
+					days: businessDaysBetween(addDaysIso(today, 28), addDaysIso(today, 29)),
+					status: 'pendiente',
+					comment: 'Asunto personal',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+				},
+				{
+					id: uniqueId('vac-miguel-pending'),
+					employeeId: 'miguel',
+					from: addDaysIso(today, 28),
+					to: addDaysIso(today, 30),
+					days: businessDaysBetween(addDaysIso(today, 28), addDaysIso(today, 30)),
+					status: 'pendiente',
+					comment: 'Descanso pendiente',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 7).toISOString(),
+				},
+				{
+					id: uniqueId('vac-sara-approved'),
+					employeeId: 'sara',
+					from: addDaysIso(today, 27),
+					to: addDaysIso(today, 31),
+					days: businessDaysBetween(addDaysIso(today, 27), addDaysIso(today, 31)),
+					status: 'aprobada',
+					comment: 'Vacaciones de verano',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 11).toISOString(),
+				},
+				{
+					id: uniqueId('vac-javier-denied'),
+					employeeId: 'javier',
+					from: addDaysIso(today, 8),
+					to: addDaysIso(today, 9),
+					days: businessDaysBetween(addDaysIso(today, 8), addDaysIso(today, 9)),
+					status: 'denegada',
+					comment: 'Cambio de turno',
+					denialReason: 'Coincide con reparto crítico.',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
+					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 8).toISOString(),
+				},
+			];
+
+			const holidaysSeed: Holiday[] = [
+				{ id: 'holiday-2026-01-01', date: '2026-01-01', name: 'Año Nuevo', center: 'Valencia' },
+				{ id: 'holiday-2026-01-06', date: '2026-01-06', name: 'Reyes', center: 'Valencia' },
+				{ id: 'holiday-2026-03-19', date: '2026-03-19', name: 'San José', center: 'Valencia' },
+				{ id: 'holiday-2026-10-09', date: '2026-10-09', name: 'Día de la Comunidad Valenciana', center: 'Valencia' },
+				{ id: 'holiday-2026-12-25', date: '2026-12-25', name: 'Navidad', center: 'Valencia' },
+			];
+
+			const auditSeed: AuditEntry[] = [
+				{
+					id: uniqueId('audit-init'),
+					at: new Date().toISOString(),
+					user: 'Sistema demo',
+					action: 'Datos iniciales',
+					detail: 'Se cargaron datos ficticios de Sourcing Demo S.L.',
+				},
+			];
+
+			return {
+				timeEntries: timeEntriesSeed,
+				vacations: vacationsSeed,
+				incidents: incidentsSeed,
+				holidays: holidaysSeed,
+				auditLog: auditSeed,
+			};
+		}
+
+		function saveAll() {
+			localStorage.setItem(KEYS.timeEntries, JSON.stringify(timeEntries));
+			localStorage.setItem(KEYS.vacations, JSON.stringify(vacations));
+			localStorage.setItem(KEYS.incidents, JSON.stringify(incidents));
+			localStorage.setItem(KEYS.holidays, JSON.stringify(holidays));
+			localStorage.setItem(KEYS.audit, JSON.stringify(auditLog));
+		}
+
+		function readCollection<T>(key: string, fallback: T[]): T[] {
+			const raw = localStorage.getItem(key);
+			if (!raw) return fallback;
+
+			try {
+				const parsed = JSON.parse(raw) as T[];
+				return Array.isArray(parsed) ? parsed : fallback;
+			} catch {
+				return fallback;
+			}
+		}
+
+		function addAudit(action: string, detail: string) {
+			auditLog.unshift({
+				id: uniqueId('audit'),
+				at: new Date().toISOString(),
+				user: session?.name || 'Usuario demo',
+				action,
+				detail,
+			});
+		}
+
+		function getViews() {
+			return session.role === 'administrador' ? ADMIN_VIEWS : EMPLOYEE_VIEWS;
+		}
+
+		function currentEmployee() {
+			const employee = EMPLOYEES.find((item) => item.id === session.employeeId);
+			return employee || EMPLOYEES[0];
+		}
+
+		function employeeName(id: string) {
+			return EMPLOYEES.find((employee) => employee.id === id)?.name || id;
+		}
+
+		function todayEntry(employeeId: string) {
+			return findEntry(employeeId, todayIso());
+		}
+
+		function findEntry(employeeId: string, date: string) {
+			return timeEntries.find((entry) => entry.employeeId === employeeId && entry.date === date);
+		}
+
+		function activeBreak(entry?: TimeEntry) {
+			return entry?.breaks.find((item) => item.start && !item.end);
+		}
+
+		function currentWorkStatus(entry?: TimeEntry) {
+			if (!entry?.start) return { label: 'Sin iniciar', key: 'sin-fichaje' };
+			if (entry.end) return { label: 'Jornada finalizada', key: 'correcto' };
+			if (activeBreak(entry)) return { label: 'En pausa', key: 'pausa' };
+			return { label: 'Trabajando', key: 'trabajando' };
+		}
+
+		function punchActionLabel(entry?: TimeEntry) {
+			if (!entry?.start) return 'Fichar entrada';
+			if (entry.end) return 'Jornada finalizada';
+			if (activeBreak(entry)) return 'Volver de pausa';
+			if (entry.breaks.length > 0) return 'Fichar salida';
+			return 'Iniciar pausa';
+		}
+
+		function statusForDay(employeeId: string, date: string) {
+			const vacation = vacations.find(
+				(request) =>
+					request.employeeId === employeeId &&
+					request.status !== 'denegada' &&
+					isDateWithin(date, request.from, request.to),
+			);
+			const entry = findEntry(employeeId, date);
+
+			if (holidays.some((holiday) => holiday.date === date)) return 'festivo';
+			if (vacation?.status === 'aprobada') return 'vacaciones';
+			if (vacation?.status === 'pendiente') return 'pendiente';
+			if (entry) return entry.status;
+			if (isWeekend(date)) return 'fin de semana';
+			return 'sin fichaje';
+		}
+
+		function formatBreaks(entry?: TimeEntry) {
+			if (!entry?.breaks.length) return 'Sin pausas';
+			return entry.breaks.map((item) => `${item.start}-${item.end || 'abierta'}`).join(', ');
+		}
+
+		function workedMinutes(entry?: TimeEntry) {
+			if (!entry?.start) return 0;
+
+			let end = entry.end;
+			if (!end && entry.date === todayIso()) end = activeBreak(entry)?.start || currentTime();
+			if (!end) return 0;
+
+			let total = timeToMinutes(end) - timeToMinutes(entry.start);
+			entry.breaks.forEach((pause) => {
+				if (!pause.end) return;
+				total -= timeToMinutes(pause.end) - timeToMinutes(pause.start);
+			});
+			return Math.max(total, 0);
+		}
+
+		function vacationBalance(employeeId: string) {
+			const employee = EMPLOYEES.find((item) => item.id === employeeId) || EMPLOYEES[0];
+			const own = vacations.filter((request) => request.employeeId === employeeId);
+			const used = own.filter((request) => request.status === 'aprobada').reduce((sum, item) => sum + item.days, 0);
+			const pending = own.filter((request) => request.status === 'pendiente').reduce((sum, item) => sum + item.days, 0);
+			const denied = own.filter((request) => request.status === 'denegada').reduce((sum, item) => sum + item.days, 0);
+			return {
+				available: Math.max(employee.vacationDays - used - pending, 0),
+				used,
+				pending,
+				denied,
+			};
+		}
+
+		function filteredTimeEntries() {
+			return timeEntries
+				.filter((entry) => timeFilters.employeeId === 'all' || entry.employeeId === timeFilters.employeeId)
+				.filter((entry) => dateInRange(entry.date, timeFilters.from, timeFilters.to))
+				.filter((entry) => timeFilters.status === 'all' || entry.status === timeFilters.status)
+				.sort((a, b) => b.date.localeCompare(a.date));
+		}
+
+		function downloadCsv(filename: string, rows: Record<string, string | number>[]) {
+			const headers = Object.keys(rows[0] || { demo: 'Sin datos' });
+			const body = rows.length ? rows : [{ demo: 'Sin datos' }];
+			const csv = [
+				headers.join(';'),
+				...body.map((row) => headers.map((header) => csvValue(row[header])).join(';')),
+			].join('\n');
+			const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(blob);
+			link.download = filename;
+			link.click();
+			URL.revokeObjectURL(link.href);
+		}
+
+		function csvValue(value: string | number | undefined) {
+			const text = String(value ?? '');
+			return `"${text.replaceAll('"', '""')}"`;
+		}
+
+		function showToast(message: string) {
+			if (!toast) return;
+			toast.textContent = message;
+			toast.classList.remove('hidden');
+			window.setTimeout(() => toast.classList.add('hidden'), 4200);
+		}
+
+		function statusClass(status: string) {
+			return status
+				.toLowerCase()
+				.normalize('NFD')
+				.replace(/[\u0300-\u036f]/g, '')
+				.replace(/\s+/g, '-');
+		}
+
+		function escapeHtml(value: string) {
+			return value.replace(/[&<>"']/g, (character) => {
+				const entities: Record<string, string> = {
+					'&': '&amp;',
+					'<': '&lt;',
+					'>': '&gt;',
+					'"': '&quot;',
+					"'": '&#39;',
+				};
+				return entities[character] || character;
+			});
+		}
+
+		function todayIso() {
+			return isoFromDate(new Date());
+		}
+
+		function isoFromDate(date: Date) {
+			const year = date.getFullYear();
+			const month = String(date.getMonth() + 1).padStart(2, '0');
+			const day = String(date.getDate()).padStart(2, '0');
+			return `${year}-${month}-${day}`;
+		}
+
+		function startOfMonthIso(date: Date) {
+			return isoFromDate(new Date(date.getFullYear(), date.getMonth(), 1));
+		}
+
+		function currentTime() {
+			const now = new Date();
+			return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+		}
+
+		function formatDate(date: string) {
+			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
+				day: '2-digit',
+				month: '2-digit',
+				year: 'numeric',
+			});
+		}
+
+		function formatDateTime(value: string) {
+			return new Date(value).toLocaleString('es-ES', {
+				day: '2-digit',
+				month: '2-digit',
+				year: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit',
+			});
+		}
+
+		function formatMinutes(minutes: number) {
+			const hours = Math.floor(minutes / 60);
+			const remainder = minutes % 60;
+			return `${hours} h ${String(remainder).padStart(2, '0')} min`;
+		}
+
+		function timeToMinutes(value: string) {
+			const [hours, minutes] = value.split(':').map(Number);
+			return hours * 60 + minutes;
+		}
+
+		function addMinutesToTime(value: string, minutesToAdd: number) {
+			const total = timeToMinutes(value) + minutesToAdd;
+			const hours = Math.floor(total / 60) % 24;
+			const minutes = total % 60;
+			return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+		}
+
+		function addDaysIso(date: string, amount: number) {
+			const next = new Date(`${date}T12:00:00`);
+			next.setDate(next.getDate() + amount);
+			return isoFromDate(next);
+		}
+
+		function diffDays(from: string, to: string) {
+			const start = new Date(`${from}T12:00:00`).getTime();
+			const end = new Date(`${to}T12:00:00`).getTime();
+			return Math.round((end - start) / 86400000);
+		}
+
+		function dateRange(from: string, to: string) {
+			const total = Math.max(diffDays(from, to), 0);
+			return Array.from({ length: total + 1 }, (_, index) => addDaysIso(from, index));
+		}
+
+		function businessDaysBetween(from: string, to: string) {
+			return dateRange(from, to).filter((date) => !isWeekend(date) && !holidays.some((holiday) => holiday.date === date)).length;
+		}
+
+		function isWeekend(date: string) {
+			const day = new Date(`${date}T12:00:00`).getDay();
+			return day === 0 || day === 6;
+		}
+
+		function isDateWithin(date: string, from: string, to: string) {
+			return date >= from && date <= to;
+		}
+
+		function dateInRange(date: string, from: string, to: string) {
+			return (!from || date >= from) && (!to || date <= to);
+		}
+
+		function uniqueId(prefix: string) {
+			return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
+		}
+	</script>
+</Layout>

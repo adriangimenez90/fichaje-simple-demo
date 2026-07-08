@@ -1,11 +1,161 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="FichajeSimple | Login demo">
+	<main class="login-page">
+		<section class="login-brand" aria-labelledby="login-title">
+			<div class="brand-lockup">
+				<span class="brand-mark" aria-hidden="true">FS</span>
+				<div>
+					<p class="eyebrow">Demo SaaS local</p>
+					<h1 id="login-title">FichajeSimple</h1>
+				</div>
+			</div>
+			<p class="login-subtitle">Registro horario sencillo para pequeñas empresas</p>
+			<div class="login-snapshot" aria-label="Datos ficticios de la demo">
+				<div>
+					<span>Empresa</span>
+					<strong>Sourcing Demo S.L.</strong>
+				</div>
+				<div>
+					<span>Centro</span>
+					<strong>Valencia</strong>
+				</div>
+				<div>
+					<span>Modo</span>
+					<strong>Sin backend</strong>
+				</div>
+			</div>
+		</section>
+
+		<section class="login-panel" aria-label="Acceso a la demo">
+			<form id="login-form" class="login-form">
+				<div class="form-heading">
+					<p class="eyebrow">Acceso de prueba</p>
+					<h2>Entrar en la demo</h2>
+				</div>
+
+				<label>
+					<span>Email</span>
+					<input
+						id="email"
+						name="email"
+						type="email"
+						autocomplete="username"
+						placeholder="admin.demo@fichajesimple.es"
+						required
+					/>
+				</label>
+
+				<label>
+					<span>Contraseña</span>
+					<input
+						id="password"
+						name="password"
+						type="password"
+						autocomplete="current-password"
+						placeholder="1234"
+						required
+					/>
+				</label>
+
+				<p id="login-error" class="form-error" role="alert" hidden>
+					Revisa el email y la contraseña de la demo.
+				</p>
+
+				<button class="button button-primary" type="submit">Entrar</button>
+			</form>
+
+			<div class="quick-login" aria-label="Accesos rápidos">
+				<button class="button button-secondary" type="button" data-login="admin">
+					Entrar como administrador
+				</button>
+				<button class="button button-secondary" type="button" data-login="ana">
+					Entrar como empleado
+				</button>
+			</div>
+
+			<p class="demo-notice">
+				Esta demo utiliza datos ficticios y guarda los cambios únicamente en tu navegador.
+			</p>
+		</section>
+	</main>
+
+	<script>
+		type DemoUser = {
+			id: string;
+			email: string;
+			password: string;
+			name: string;
+			role: 'administrador' | 'empleado';
+			employeeId?: string;
+		};
+
+		const SESSION_KEY = 'fs_session';
+		const USERS: DemoUser[] = [
+			{
+				id: 'admin',
+				email: 'admin.demo@fichajesimple.es',
+				password: '1234',
+				name: 'Administrador demo',
+				role: 'administrador',
+			},
+			{
+				id: 'ana',
+				email: 'ana.demo@fichajesimple.es',
+				password: '1234',
+				name: 'Ana Martínez',
+				role: 'empleado',
+				employeeId: 'ana',
+			},
+			{
+				id: 'miguel',
+				email: 'miguel.demo@fichajesimple.es',
+				password: '1234',
+				name: 'Miguel Torres',
+				role: 'empleado',
+				employeeId: 'miguel',
+			},
+		];
+
+		function startSession(user: DemoUser) {
+			localStorage.setItem(
+				SESSION_KEY,
+				JSON.stringify({
+					id: user.id,
+					email: user.email,
+					name: user.name,
+					role: user.role,
+					employeeId: user.employeeId,
+				}),
+			);
+			window.location.href = '/app';
+		}
+
+		const form = document.querySelector<HTMLFormElement>('#login-form');
+		const error = document.querySelector<HTMLElement>('#login-error');
+
+		form?.addEventListener('submit', (event) => {
+			event.preventDefault();
+			const formData = new FormData(form);
+			const email = String(formData.get('email') || '').trim().toLowerCase();
+			const password = String(formData.get('password') || '');
+			const user = USERS.find((candidate) => candidate.email === email && candidate.password === password);
+
+			if (!user) {
+				if (error) error.hidden = false;
+				return;
+			}
+
+			startSession(user);
+		});
+
+		document.querySelectorAll<HTMLButtonElement>('[data-login]').forEach((button) => {
+			button.addEventListener('click', () => {
+				const user = USERS.find((candidate) => candidate.id === button.dataset.login);
+				if (user) startSession(user);
+			});
+		});
+	</script>
 </Layout>
