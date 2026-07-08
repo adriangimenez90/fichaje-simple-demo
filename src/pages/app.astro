@@ -13,6 +13,7 @@ import Layout from '../layouts/Layout.astro';
 						<span class="muted-line">Sourcing Demo S.L. · Valencia</span>
 					</div>
 				</div>
+				<span class="demo-badge">Demo local</span>
 				<div class="company-chip">
 					<span>Empresa demo</span>
 					<strong>Sourcing Demo S.L.</strong>
@@ -139,22 +140,22 @@ import Layout from '../layouts/Layout.astro';
 		];
 
 		const EMPLOYEE_VIEWS = [
-			{ id: 'inicio', label: 'Inicio' },
-			{ id: 'fichar', label: 'Fichar' },
-			{ id: 'calendario', label: 'Calendario' },
-			{ id: 'historial', label: 'Historial' },
-			{ id: 'vacaciones', label: 'Vacaciones' },
+			{ id: 'inicio', label: 'Inicio', hint: 'Tu jornada de hoy' },
+			{ id: 'fichar', label: 'Fichar', hint: 'Entrada, pausas y salida' },
+			{ id: 'calendario', label: 'Calendario', hint: 'Estados por día' },
+			{ id: 'historial', label: 'Historial', hint: 'Registros mensuales' },
+			{ id: 'vacaciones', label: 'Vacaciones', hint: 'Saldo y solicitudes' },
 		];
 
 		const ADMIN_VIEWS = [
-			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'fichajes', label: 'Fichajes' },
-			{ id: 'incidencias', label: 'Incidencias' },
-			{ id: 'vacaciones-admin', label: 'Vacaciones' },
-			{ id: 'festivos', label: 'Festivos' },
-			{ id: 'exportaciones', label: 'Exportaciones' },
-			{ id: 'auditoria', label: 'Auditoría' },
-			{ id: 'configuracion', label: 'Configuración' },
+			{ id: 'dashboard', label: 'Dashboard', hint: 'Estado del equipo' },
+			{ id: 'fichajes', label: 'Fichajes', hint: 'Consulta y CSV' },
+			{ id: 'incidencias', label: 'Incidencias', hint: 'Pendientes de revisar' },
+			{ id: 'vacaciones-admin', label: 'Vacaciones', hint: 'Aprobaciones y solapes' },
+			{ id: 'festivos', label: 'Festivos', hint: 'Calendario del centro' },
+			{ id: 'exportaciones', label: 'Exportaciones', hint: 'Informes simulados' },
+			{ id: 'auditoria', label: 'Auditoría', hint: 'Actividad local' },
+			{ id: 'configuracion', label: 'Configuración', hint: 'Datos de demo' },
 		];
 
 		const STATUS_LABELS: Record<string, string> = {
@@ -197,6 +198,7 @@ import Layout from '../layouts/Layout.astro';
 		const mobileNav = document.querySelector<HTMLElement>('#mobile-nav');
 		const userChip = document.querySelector<HTMLElement>('#user-chip');
 		const toast = document.querySelector<HTMLElement>('#toast');
+		let toastTimer: number | undefined;
 
 		init();
 
@@ -311,7 +313,33 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderNav() {
 			const views = getViews();
-			const html = views
+			const roleLabel = session.role === 'administrador' ? 'Administrador' : 'Empleado';
+			const navIntro = `
+				<div class="nav-context">
+					<span>Vista activa</span>
+					<strong>${roleLabel}</strong>
+					<small>${session.role === 'administrador' ? 'Gestión completa del equipo demo' : 'Acciones personales de jornada y vacaciones'}</small>
+				</div>
+			`;
+			const sidebarHtml = views
+				.map(
+					(view) => `
+						<button
+							class="button nav-button"
+							type="button"
+							data-view="${view.id}"
+							aria-current="${activeView === view.id ? 'page' : 'false'}"
+						>
+							<span class="nav-dot" aria-hidden="true"></span>
+							<span>
+								<strong>${view.label}</strong>
+								<small>${view.hint}</small>
+							</span>
+						</button>
+					`,
+				)
+				.join('');
+			const mobileHtml = views
 				.map(
 					(view) => `
 						<button
@@ -326,8 +354,8 @@ import Layout from '../layouts/Layout.astro';
 				)
 				.join('');
 
-			if (sidebarNav) sidebarNav.innerHTML = html;
-			if (mobileNav) mobileNav.innerHTML = html;
+			if (sidebarNav) sidebarNav.innerHTML = navIntro + sidebarHtml;
+			if (mobileNav) mobileNav.innerHTML = mobileHtml;
 		}
 
 		function renderPage() {
@@ -412,24 +440,45 @@ import Layout from '../layouts/Layout.astro';
 			const entry = todayEntry(employee.id);
 			const status = currentWorkStatus(entry);
 			const actionLabel = punchActionLabel(entry);
+			const actionHelp = punchHelpText(entry);
 
 			return `
-				${sectionTitle('Fichar', 'Registra entradas, pausas, salidas y ajustes manuales.')}
-				<div class="grid grid-2">
-					<section class="panel">
-						<h2>Acción principal</h2>
-						<button class="button button-primary big-action" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
-							${actionLabel}
+				${sectionTitle('Fichar', 'Tu acción principal siempre aparece destacada. Los cambios quedan solo en este navegador.')}
+				<div class="grid punch-layout">
+					<section class="panel punch-panel">
+						<div class="punch-status-row">
+							<div>
+								<span class="meta-label">Estado actual</span>
+								<strong>${status.label}</strong>
+							</div>
+							${pill(status.label, status.key)}
+						</div>
+						<button class="button button-primary punch-button" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
+							<span>${actionLabel}</span>
+							<small>${actionHelp}</small>
 						</button>
-						<div class="summary-list top-gap">
-							${summaryRow('Estado', pill(status.label, status.key))}
-							${summaryRow('Entrada', entry?.start || 'Sin registrar')}
-							${summaryRow('Pausas', formatBreaks(entry))}
-							${summaryRow('Salida', entry?.end || 'Sin registrar')}
+						<div class="punch-kpis">
+							<div>
+								<span>Entrada</span>
+								<strong>${entry?.start || '--:--'}</strong>
+							</div>
+							<div>
+								<span>Pausas</span>
+								<strong>${entry?.breaks.length || 0}</strong>
+							</div>
+							<div>
+								<span>Salida</span>
+								<strong>${entry?.end || '--:--'}</strong>
+							</div>
+							<div>
+								<span>Trabajado</span>
+								<strong>${formatMinutes(workedMinutes(entry))}</strong>
+							</div>
 						</div>
 					</section>
-					<section class="panel">
+					<section class="panel quick-actions-panel">
 						<h2>Acciones rápidas</h2>
+						<p class="helper-text">Úsalas para registrar pausas habituales o enviar una corrección a revisión.</p>
 						<div class="tab-actions">
 							<button class="button button-secondary" type="button" data-action="quick-pause" data-minutes="15">
 								Pausa 15 min
@@ -470,19 +519,20 @@ import Layout from '../layouts/Layout.astro';
 						data-date="${iso}"
 					>
 						<strong>${date.getDate()}</strong>
-						<span>${STATUS_LABELS[dayStatus] || dayStatus}</span>
+						<span class="calendar-day-label">${STATUS_LABELS[dayStatus] || dayStatus}</span>
 					</button>
 				`;
 			}).join('');
 
 			return `
-				${sectionTitle('Calendario', 'Vista mensual con estados de fichaje, vacaciones y festivos.')}
-				<section class="panel">
+				${sectionTitle('Calendario', 'Vista mensual con estados de fichaje, vacaciones y festivos. Pulsa cualquier día para ver el detalle.')}
+				<section class="panel calendar-panel">
 					<div class="calendar-toolbar">
 						<button class="button button-secondary button-small" type="button" data-action="calendar-prev">Mes anterior</button>
 						<h2>${calendarCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
 						<button class="button button-secondary button-small" type="button" data-action="calendar-next">Mes siguiente</button>
 					</div>
+					${statusLegend(['correcto', 'incidencia', 'festivo', 'vacaciones', 'pendiente', 'sin fichaje', 'fin de semana'])}
 					<div class="calendar-grid" aria-label="Calendario mensual">
 						${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day) => `<div class="calendar-head">${day}</div>`).join('')}
 						${cells}
@@ -499,9 +549,11 @@ import Layout from '../layouts/Layout.astro';
 			const rows = timeEntries
 				.filter((entry) => entry.employeeId === employee.id && entry.date.startsWith(historyMonth))
 				.sort((a, b) => b.date.localeCompare(a.date));
+			const incidentRows = rows.filter((entry) => entry.status === 'incidencia').length;
+			const totalWorked = rows.reduce((sum, entry) => sum + workedMinutes(entry), 0);
 
 			return `
-				${sectionTitle('Historial', 'Consulta tus fichajes por mes y revisa cada día.')}
+				${sectionTitle('Historial', 'Consulta tus fichajes por mes. Cada día se puede desplegar para revisar el detalle.')}
 				<section class="panel">
 					<form id="history-filter-form" class="form-grid compact-form">
 						<label class="field">
@@ -510,6 +562,11 @@ import Layout from '../layouts/Layout.astro';
 						</label>
 						<button class="button button-secondary" type="submit">Filtrar</button>
 					</form>
+					<div class="history-summary">
+						${metricCard('Días con fichaje', String(rows.length), rows.length ? 'correcto' : 'sin fichaje')}
+						${metricCard('Horas registradas', formatMinutes(totalWorked), 'trabajando')}
+						${metricCard('Incidencias', String(incidentRows), incidentRows ? 'incidencia' : 'correcto')}
+					</div>
 				</section>
 				<section class="panel top-gap">
 					<h2>Fichajes del mes</h2>
@@ -518,7 +575,10 @@ import Layout from '../layouts/Layout.astro';
 							(entry) => `
 								<details class="record-detail">
 									<summary>
-										<span>${formatDate(entry.date)}</span>
+										<span>
+											<strong>${formatDate(entry.date)}</strong>
+											<small>${entry.start || '--:--'} - ${entry.end || 'sin salida'} · ${formatMinutes(workedMinutes(entry))}</small>
+										</span>
 										${pill(entry.status)}
 									</summary>
 									${renderDayDetail(employee.id, entry.date)}
@@ -538,16 +598,28 @@ import Layout from '../layouts/Layout.astro';
 				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 			return `
-				${sectionTitle('Vacaciones', 'Solicita días y revisa el estado de tus permisos.')}
-				<div class="grid grid-4">
-					${metricCard('Disponibles', String(balance.available), 'correcto')}
-					${metricCard('Usados', String(balance.used), 'vacaciones')}
-					${metricCard('Pendientes', String(balance.pending), 'pendiente')}
-					${metricCard('Denegados', String(balance.denied), 'incidencia')}
-				</div>
+				${sectionTitle('Vacaciones', 'Solicita días y revisa el estado de tus permisos. El saldo se calcula con datos ficticios locales.')}
+				<section class="panel vacation-balance">
+					<div>
+						<span class="meta-label">Saldo anual</span>
+						<strong>${balance.available} días disponibles</strong>
+						<p class="helper-text">${balance.used} usados · ${balance.pending} pendientes · ${balance.denied} denegados de ${employee.vacationDays} días anuales.</p>
+					</div>
+					<div class="vacation-bar" aria-label="Distribución de vacaciones">
+						<span class="bar-used" style="width: ${Math.min((balance.used / employee.vacationDays) * 100, 100)}%"></span>
+						<span class="bar-pending" style="width: ${Math.min((balance.pending / employee.vacationDays) * 100, 100)}%"></span>
+					</div>
+					<div class="vacation-balance-grid">
+						${metricCard('Disponibles', String(balance.available), 'correcto')}
+						${metricCard('Usados', String(balance.used), 'vacaciones')}
+						${metricCard('Pendientes', String(balance.pending), 'pendiente')}
+						${metricCard('Denegados', String(balance.denied), 'incidencia')}
+					</div>
+				</section>
 				<div class="grid grid-2 top-gap">
 					<section class="panel">
 						<h2>Nueva solicitud</h2>
+						<p class="helper-text">Al guardar, la solicitud queda pendiente y se registra en auditoría.</p>
 						<form id="vacation-request-form" class="form-grid">
 							<label class="field">
 								<span>Fecha desde</span>
@@ -907,15 +979,20 @@ import Layout from '../layouts/Layout.astro';
 						<h1>${title}</h1>
 						<p>${description}</p>
 					</div>
+					<div class="demo-banner">
+						<strong>Demo sin backend</strong>
+						<span>Los cambios se guardan únicamente en localStorage.</span>
+					</div>
 				</div>
 			`;
 		}
 
-		function metricCard(label: string, value: string, status = 'correcto') {
+		function metricCard(label: string, value: string, status = 'correcto', helper = '') {
 			return `
 				<div class="metric-card">
 					<span>${label}</span>
 					<strong>${value}</strong>
+					${helper ? `<small>${helper}</small>` : ''}
 					<div class="top-gap-small">${pill(STATUS_LABELS[status] || status, status)}</div>
 				</div>
 			`;
@@ -931,11 +1008,28 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function emptyState(message: string) {
-			return `<div class="empty-state">${message}</div>`;
+			return `<div class="empty-state"><strong>Sin datos</strong><span>${message}</span></div>`;
 		}
 
 		function pill(label: string, status = label.toLowerCase()) {
 			return `<span class="status-pill status-${statusClass(status)}">${STATUS_LABELS[label] || label}</span>`;
+		}
+
+		function statusLegend(statuses: string[]) {
+			return `
+				<div class="status-legend" aria-label="Leyenda de estados">
+					${statuses
+						.map(
+							(status) => `
+								<span>
+									<i class="legend-dot status-${statusClass(status)}" aria-hidden="true"></i>
+									${STATUS_LABELS[status] || status}
+								</span>
+							`,
+						)
+						.join('')}
+				</div>
+			`;
 		}
 
 		function manualAdjustmentForm() {
@@ -982,13 +1076,20 @@ import Layout from '../layouts/Layout.astro';
 
 			return `
 				<div class="day-detail">
-					<h3>${formatDate(date)}</h3>
-					<div class="summary-list">
-						${summaryRow('Estado', pill(STATUS_LABELS[statusForDay(employeeId, date)] || statusForDay(employeeId, date), statusForDay(employeeId, date)))}
-						${summaryRow('Entrada', entry?.start || 'Sin registrar')}
-						${summaryRow('Pausas', formatBreaks(entry))}
-						${summaryRow('Salida', entry?.end || 'Sin registrar')}
-						${summaryRow('Tiempo trabajado', formatMinutes(workedMinutes(entry)))}
+					<div class="day-detail-head">
+						<div>
+							<span class="meta-label">Detalle del día</span>
+							<h3>${formatDate(date)}</h3>
+						</div>
+						${pill(STATUS_LABELS[statusForDay(employeeId, date)] || statusForDay(employeeId, date), statusForDay(employeeId, date))}
+					</div>
+					<div class="day-detail-grid">
+						<div><span>Entrada</span><strong>${entry?.start || 'Sin registrar'}</strong></div>
+						<div><span>Pausas</span><strong>${formatBreaks(entry)}</strong></div>
+						<div><span>Salida</span><strong>${entry?.end || 'Sin registrar'}</strong></div>
+						<div><span>Tiempo trabajado</span><strong>${formatMinutes(workedMinutes(entry))}</strong></div>
+					</div>
+					<div class="summary-list top-gap">
 						${summaryRow('Festivo', holiday ? escapeHtml(holiday.name) : 'No')}
 						${summaryRow('Vacaciones', vacation ? `${formatDate(vacation.from)} - ${formatDate(vacation.to)} (${vacation.status})` : 'No')}
 						${summaryRow('Incidencias', dayIncidents.length ? dayIncidents.map((item) => escapeHtml(item.type)).join(', ') : 'Sin incidencias')}
@@ -999,10 +1100,11 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderVacationRow(request: VacationRequest) {
 			return `
-				<div class="stat-row">
-					<div>
+				<div class="vacation-card status-border-${statusClass(request.status)}">
+					<div class="vacation-card-main">
+						<span class="meta-label">${request.days} días solicitados</span>
 						<strong>${formatDate(request.from)} - ${formatDate(request.to)}</strong>
-						<span>${request.days} días · ${escapeHtml(request.comment || 'Sin comentario')}</span>
+						<span>${escapeHtml(request.comment || 'Sin comentario')}</span>
 					</div>
 					${pill(request.status)}
 				</div>
@@ -1010,39 +1112,54 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderVacationAdminDetail(request: VacationRequest) {
-			const overlapRows = dateRange(request.from, request.to)
-				.map((date) => {
-					const approved = vacations.filter(
-						(item) =>
-							item.id !== request.id &&
-							item.status === 'aprobada' &&
-							isDateWithin(date, item.from, item.to),
-					);
-					const pending = vacations.filter(
-						(item) =>
-							item.id !== request.id &&
-							item.status === 'pendiente' &&
-							isDateWithin(date, item.from, item.to),
-					);
-					return `
+			const overlapDays = dateRange(request.from, request.to).map((date) => {
+				const approved = vacations.filter(
+					(item) =>
+						item.id !== request.id &&
+						item.status === 'aprobada' &&
+						isDateWithin(date, item.from, item.to),
+				);
+				const pending = vacations.filter(
+					(item) =>
+						item.id !== request.id &&
+						item.status === 'pendiente' &&
+						isDateWithin(date, item.from, item.to),
+				);
+				return { date, approved, pending };
+			});
+			const approvedConflictDays = overlapDays.filter((day) => day.approved.length).length;
+			const pendingConflictDays = overlapDays.filter((day) => day.pending.length).length;
+			const overlapRows = overlapDays
+				.map(
+					(day) => `
 						<tr>
-							<td>${formatDate(date)}</td>
-							<td>${employeeName(request.employeeId)}</td>
-							<td>${approved.map((item) => employeeName(item.employeeId)).join(', ') || 'Sin aprobadas'}</td>
-							<td>${pending.map((item) => employeeName(item.employeeId)).join(', ') || 'Sin pendientes'}</td>
+							<td><strong>${formatDate(day.date)}</strong></td>
+							<td>${pill('Solicitud actual', 'pendiente')}</td>
+							<td>${day.approved.map((item) => employeeName(item.employeeId)).join(', ') || '<span class="muted-cell">Sin aprobadas</span>'}</td>
+							<td>${day.pending.map((item) => employeeName(item.employeeId)).join(', ') || '<span class="muted-cell">Sin pendientes</span>'}</td>
 						</tr>
-					`;
-				})
+					`,
+				)
 				.join('');
 
 			return `
-				<div class="summary-list">
-					${summaryRow('Empleado', employeeName(request.employeeId))}
-					${summaryRow('Periodo', `${formatDate(request.from)} - ${formatDate(request.to)}`)}
-					${summaryRow('Días solicitados', String(request.days))}
-					${summaryRow('Estado', pill(request.status))}
-					${summaryRow('Comentario', escapeHtml(request.comment || 'Sin comentario'))}
+				<div class="vacation-admin-summary">
+					<div>
+						<span class="meta-label">Solicitud seleccionada</span>
+						<strong>${employeeName(request.employeeId)}</strong>
+						<p>${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días</p>
+						${pill(request.status)}
+					</div>
+					<div class="conflict-meter ${approvedConflictDays ? 'has-conflict' : ''}">
+						<strong>${approvedConflictDays}</strong>
+						<span>días con vacaciones aprobadas coincidentes</span>
+					</div>
+					<div class="conflict-meter ${pendingConflictDays ? 'has-warning' : ''}">
+						<strong>${pendingConflictDays}</strong>
+						<span>días con solicitudes pendientes coincidentes</span>
+					</div>
 				</div>
+				<p class="helper-text top-gap">La tabla separa vacaciones ya aprobadas de solicitudes pendientes para decidir con más contexto.</p>
 				<div class="table-wrap top-gap">
 					<table>
 						<thead>
@@ -1108,6 +1225,7 @@ import Layout from '../layouts/Layout.astro';
 			const employee = currentEmployee();
 			const now = currentTime();
 			let entry = todayEntry(employee.id);
+			let feedback = '';
 
 			if (!entry) {
 				entry = {
@@ -1120,20 +1238,25 @@ import Layout from '../layouts/Layout.astro';
 				};
 				timeEntries.push(entry);
 				addAudit('Fichaje de entrada', `${employee.name} registró entrada a las ${now}`);
+				feedback = `Entrada registrada a las ${now}.`;
 			} else if (activeBreak(entry)) {
 				const lastBreak = activeBreak(entry);
 				if (lastBreak) lastBreak.end = now;
 				addAudit('Fin de pausa', `${employee.name} volvió de pausa a las ${now}`);
+				feedback = `Pausa cerrada a las ${now}.`;
 			} else if (entry.breaks.length === 0) {
 				entry.breaks.push({ start: now });
 				addAudit('Inicio de pausa', `${employee.name} inició pausa a las ${now}`);
+				feedback = `Pausa iniciada a las ${now}.`;
 			} else {
 				entry.end = now;
 				entry.status = entry.status === 'incidencia' ? 'incidencia' : 'correcto';
 				addAudit('Fichaje de salida', `${employee.name} registró salida a las ${now}`);
+				feedback = `Salida registrada a las ${now}. Jornada guardada.`;
 			}
 
 			saveAll();
+			showToast(feedback);
 			renderPage();
 		}
 
@@ -1151,11 +1274,14 @@ import Layout from '../layouts/Layout.astro';
 			entry.breaks.push({ start, end });
 			addAudit('Pausa rápida', `${employee.name} registró una pausa de ${minutes} minutos.`);
 			saveAll();
+			showToast(`Pausa rápida de ${minutes} minutos registrada.`);
 			renderPage();
 		}
 
 		function toggleManualForm() {
-			document.querySelector('#manual-adjustment')?.classList.toggle('hidden');
+			const manualBox = document.querySelector('#manual-adjustment');
+			manualBox?.classList.toggle('hidden');
+			showToast(manualBox?.classList.contains('hidden') ? 'Formulario de ajuste oculto.' : 'Formulario de ajuste manual abierto.');
 		}
 
 		function saveManualAdjustment(form: HTMLFormElement) {
@@ -1256,6 +1382,7 @@ import Layout from '../layouts/Layout.astro';
 				to: String(formData.get('to') || todayIso()),
 				status: String(formData.get('status') || 'all'),
 			};
+			showToast('Filtros aplicados.');
 			renderPage();
 		}
 
@@ -1633,6 +1760,14 @@ import Layout from '../layouts/Layout.astro';
 			return 'Iniciar pausa';
 		}
 
+		function punchHelpText(entry?: TimeEntry) {
+			if (!entry?.start) return 'Comienza la jornada de hoy';
+			if (entry.end) return 'Ya no hay acciones pendientes';
+			if (activeBreak(entry)) return 'Cierra la pausa y vuelve a trabajar';
+			if (entry.breaks.length > 0) return 'Finaliza y guarda la jornada';
+			return 'Registra una pausa cuando salgas';
+		}
+
 		function statusForDay(employeeId: string, date: string) {
 			const vacation = vacations.find(
 				(request) =>
@@ -1714,9 +1849,10 @@ import Layout from '../layouts/Layout.astro';
 
 		function showToast(message: string) {
 			if (!toast) return;
+			if (toastTimer) window.clearTimeout(toastTimer);
 			toast.textContent = message;
 			toast.classList.remove('hidden');
-			window.setTimeout(() => toast.classList.add('hidden'), 4200);
+			toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 4200);
 		}
 
 		function statusClass(status: string) {
