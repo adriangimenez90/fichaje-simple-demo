@@ -33,9 +33,10 @@ import Layout from '../layouts/Layout.astro';
 			<div class="demo-try">
 				<h2>Qué puedes probar en esta demo</h2>
 				<ul>
-					<li>Fichar entrada, pausas, vuelta de pausa y salida como empleado.</li>
+					<li>Fichar entrada, iniciar descanso, reanudar jornada y cerrar salida como empleado.</li>
 					<li>Solicitar vacaciones y revisar saldo, historial y calendario.</li>
-					<li>Gestionar incidencias, aprobaciones y coincidencias de vacaciones como administrador.</li>
+					<li>Validar vacaciones con coincidencias de equipo y aprobar o denegar solicitudes.</li>
+					<li>Gestionar usuarios, incidencias, informes y exportaciones como administrador global.</li>
 					<li>Previsualizar informes y simular programaciones por email.</li>
 				</ul>
 			</div>
@@ -80,8 +81,11 @@ import Layout from '../layouts/Layout.astro';
 			</form>
 
 			<div class="quick-login" aria-label="Accesos rápidos">
-				<button class="button button-secondary" type="button" data-login="admin">
-					Entrar como administrador
+				<button class="button button-secondary" type="button" data-login="admin_global">
+					Entrar como administrador global
+				</button>
+				<button class="button button-secondary" type="button" data-login="validador_vacaciones">
+					Entrar como validador de vacaciones
 				</button>
 				<button class="button button-secondary" type="button" data-login="ana">
 					Entrar como empleado
@@ -100,18 +104,27 @@ import Layout from '../layouts/Layout.astro';
 			email: string;
 			password: string;
 			name: string;
-			role: 'administrador' | 'empleado';
+			role: 'admin_global' | 'validador_vacaciones' | 'empleado';
+			department?: string;
 			employeeId?: string;
 		};
 
 		const SESSION_KEY = 'fs_session';
 		const USERS: DemoUser[] = [
 			{
-				id: 'admin',
+				id: 'admin_global',
 				email: 'admin.demo@fichajesimple.es',
 				password: '1234',
 				name: 'Administrador demo',
-				role: 'administrador',
+				role: 'admin_global',
+			},
+			{
+				id: 'validador_vacaciones',
+				email: 'vacaciones.demo@fichajesimple.es',
+				password: '1234',
+				name: 'Validador vacaciones',
+				role: 'validador_vacaciones',
+				department: 'Administración',
 			},
 			{
 				id: 'ana',
@@ -119,6 +132,7 @@ import Layout from '../layouts/Layout.astro';
 				password: '1234',
 				name: 'Ana Martínez',
 				role: 'empleado',
+				department: 'Administración',
 				employeeId: 'ana',
 			},
 			{
@@ -127,6 +141,7 @@ import Layout from '../layouts/Layout.astro';
 				password: '1234',
 				name: 'Miguel Torres',
 				role: 'empleado',
+				department: 'Almacén',
 				employeeId: 'miguel',
 			},
 		];
@@ -139,6 +154,7 @@ import Layout from '../layouts/Layout.astro';
 					email: user.email,
 					name: user.name,
 					role: user.role,
+					department: user.department,
 					employeeId: user.employeeId,
 				}),
 			);

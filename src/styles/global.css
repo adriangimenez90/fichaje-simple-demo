@@ -696,7 +696,8 @@ textarea:focus-visible {
 .status-correcto,
 .status-aprobada,
 .status-revisada,
-.status-trabajando {
+.status-trabajando,
+.status-activo {
 	background: #e2f4e7;
 	color: var(--success);
 }
@@ -720,7 +721,8 @@ textarea:focus-visible {
 }
 
 .status-sin-fichaje,
-.status-fin-de-semana {
+.status-fin-de-semana,
+.status-inactivo {
 	background: #eef2f2;
 	color: var(--muted);
 }
@@ -805,6 +807,11 @@ textarea:focus-visible {
 	font-size: 1.75rem;
 }
 
+.checkout-button {
+	min-height: 48px;
+	font-size: 1rem;
+}
+
 .punch-button small {
 	color: rgba(255, 255, 255, 0.82);
 	font-size: 0.88rem;
@@ -813,7 +820,7 @@ textarea:focus-visible {
 
 .punch-kpis {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 	gap: 10px;
 }
 
@@ -845,6 +852,68 @@ textarea:focus-visible {
 	display: grid;
 	align-content: start;
 	gap: 12px;
+}
+
+.quick-actions-panel .tab-actions,
+.quick-admin-actions,
+.row-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.quick-admin-actions .button {
+	flex: 1 1 170px;
+}
+
+.row-actions .button {
+	width: auto;
+}
+
+.break-summary {
+	display: grid;
+	gap: 10px;
+	margin-top: 6px;
+}
+
+.break-list {
+	display: grid;
+	gap: 8px;
+}
+
+.break-item {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 2px 10px;
+	border: 1px solid var(--line);
+	border-left: 4px solid var(--primary);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 10px;
+}
+
+.break-item span,
+.break-item small {
+	color: var(--muted);
+	font-size: 0.78rem;
+	font-weight: 700;
+}
+
+.break-item strong {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.break-item small {
+	grid-column: 1 / -1;
+}
+
+.break-quick {
+	border-left-color: var(--accent);
+}
+
+.break-meal {
+	border-left-color: var(--pending);
 }
 
 .big-action {
@@ -1006,6 +1075,40 @@ textarea:focus-visible {
 .vacation-card-main > span:last-child {
 	color: var(--muted);
 	font-size: 0.88rem;
+}
+
+.vacation-preview {
+	border: 1px solid #d6e5e1;
+	border-radius: 8px;
+	background: var(--surface-soft);
+	padding: 14px;
+}
+
+.vacation-preview h3 {
+	margin: 0;
+	font-size: 1rem;
+}
+
+.overlap-list {
+	display: grid;
+	gap: 8px;
+	margin-top: 10px;
+}
+
+.overlap-list div {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 10px;
+}
+
+.overlap-list span {
+	color: var(--muted);
+	font-size: 0.86rem;
 }
 
 .status-border-aprobada {
@@ -1514,7 +1617,7 @@ tr:last-child td {
 
 .day-detail-grid {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 	gap: 10px;
 }
 
