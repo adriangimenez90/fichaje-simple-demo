@@ -727,6 +727,21 @@ textarea:focus-visible {
 	color: var(--muted);
 }
 
+.status-approved {
+	background: #e6f0f8;
+	color: var(--accent);
+}
+
+.status-mixed {
+	background: #dff3ee;
+	color: var(--primary-dark);
+}
+
+.status-free {
+	background: #eef2f2;
+	color: var(--muted);
+}
+
 .quick-punch-card {
 	display: flex;
 	align-items: center;
@@ -1316,6 +1331,193 @@ textarea:focus-visible {
 	color: var(--muted);
 }
 
+.team-legend-approved {
+	background: #e1f1ff;
+}
+
+.team-legend-pending {
+	background: #fff3cf;
+}
+
+.team-legend-mixed {
+	background: #dff3ee;
+}
+
+.team-legend-free {
+	background: #f6f8f8;
+}
+
+.team-calendar-controls {
+	grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+	align-items: end;
+}
+
+.team-calendar-panel {
+	display: grid;
+	gap: 14px;
+}
+
+.team-calendar-meta {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.team-calendar-grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 6px;
+}
+
+.team-calendar-day {
+	display: grid;
+	align-content: start;
+	gap: 8px;
+	min-height: 118px;
+	border: 1px solid var(--line);
+	border-left: 4px solid #c7d1cf;
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 9px;
+	text-align: left;
+	box-shadow: 0 3px 10px rgba(23, 33, 31, 0.03);
+}
+
+.team-calendar-day:hover,
+.team-calendar-day.is-selected {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 3px rgba(17, 122, 101, 0.12);
+}
+
+.team-calendar-day.is-muted {
+	opacity: 0.38;
+}
+
+.team-calendar-day > strong {
+	font-size: 0.92rem;
+}
+
+.team-day-approved {
+	border-left-color: var(--accent);
+	background: #f3f8fc;
+}
+
+.team-day-pending {
+	border-left-color: var(--pending);
+	background: #fffaf0;
+}
+
+.team-day-mixed {
+	border-left-color: var(--primary);
+	background: #f0fbf7;
+}
+
+.team-day-names {
+	display: grid;
+	gap: 4px;
+	min-width: 0;
+}
+
+.team-day-names span {
+	overflow: hidden;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.78);
+	padding: 3px 5px;
+	color: var(--muted-strong);
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.team-day-names .more-count {
+	color: var(--primary-dark);
+}
+
+.team-day-detail {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background:
+		linear-gradient(180deg, #ffffff, #f8fbfa),
+		#ffffff;
+	padding: 14px;
+}
+
+.team-day-detail h4 {
+	margin: 0 0 8px;
+	font-size: 0.95rem;
+}
+
+.team-vacation-list {
+	display: grid;
+	gap: 8px;
+}
+
+.team-vacation-list div {
+	display: grid;
+	gap: 2px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 10px;
+}
+
+.team-vacation-list span {
+	color: var(--muted);
+	font-size: 0.84rem;
+}
+
+.team-planning-wrap {
+	margin-top: 14px;
+}
+
+.team-planning-table th:not(.sticky-col) {
+	min-width: 76px;
+	padding: 8px;
+	text-align: center;
+}
+
+.team-planning-table th small {
+	display: block;
+	margin-top: 2px;
+	color: var(--muted);
+	font-size: 0.68rem;
+	font-weight: 650;
+	text-transform: capitalize;
+}
+
+.planning-cell {
+	min-width: 76px;
+	height: 42px;
+	padding: 8px;
+	text-align: center;
+	font-size: 0.78rem;
+	font-weight: 800;
+}
+
+.team-planning-table .is-weekend {
+	background: #f1f5f4;
+}
+
+.planning-approved {
+	background: #e1f1ff;
+	color: var(--accent);
+}
+
+.planning-pending {
+	background: #fff3cf;
+	color: var(--pending);
+}
+
+.planning-mixed {
+	background: #dff3ee;
+	color: var(--primary-dark);
+}
+
+.planning-free {
+	color: var(--muted);
+}
+
 .history-summary {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1729,7 +1931,8 @@ tr:last-child td {
 	}
 
 	.compact-form,
-	.admin-filters {
+	.admin-filters,
+	.team-calendar-controls {
 		grid-template-columns: 1fr;
 	}
 
@@ -1755,6 +1958,10 @@ tr:last-child td {
 	}
 
 	.report-schedule-form {
+		grid-template-columns: 1fr;
+	}
+
+	.team-calendar-meta {
 		grid-template-columns: 1fr;
 	}
 
@@ -1846,15 +2053,30 @@ tr:last-child td {
 		gap: 4px;
 	}
 
+	.team-calendar-grid {
+		gap: 4px;
+	}
+
 	.calendar-head,
-	.calendar-day {
+	.calendar-day,
+	.team-calendar-day {
 		min-height: 44px;
 		padding: 6px 5px;
+	}
+
+	.team-calendar-day {
+		min-height: 78px;
+		gap: 4px;
 	}
 
 	.calendar-day span {
 		max-width: 100%;
 		font-size: 0.62rem;
+	}
+
+	.team-day-names span {
+		padding: 2px 4px;
+		font-size: 0.58rem;
 	}
 
 	.calendar-toolbar {
@@ -1894,7 +2116,9 @@ tr:last-child td {
 	}
 
 	.vacation-matrix th,
-	.vacation-matrix td {
+	.vacation-matrix td,
+	.planning-cell,
+	.team-planning-table th:not(.sticky-col) {
 		min-width: 82px;
 		padding: 8px;
 		font-size: 0.78rem;

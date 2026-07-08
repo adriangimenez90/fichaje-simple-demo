@@ -49,6 +49,7 @@ import Layout from '../layouts/Layout.astro';
 		type EntryStatus = 'correcto' | 'incidencia' | 'pendiente' | 'sin fichaje';
 		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada';
 		type IncidentStatus = 'pendiente' | 'revisada';
+		type TeamCalendarMode = 'month' | 'planning';
 
 		type Session = {
 			id: string;
@@ -218,6 +219,9 @@ import Layout from '../layouts/Layout.astro';
 		let selectedVacationId = '';
 		let historyMonth = todayIso().slice(0, 7);
 		let teamCalendarDepartment = 'all';
+		let teamCalendarMode: TeamCalendarMode = 'month';
+		let teamCalendarCursor = new Date();
+		let selectedTeamCalendarDay = todayIso();
 		let vacationHistoryFilters = {
 			employeeId: 'all',
 			department: 'all',
@@ -314,6 +318,9 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'calendar-prev') changeCalendarMonth(-1);
 				if (action === 'calendar-next') changeCalendarMonth(1);
 				if (action === 'calendar-day') selectCalendarDay(actionButton.dataset.date || todayIso());
+				if (action === 'team-calendar-prev') changeTeamCalendarMonth(-1);
+				if (action === 'team-calendar-next') changeTeamCalendarMonth(1);
+				if (action === 'team-calendar-day') selectTeamCalendarDay(actionButton.dataset.date || todayIso());
 				if (action === 'review-incident') reviewIncident(actionButton.dataset.id || '');
 				if (action === 'select-vacation') selectVacation(actionButton.dataset.id || '');
 				if (action === 'approve-vacation') resolveVacation('aprobada');
@@ -370,6 +377,8 @@ import Layout from '../layouts/Layout.astro';
 					event.preventDefault();
 					const formData = new FormData(form);
 					teamCalendarDepartment = String(formData.get('department') || 'all');
+					const nextMode = String(formData.get('mode') || 'month');
+					teamCalendarMode = nextMode === 'planning' ? 'planning' : 'month';
 					renderPage();
 				}
 
@@ -1069,6 +1078,7 @@ import Layout from '../layouts/Layout.astro';
 			selectedVacationId = selected?.id || '';
 			const scopedEmployees = selected ? departmentEmployees(employeeById(selected.employeeId)?.department || '') : [];
 			const balance = selected ? vacationBalance(selected.employeeId) : undefined;
+			const conflictCounts = selected ? vacationConflictCounts(selected, scopedEmployees) : { approved: 0, pending: 0 };
 
 			return `
 				${sectionTitle('Solicitudes', 'Revisa solicitudes pendientes con saldo y coincidencias del departamento.')}
@@ -1095,8 +1105,12 @@ import Layout from '../layouts/Layout.astro';
 						<h2>Detalle de validación</h2>
 						${selected ? `
 							<div class="summary-list">
-								${summaryRow('Empleado', employeeName(selected.employeeId))}
+								${summaryRow('Solicitante', employeeName(selected.employeeId))}
+								${summaryRow('Departamento', escapeHtml(employeeById(selected.employeeId)?.department || 'Sin departamento'))}
+								${summaryRow('Fechas', `${formatDate(selected.from)} - ${formatDate(selected.to)}`)}
 								${summaryRow('Días solicitados', String(selected.days))}
+								${summaryRow('Coincidencias aprobadas', String(conflictCounts.approved))}
+								${summaryRow('Coincidencias pendientes', String(conflictCounts.pending))}
 								${summaryRow('Comentario', escapeHtml(selected.comment || 'Sin comentario'))}
 								${summaryRow('Saldo disponible', `${balance?.available ?? 0} días`)}
 							</div>
@@ -1111,18 +1125,13 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderTeamCalendar() {
 			const departments = departmentList();
-			const rows = vacations
-				.filter((request) => request.status !== 'denegada')
-				.filter((request) => {
-					const employee = employeeById(request.employeeId);
-					return teamCalendarDepartment === 'all' || employee?.department === teamCalendarDepartment;
-				})
-				.sort((a, b) => a.from.localeCompare(b.from));
+			const visibleEmployees = teamCalendarEmployees();
+			const monthLabel = teamCalendarCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
 			return `
-				${sectionTitle('Calendario equipo', 'Vista de vacaciones aprobadas y pendientes por departamento.')}
+				${sectionTitle('Calendario equipo', 'Vista visual de vacaciones aprobadas y solicitudes pendientes por departamento.')}
 				<section class="panel">
-					<form id="team-calendar-filter-form" class="form-grid compact-form">
+					<form id="team-calendar-filter-form" class="form-grid team-calendar-controls">
 						<label class="field">
 							<span>Departamento</span>
 							<select name="department">
@@ -1130,44 +1139,260 @@ import Layout from '../layouts/Layout.astro';
 								${departments.map((department) => `<option value="${department}" ${teamCalendarDepartment === department ? 'selected' : ''}>${department}</option>`).join('')}
 							</select>
 						</label>
+						<label class="field">
+							<span>Vista</span>
+							<select name="mode">
+								<option value="month" ${teamCalendarMode === 'month' ? 'selected' : ''}>Calendario mensual</option>
+								<option value="planning" ${teamCalendarMode === 'planning' ? 'selected' : ''}>Planning por empleado</option>
+							</select>
+						</label>
 						<button class="button button-secondary" type="submit">Aplicar filtro</button>
 					</form>
 				</section>
-				<section class="panel top-gap">
-					<h2>Vacaciones del equipo</h2>
-					${rows.length ? `
-						<div class="table-wrap">
-							<table>
-								<thead>
-									<tr>
-										<th>Empleado</th>
-										<th>Departamento</th>
-										<th>Rango</th>
-										<th>Días</th>
-										<th>Estado</th>
-										<th>Comentario</th>
-									</tr>
-								</thead>
-								<tbody>
-									${rows.map((request) => {
-										const employee = employeeById(request.employeeId);
-										return `
-											<tr>
-												<td><strong>${employeeName(request.employeeId)}</strong></td>
-												<td>${escapeHtml(employee?.department || '')}</td>
-												<td>${formatDate(request.from)} - ${formatDate(request.to)}</td>
-												<td>${request.days}</td>
-												<td>${pill(request.status)}</td>
-												<td>${escapeHtml(request.comment || 'Sin comentario')}</td>
-											</tr>
-										`;
-									}).join('')}
-								</tbody>
-							</table>
-						</div>
-					` : emptyState('No hay vacaciones aprobadas o pendientes para el filtro seleccionado.')}
+				<section class="panel top-gap team-calendar-panel">
+					<div class="calendar-toolbar">
+						<button class="button button-secondary button-small" type="button" data-action="team-calendar-prev">Mes anterior</button>
+						<h2>${monthLabel}</h2>
+						<button class="button button-secondary button-small" type="button" data-action="team-calendar-next">Mes siguiente</button>
+					</div>
+					${teamVacationLegend()}
+					<p class="helper-text">
+						${teamCalendarMode === 'month'
+							? 'Usa el calendario para revisar ocupación por días. En móvil, toca un día para ver el detalle debajo.'
+							: 'Usa el planning para comparar empleados por fechas. Desplázate horizontalmente si el mes no cabe completo.'}
+					</p>
+					<div class="team-calendar-meta">
+						${metricCard('Personas visibles', String(visibleEmployees.length), 'correcto')}
+						${metricCard('Vacaciones aprobadas del mes', String(teamMonthRequests(visibleEmployees).filter((request) => request.status === 'aprobada').length), 'vacaciones')}
+						${metricCard('Solicitudes pendientes del mes', String(teamMonthRequests(visibleEmployees).filter((request) => request.status === 'pendiente').length), 'pendiente')}
+					</div>
+					${teamCalendarMode === 'month' ? renderTeamMonthCalendar(visibleEmployees) : renderTeamPlanning(visibleEmployees)}
 				</section>
 			`;
+		}
+
+		function renderTeamMonthCalendar(employees: Employee[]) {
+			if (!employees.length) return emptyState('No hay empleados para el departamento seleccionado.');
+
+			const year = teamCalendarCursor.getFullYear();
+			const month = teamCalendarCursor.getMonth();
+			const first = new Date(year, month, 1);
+			const startOffset = (first.getDay() + 6) % 7;
+			const start = new Date(year, month, 1 - startOffset);
+			const cells = Array.from({ length: 42 }, (_, index) => {
+				const date = new Date(start);
+				date.setDate(start.getDate() + index);
+				const iso = isoFromDate(date);
+				const dayData = teamVacationDayData(iso, employees);
+				const dayStatus = teamVacationDayStatus(dayData);
+				const names = uniqueVacationNames([...dayData.approved, ...dayData.pending]);
+				const visibleNames = names.slice(0, 3);
+				const extraCount = Math.max(names.length - visibleNames.length, 0);
+				const isCurrentMonth = date.getMonth() === month;
+
+				return `
+					<button
+						class="team-calendar-day team-day-${dayStatus} ${isCurrentMonth ? '' : 'is-muted'} ${selectedTeamCalendarDay === iso ? 'is-selected' : ''}"
+						type="button"
+						data-action="team-calendar-day"
+						data-date="${iso}"
+						title="${teamVacationTooltip(iso, dayData)}"
+					>
+						<strong>${date.getDate()}</strong>
+						<div class="team-day-names">
+							${visibleNames.map((name) => `<span>${escapeHtml(name)}</span>`).join('')}
+							${extraCount ? `<span class="more-count">+${extraCount} más</span>` : ''}
+						</div>
+					</button>
+				`;
+			}).join('');
+
+			return `
+				<div class="team-calendar-grid top-gap" aria-label="Calendario mensual del equipo">
+					${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day) => `<div class="calendar-head">${day}</div>`).join('')}
+					${cells}
+				</div>
+				${renderTeamDayDetail(selectedTeamCalendarDay, employees)}
+			`;
+		}
+
+		function renderTeamPlanning(employees: Employee[]) {
+			if (!employees.length) return emptyState('No hay empleados para el departamento seleccionado.');
+
+			const monthDays = teamMonthDateRange();
+
+			return `
+				<div class="table-wrap vacation-matrix-wrap team-planning-wrap top-gap">
+					<table class="vacation-matrix team-planning-table">
+						<thead>
+							<tr>
+								<th class="sticky-col">Empleado</th>
+								${monthDays.map((date) => `
+									<th class="${isWeekend(date) ? 'is-weekend' : ''}">
+										<span>${formatDayHeader(date)}</span>
+										<small>${weekdayShort(date)}</small>
+									</th>
+								`).join('')}
+							</tr>
+						</thead>
+						<tbody>
+							${employees.map((employee) => `
+								<tr>
+									<th class="sticky-col">
+										<strong>${employee.name}</strong>
+										<span>${employee.department}</span>
+									</th>
+									${monthDays.map((date) => renderTeamPlanningCell(employee, date)).join('')}
+								</tr>
+							`).join('')}
+						</tbody>
+					</table>
+				</div>
+			`;
+		}
+
+		function renderTeamPlanningCell(employee: Employee, date: string) {
+			const requests = teamVacationRequestsForDate(date, [employee]);
+			const approved = requests.filter((request) => request.status === 'aprobada');
+			const pending = requests.filter((request) => request.status === 'pendiente');
+			const state = approved.length && pending.length ? 'mixed' : approved.length ? 'approved' : pending.length ? 'pending' : 'free';
+			const label = state === 'approved' ? 'VAC' : state === 'pending' ? 'PEN' : state === 'mixed' ? 'MIX' : '';
+
+			return `
+				<td
+					class="planning-cell planning-${state} ${isWeekend(date) ? 'is-weekend' : ''}"
+					title="${teamPlanningTooltip(employee, date, requests)}"
+				>
+					${label}
+				</td>
+			`;
+		}
+
+		function renderTeamDayDetail(date: string, employees: Employee[]) {
+			const dayData = teamVacationDayData(date, employees);
+
+			return `
+				<section class="team-day-detail top-gap" aria-live="polite">
+					<div class="day-detail-head">
+						<div>
+							<span class="meta-label">Detalle del día</span>
+							<h3>${formatDate(date)}</h3>
+						</div>
+						${pill(teamVacationDayStatusLabel(teamVacationDayStatus(dayData)), teamVacationDayStatus(dayData))}
+					</div>
+					${dayData.approved.length || dayData.pending.length ? `
+						<div class="grid grid-2">
+							<div>
+								<h4>Aprobadas</h4>
+								${renderTeamVacationList(dayData.approved)}
+							</div>
+							<div>
+								<h4>Pendientes</h4>
+								${renderTeamVacationList(dayData.pending)}
+							</div>
+						</div>
+					` : emptyState('Sin vacaciones registradas.')}
+				</section>
+			`;
+		}
+
+		function renderTeamVacationList(requests: VacationRequest[]) {
+			if (!requests.length) return `<p class="helper-text">Sin registros.</p>`;
+
+			return `
+				<div class="team-vacation-list">
+					${requests.map((request) => `
+						<div>
+							<strong>${employeeName(request.employeeId)}</strong>
+							<span>${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días</span>
+						</div>
+					`).join('')}
+				</div>
+			`;
+		}
+
+		function teamVacationLegend() {
+			return `
+				<div class="comparison-legend team-vacation-legend">
+					<span><i class="team-legend-approved"></i> Aprobadas</span>
+					<span><i class="team-legend-pending"></i> Pendientes</span>
+					<span><i class="team-legend-mixed"></i> Mixto</span>
+					<span><i class="team-legend-free"></i> Libre</span>
+				</div>
+			`;
+		}
+
+		function teamCalendarEmployees() {
+			return teamCalendarDepartment === 'all' ? EMPLOYEES : departmentEmployees(teamCalendarDepartment);
+		}
+
+		function teamMonthDateRange() {
+			const year = teamCalendarCursor.getFullYear();
+			const month = teamCalendarCursor.getMonth();
+			return dateRange(isoFromDate(new Date(year, month, 1)), isoFromDate(new Date(year, month + 1, 0)));
+		}
+
+		function teamMonthRequests(employees: Employee[]) {
+			const monthDays = teamMonthDateRange();
+			const from = monthDays[0];
+			const to = monthDays[monthDays.length - 1];
+			const employeeIds = new Set(employees.map((employee) => employee.id));
+			return vacations
+				.filter((request) => request.status !== 'denegada')
+				.filter((request) => employeeIds.has(request.employeeId))
+				.filter((request) => rangesOverlap(from, to, request.from, request.to));
+		}
+
+		function teamVacationRequestsForDate(date: string, employees: Employee[]) {
+			const employeeIds = new Set(employees.map((employee) => employee.id));
+			return vacations
+				.filter((request) => request.status !== 'denegada')
+				.filter((request) => employeeIds.has(request.employeeId))
+				.filter((request) => isDateWithin(date, request.from, request.to));
+		}
+
+		function teamVacationDayData(date: string, employees: Employee[]) {
+			const dayRequests = teamVacationRequestsForDate(date, employees);
+			return {
+				approved: dayRequests.filter((request) => request.status === 'aprobada'),
+				pending: dayRequests.filter((request) => request.status === 'pendiente'),
+			};
+		}
+
+		function teamVacationDayStatus(dayData: { approved: VacationRequest[]; pending: VacationRequest[] }) {
+			if (dayData.approved.length && dayData.pending.length) return 'mixed';
+			if (dayData.approved.length) return 'approved';
+			if (dayData.pending.length) return 'pending';
+			return 'free';
+		}
+
+		function teamVacationDayStatusLabel(status: string) {
+			if (status === 'approved') return 'Aprobadas';
+			if (status === 'pending') return 'Pendientes';
+			if (status === 'mixed') return 'Mixto';
+			return 'Libre';
+		}
+
+		function teamVacationTooltip(date: string, dayData: { approved: VacationRequest[]; pending: VacationRequest[] }) {
+			const approvedNames = uniqueVacationNames(dayData.approved).join(', ') || 'Ninguna';
+			const pendingNames = uniqueVacationNames(dayData.pending).join(', ') || 'Ninguna';
+			const empty = !dayData.approved.length && !dayData.pending.length ? '\nSin vacaciones registradas' : '';
+			return escapeHtml(`${formatDate(date)}\nAprobadas: ${approvedNames}\nPendientes: ${pendingNames}${empty}`);
+		}
+
+		function teamPlanningTooltip(employee: Employee, date: string, requests: VacationRequest[]) {
+			if (!requests.length) {
+				return escapeHtml(`${employee.name}\n${formatDate(date)}\nLibre`);
+			}
+
+			const detail = requests
+				.map((request) => `${request.status === 'aprobada' ? 'Aprobada' : 'Pendiente'}: ${formatDate(request.from)} - ${formatDate(request.to)}`)
+				.join('\n');
+			return escapeHtml(`${employee.name}\n${formatDate(date)}\n${detail}`);
+		}
+
+		function uniqueVacationNames(requests: VacationRequest[]) {
+			return Array.from(new Set(requests.map((request) => employeeName(request.employeeId))));
 		}
 
 		function renderVacationHistory() {
@@ -1787,6 +2012,39 @@ import Layout from '../layouts/Layout.astro';
 			`;
 		}
 
+		function vacationConflictCounts(request: VacationRequest, scopeEmployees = EMPLOYEES) {
+			const scopeIds = new Set(scopeEmployees.map((employee) => employee.id));
+			const approved = new Set(
+				vacations
+					.filter(
+						(item) =>
+							item.id !== request.id &&
+							item.employeeId !== request.employeeId &&
+							scopeIds.has(item.employeeId) &&
+							item.status === 'aprobada' &&
+							rangesOverlap(request.from, request.to, item.from, item.to),
+					)
+					.map((item) => item.employeeId),
+			);
+			const pending = new Set(
+				vacations
+					.filter(
+						(item) =>
+							item.id !== request.id &&
+							item.employeeId !== request.employeeId &&
+							scopeIds.has(item.employeeId) &&
+							item.status === 'pendiente' &&
+							rangesOverlap(request.from, request.to, item.from, item.to),
+					)
+					.map((item) => item.employeeId),
+			);
+
+			return {
+				approved: approved.size,
+				pending: pending.size,
+			};
+		}
+
 		function renderVacationComparisonCell(employeeId: string, date: string, request: VacationRequest) {
 			if (employeeId === request.employeeId && isDateWithin(date, request.from, request.to)) {
 				return `<td class="comparison-cell cell-actual">Actual</td>`;
@@ -2363,6 +2621,17 @@ import Layout from '../layouts/Layout.astro';
 
 		function selectCalendarDay(date: string) {
 			selectedCalendarDay = date;
+			renderPage();
+		}
+
+		function changeTeamCalendarMonth(offset: number) {
+			teamCalendarCursor = new Date(teamCalendarCursor.getFullYear(), teamCalendarCursor.getMonth() + offset, 1);
+			selectedTeamCalendarDay = isoFromDate(new Date(teamCalendarCursor.getFullYear(), teamCalendarCursor.getMonth(), 1));
+			renderPage();
+		}
+
+		function selectTeamCalendarDay(date: string) {
+			selectedTeamCalendarDay = date;
 			renderPage();
 		}
 
@@ -3087,6 +3356,12 @@ import Layout from '../layouts/Layout.astro';
 			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
 				day: '2-digit',
 				month: '2-digit',
+			});
+		}
+
+		function weekdayShort(date: string) {
+			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
+				weekday: 'short',
 			});
 		}
 
