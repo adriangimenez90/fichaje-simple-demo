@@ -132,6 +132,7 @@ import Layout from '../layouts/Layout.astro';
 		};
 
 		const KEYS = {
+			demoVersion: 'fs_demoVersion',
 			session: 'fs_session',
 			timeEntries: 'fs_timeEntries',
 			vacations: 'fs_vacations',
@@ -140,6 +141,8 @@ import Layout from '../layouts/Layout.astro';
 			scheduledReports: 'fs_scheduledReports',
 			audit: 'fs_audit',
 		} as const;
+
+		const DEMO_VERSION = 'fichaje-simple-commercial-2026-07';
 
 		const EMPLOYEES: Employee[] = [
 			{ id: 'ana', name: 'Ana Martínez', department: 'Administración', vacationDays: 22 },
@@ -694,6 +697,7 @@ import Layout from '../layouts/Layout.astro';
 
 			return `
 				${sectionTitle('Dashboard', 'Estado de hoy para Sourcing Demo S.L.')}
+				${demoTryBlock()}
 				<div class="grid grid-3">
 					${metricCard('Empleados activos', String(EMPLOYEES.length), 'correcto')}
 					${metricCard('Trabajando ahora', String(workingNow), 'trabajando')}
@@ -929,9 +933,18 @@ import Layout from '../layouts/Layout.astro';
 					pill(request.status),
 					escapeHtml(request.comment || 'Sin comentario'),
 				]);
+			const pendingIncidentsCount = incidents.filter((incident) => incident.status === 'pendiente').length;
+			const missingTodayCount = buildMissingPunchReport().length;
+			const pendingVacationCount = vacations.filter((request) => request.status === 'pendiente').length;
 
 			return `
 				${sectionTitle('Informes', 'Previsualiza reportes de control horario y programa envíos simulados por email.')}
+				<div class="report-overview">
+					${metricCard('Incidencias pendientes', String(pendingIncidentsCount), pendingIncidentsCount ? 'incidencia' : 'correcto', 'Requieren revisión administrativa')}
+					${metricCard('Sin fichaje hoy', String(missingTodayCount), missingTodayCount ? 'pendiente' : 'correcto', 'Personas sin entrada registrada')}
+					${metricCard('Vacaciones pendientes', String(pendingVacationCount), pendingVacationCount ? 'pendiente' : 'correcto', 'Solicitudes esperando decisión')}
+					${metricCard('Informes programados', String(scheduledReports.length), 'trabajando', 'Envío automático simulado')}
+				</div>
 				<section class="panel">
 					<div class="panel-heading">
 						<div>
@@ -1116,6 +1129,7 @@ import Layout from '../layouts/Layout.astro';
 							${summaryRow('Razón social', 'Sourcing Demo S.L.')}
 							${summaryRow('Centro', 'Valencia')}
 							${summaryRow('Modo de datos', 'Ficticio, localStorage')}
+							${summaryRow('Validez legal', 'Demo local, no válida como registro horario real')}
 							${summaryRow('Backend', 'No configurado')}
 						</div>
 					</section>
@@ -1131,7 +1145,7 @@ import Layout from '../layouts/Layout.astro';
 				<section class="panel top-gap">
 					<h2>Persistencia</h2>
 					<p class="helper-text">
-						La sesión, fichajes, vacaciones, incidencias, festivos y auditoría se guardan únicamente en el navegador.
+						La sesión, fichajes, vacaciones, incidencias, festivos, informes programados y auditoría se guardan únicamente en el navegador.
 					</p>
 				</section>
 			`;
@@ -1147,9 +1161,26 @@ import Layout from '../layouts/Layout.astro';
 					</div>
 					<div class="demo-banner">
 						<strong>Demo sin backend</strong>
-						<span>Los cambios se guardan únicamente en localStorage.</span>
+						<span>Demo local con datos ficticios, no válida como registro horario real.</span>
 					</div>
 				</div>
+			`;
+		}
+
+		function demoTryBlock() {
+			return `
+				<section class="panel demo-try-panel">
+					<div>
+						<span class="meta-label">Qué puedes probar en esta demo</span>
+						<h2>Recorrido recomendado para una empresa pequeña</h2>
+						<p class="helper-text">Empieza fichando como empleado, después entra como administrador para revisar incidencias, vacaciones e informes.</p>
+					</div>
+					<div class="demo-try-grid">
+						<div><strong>1. Fichaje</strong><span>Entrada, pausas, salida y ajustes manuales.</span></div>
+						<div><strong>2. Vacaciones</strong><span>Solicitud, aprobación y tabla de coincidencias por día.</span></div>
+						<div><strong>3. Informes</strong><span>Resumen semanal/mensual, incidencias y programación simulada.</span></div>
+					</div>
+				</section>
 			`;
 		}
 
@@ -1334,6 +1365,7 @@ import Layout from '../layouts/Layout.astro';
 					<span><i class="cell-pending"></i> Solicitud pendiente</span>
 					<span><i class="cell-free"></i> Libre</span>
 				</div>
+				<p class="helper-text top-gap">Tabla comparativa por empleado y día. Si el rango es largo, desplázate horizontalmente para revisar todas las fechas.</p>
 				<div class="table-wrap vacation-matrix-wrap top-gap">
 					<table class="vacation-matrix">
 						<thead>
@@ -1852,6 +1884,17 @@ import Layout from '../layouts/Layout.astro';
 
 		function loadDemoData() {
 			const defaults = createDefaults();
+			if (localStorage.getItem(KEYS.demoVersion) !== DEMO_VERSION) {
+				timeEntries = defaults.timeEntries;
+				vacations = defaults.vacations;
+				incidents = defaults.incidents;
+				holidays = defaults.holidays;
+				scheduledReports = defaults.scheduledReports;
+				auditLog = defaults.auditLog;
+				saveAll();
+				return;
+			}
+
 			timeEntries = readCollection(KEYS.timeEntries, defaults.timeEntries);
 			vacations = readCollection(KEYS.vacations, defaults.vacations);
 			incidents = readCollection(KEYS.incidents, defaults.incidents);
@@ -1880,20 +1923,67 @@ import Layout from '../layouts/Layout.astro';
 			const incidentsSeed: Incident[] = [];
 
 			EMPLOYEES.forEach((employee, employeeIndex) => {
-				for (let offset = 1; offset <= 12; offset += 1) {
+				for (let offset = 1; offset <= 120; offset += 1) {
 					const date = addDaysIso(today, -offset);
 					if (isWeekend(date)) continue;
-					const hasIncident = employee.id === 'carlos' && offset === 2;
+
+					const missedDay = (offset + employeeIndex * 5) % 43 === 0;
+					const missingEnd = (offset + employeeIndex * 3) % 37 === 0;
+					const lateStart = (offset + employeeIndex) % 29 === 0;
+					const longBreak = (offset + employeeIndex * 2) % 31 === 0;
+					if (missedDay) {
+						incidentsSeed.push({
+							id: uniqueId(`incident-missed-${employee.id}-${offset}`),
+							employeeId: employee.id,
+							date,
+							type: 'Sin fichaje',
+							detail: 'No consta entrada registrada en una jornada laborable.',
+							status: offset < 35 ? 'revisada' : 'pendiente',
+							createdAt: new Date(Date.now() - offset * 86400000).toISOString(),
+							reviewedAt: offset < 35 ? new Date(Date.now() - (offset - 1) * 86400000).toISOString() : undefined,
+						});
+						continue;
+					}
+
+					const start = lateStart ? '09:38' : employeeIndex % 2 === 0 ? '08:47' : '09:04';
+					const breakStart = employeeIndex % 2 === 0 ? '11:18' : '12:05';
+					const breakEnd = longBreak ? '12:25' : employeeIndex % 2 === 0 ? '11:34' : '12:28';
+					const end = missingEnd ? undefined : employeeIndex % 2 === 0 ? '17:04' : '17:24';
+					const status: EntryStatus = missingEnd || lateStart || longBreak ? 'incidencia' : 'correcto';
+
 					timeEntriesSeed.push({
 						id: uniqueId(`seed-${employee.id}-${offset}`),
 						employeeId: employee.id,
 						date,
-						start: employeeIndex % 2 === 0 ? '08:45' : '09:05',
-						breaks: [{ start: '11:15', end: employeeIndex % 2 === 0 ? '11:32' : '11:25' }],
-						end: hasIncident ? undefined : employeeIndex % 2 === 0 ? '17:02' : '17:20',
-						status: hasIncident ? 'incidencia' : 'correcto',
-						notes: hasIncident ? 'Salida pendiente de revisar' : undefined,
+						start,
+						breaks: [{ start: breakStart, end: breakEnd }],
+						end,
+						status,
+						notes: missingEnd
+							? 'Salida pendiente de revisar'
+							: lateStart
+								? 'Entrada fuera del horario habitual'
+								: longBreak
+									? 'Pausa superior a lo habitual'
+									: undefined,
 					});
+
+					if (status === 'incidencia') {
+						incidentsSeed.push({
+							id: uniqueId(`incident-${employee.id}-${offset}`),
+							employeeId: employee.id,
+							date,
+							type: missingEnd ? 'Salida olvidada' : lateStart ? 'Entrada tardía' : 'Pausa prolongada',
+							detail: missingEnd
+								? 'Jornada sin salida registrada.'
+								: lateStart
+									? `Entrada registrada a las ${start}.`
+									: `Pausa registrada entre ${breakStart} y ${breakEnd}.`,
+							status: offset < 40 ? 'revisada' : 'pendiente',
+							createdAt: new Date(Date.now() - offset * 86400000).toISOString(),
+							reviewedAt: offset < 40 ? new Date(Date.now() - (offset - 1) * 86400000).toISOString() : undefined,
+						});
+					}
 				}
 			});
 
@@ -1981,6 +2071,70 @@ import Layout from '../layouts/Layout.astro';
 					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
 					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 8).toISOString(),
 				},
+				{
+					id: uniqueId('vac-laura-past'),
+					employeeId: 'laura',
+					from: addDaysIso(today, -84),
+					to: addDaysIso(today, -80),
+					days: businessDaysBetween(addDaysIso(today, -84), addDaysIso(today, -80)),
+					status: 'aprobada',
+					comment: 'Semana de descanso ya disfrutada',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 110).toISOString(),
+					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 108).toISOString(),
+				},
+				{
+					id: uniqueId('vac-carlos-past'),
+					employeeId: 'carlos',
+					from: addDaysIso(today, -48),
+					to: addDaysIso(today, -46),
+					days: businessDaysBetween(addDaysIso(today, -48), addDaysIso(today, -46)),
+					status: 'aprobada',
+					comment: 'Puente familiar',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 70).toISOString(),
+					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 69).toISOString(),
+				},
+				{
+					id: uniqueId('vac-marta-recent'),
+					employeeId: 'marta',
+					from: addDaysIso(today, -18),
+					to: addDaysIso(today, -15),
+					days: businessDaysBetween(addDaysIso(today, -18), addDaysIso(today, -15)),
+					status: 'aprobada',
+					comment: 'Vacaciones recientes',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 36).toISOString(),
+					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 35).toISOString(),
+				},
+				{
+					id: uniqueId('vac-laura-overlap'),
+					employeeId: 'laura',
+					from: addDaysIso(today, 27),
+					to: addDaysIso(today, 29),
+					days: businessDaysBetween(addDaysIso(today, 27), addDaysIso(today, 29)),
+					status: 'pendiente',
+					comment: 'Pendiente por coordinación de equipo',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+				},
+				{
+					id: uniqueId('vac-carlos-future'),
+					employeeId: 'carlos',
+					from: addDaysIso(today, 54),
+					to: addDaysIso(today, 58),
+					days: businessDaysBetween(addDaysIso(today, 54), addDaysIso(today, 58)),
+					status: 'aprobada',
+					comment: 'Vacaciones de septiembre',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15).toISOString(),
+					decidedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
+				},
+				{
+					id: uniqueId('vac-marta-pending-future'),
+					employeeId: 'marta',
+					from: addDaysIso(today, 56),
+					to: addDaysIso(today, 57),
+					days: businessDaysBetween(addDaysIso(today, 56), addDaysIso(today, 57)),
+					status: 'pendiente',
+					comment: 'Coincide parcialmente con reparto',
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+				},
 			];
 
 			const holidaysSeed: Holiday[] = [
@@ -2001,17 +2155,31 @@ import Layout from '../layouts/Layout.astro';
 				},
 			];
 
+			const scheduledReportsSeed: ScheduledReport[] = [
+				{
+					id: uniqueId('report-weekly-default'),
+					reportType: 'Resumen semanal',
+					frequency: 'Semanal',
+					sendDay: 'Lunes',
+					recipient: 'responsable@sourcingdemo.es',
+					format: 'CSV + PDF',
+					active: true,
+					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
+				},
+			];
+
 			return {
 				timeEntries: timeEntriesSeed,
 				vacations: vacationsSeed,
 				incidents: incidentsSeed,
 				holidays: holidaysSeed,
-				scheduledReports: [],
+				scheduledReports: scheduledReportsSeed,
 				auditLog: auditSeed,
 			};
 		}
 
 		function saveAll() {
+			localStorage.setItem(KEYS.demoVersion, DEMO_VERSION);
 			localStorage.setItem(KEYS.timeEntries, JSON.stringify(timeEntries));
 			localStorage.setItem(KEYS.vacations, JSON.stringify(vacations));
 			localStorage.setItem(KEYS.incidents, JSON.stringify(incidents));

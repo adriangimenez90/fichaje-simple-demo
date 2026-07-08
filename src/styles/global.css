@@ -237,6 +237,16 @@ textarea:focus-visible {
 	font-size: 1.35rem;
 }
 
+.demo-warning {
+	max-width: 760px;
+	border: 1px solid #ead59b;
+	border-radius: 8px;
+	background: #fffaf0;
+	color: var(--pending);
+	padding: 12px 14px;
+	font-weight: 700;
+}
+
 .login-snapshot {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -257,6 +267,31 @@ textarea:focus-visible {
 
 .login-snapshot div {
 	padding: 14px;
+}
+
+.demo-try {
+	max-width: 760px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.82);
+	padding: 18px;
+}
+
+.demo-try h2 {
+	margin: 0 0 10px;
+	font-size: 1.05rem;
+}
+
+.demo-try ul {
+	display: grid;
+	gap: 8px;
+	margin: 0;
+	padding-left: 18px;
+	color: var(--muted-strong);
+}
+
+.demo-try li {
+	padding-left: 2px;
 }
 
 .login-snapshot span,
@@ -506,15 +541,15 @@ textarea:focus-visible {
 	display: grid;
 	gap: 2px;
 	max-width: 320px;
-	border: 1px solid #cfe2dd;
+	border: 1px solid #ead59b;
 	border-radius: 8px;
-	background: rgba(255, 255, 255, 0.74);
+	background: #fffaf0;
 	padding: 11px 12px;
 	box-shadow: var(--shadow-soft);
 }
 
 .demo-banner strong {
-	color: var(--primary-dark);
+	color: var(--pending);
 	font-size: 0.88rem;
 }
 
@@ -1022,6 +1057,44 @@ textarea:focus-visible {
 	font-weight: 600;
 }
 
+.demo-try-panel {
+	display: grid;
+	gap: 16px;
+	margin-bottom: 16px;
+	border-color: #c4e4dc;
+	background:
+		linear-gradient(135deg, #ffffff, #f5fbfa),
+		#ffffff;
+}
+
+.demo-try-panel h2 {
+	margin: 2px 0 4px;
+}
+
+.demo-try-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.demo-try-grid div {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 12px;
+}
+
+.demo-try-grid strong,
+.demo-try-grid span {
+	display: block;
+}
+
+.demo-try-grid span {
+	margin-top: 4px;
+	color: var(--muted);
+	font-size: 0.88rem;
+}
+
 .comparison-legend {
 	display: flex;
 	flex-wrap: wrap;
@@ -1050,6 +1123,10 @@ textarea:focus-visible {
 
 .vacation-matrix-wrap {
 	max-width: 100%;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	border-color: #ccd9d6;
+	box-shadow: inset -16px 0 18px -20px rgba(23, 33, 31, 0.5);
 }
 
 .vacation-matrix {
@@ -1064,6 +1141,7 @@ textarea:focus-visible {
 	padding: 10px;
 	text-align: center;
 	white-space: nowrap;
+	border-right: 1px solid var(--line);
 }
 
 .vacation-matrix thead th {
@@ -1097,6 +1175,11 @@ textarea:focus-visible {
 	font-weight: 650;
 }
 
+.vacation-matrix tbody tr:hover th,
+.vacation-matrix tbody tr:hover td {
+	filter: brightness(0.985);
+}
+
 .cell-actual {
 	background: #dff3ee;
 	color: var(--primary-dark);
@@ -1124,6 +1207,13 @@ textarea:focus-visible {
 	margin-top: 16px;
 }
 
+.report-overview {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
 .panel-heading {
 	display: flex;
 	align-items: flex-start;
@@ -1141,12 +1231,16 @@ textarea:focus-visible {
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: #ffffff;
-	padding: 14px;
+	padding: 16px;
 	box-shadow: 0 4px 14px rgba(23, 33, 31, 0.04);
 }
 
 .report-card-head {
-	margin-bottom: 10px;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
 }
 
 .report-card h3 {
@@ -1168,6 +1262,7 @@ textarea:focus-visible {
 .report-table th,
 .report-table td {
 	padding: 10px 12px;
+	font-size: 0.88rem;
 }
 
 .report-schedule-form {
@@ -1446,6 +1541,11 @@ tr:last-child td {
 		grid-template-columns: 1fr;
 	}
 
+	.demo-try-grid,
+	.report-overview {
+		grid-template-columns: 1fr;
+	}
+
 	.app-shell {
 		display: block;
 		padding-bottom: 78px;
@@ -1557,8 +1657,17 @@ tr:last-child td {
 		padding: 20px;
 	}
 
+	.login-brand {
+		gap: 16px;
+	}
+
 	.login-brand h1 {
 		font-size: 2.45rem;
+	}
+
+	.demo-warning,
+	.demo-try {
+		padding: 12px;
 	}
 
 	.header-actions {
@@ -1668,6 +1777,14 @@ tr:last-child td {
 
 	.vacation-matrix .sticky-col {
 		min-width: 150px;
+	}
+
+	.report-overview {
+		gap: 10px;
+	}
+
+	.report-card-head {
+		display: grid;
 	}
 
 	.mobile-nav {
