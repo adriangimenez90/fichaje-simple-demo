@@ -13,7 +13,7 @@ import Layout from '../layouts/Layout.astro';
 						<span class="muted-line">Sourcing Demo S.L. · Valencia</span>
 					</div>
 				</div>
-				<span class="demo-badge">Demo local</span>
+				<span class="demo-badge">Demo pública</span>
 				<div class="company-chip">
 					<span>Empresa demo</span>
 					<strong>Sourcing Demo S.L.</strong>
@@ -1746,7 +1746,7 @@ import Layout from '../layouts/Layout.astro';
 							${summaryRow('Razón social', 'Sourcing Demo S.L.')}
 							${summaryRow('Centro', 'Valencia')}
 							${summaryRow('Modo de datos', 'Ficticio, localStorage')}
-							${summaryRow('Validez legal', 'Demo local, no válida como registro horario real')}
+							${summaryRow('Validez legal', 'Demo pública con datos ficticios. No válida como registro horario real.')}
 							${summaryRow('Backend', 'No configurado')}
 						</div>
 					</section>
@@ -1778,8 +1778,8 @@ import Layout from '../layouts/Layout.astro';
 						<p>${description}</p>
 					</div>
 					<div class="demo-banner">
-						<strong>Demo sin backend</strong>
-						<span>Demo local con datos ficticios, no válida como registro horario real.</span>
+						<strong>Demo pública</strong>
+						<span>Demo pública con datos ficticios. No válida como registro horario real.</span>
 					</div>
 				</div>
 			`;
@@ -1789,9 +1789,9 @@ import Layout from '../layouts/Layout.astro';
 			return `
 				<section class="panel demo-try-panel">
 					<div>
-						<span class="meta-label">Qué puedes probar en esta demo</span>
+						<span class="meta-label">Qué probar en esta demo</span>
 						<h2>Recorrido recomendado para una empresa pequeña</h2>
-						<p class="helper-text">Empieza fichando como usuario normal, valida vacaciones con el rol específico y termina revisando informes como administrador global.</p>
+						<p class="helper-text">Prueba el fichaje, los descansos, las vacaciones, el planning tipo Excel y los informes/exportaciones con datos ficticios.</p>
 					</div>
 					<div class="demo-try-grid">
 						<div><strong>1. Fichaje</strong><span>Entrada, descansos, salida y ajustes manuales.</span></div>
@@ -2523,7 +2523,7 @@ import Layout from '../layouts/Layout.astro';
 			users.push(user);
 			addAudit('Usuario creado', `${name} (${email}) con rol ${roleLabel(role)}.`);
 			saveAll();
-			showToast('Usuario creado en la demo local.');
+			showToast('Usuario creado en la demo pública.');
 			renderPage();
 		}
 

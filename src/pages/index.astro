@@ -8,13 +8,13 @@ import Layout from '../layouts/Layout.astro';
 			<div class="brand-lockup">
 				<img class="brand-logo" src="/brand/fichajesimple-logo.png" alt="FichajeSimple" />
 				<div>
-					<p class="eyebrow">Demo SaaS local</p>
+					<p class="eyebrow">Demo SaaS pública</p>
 					<h1 id="login-title" class="sr-only">FichajeSimple</h1>
 				</div>
 			</div>
 			<p class="login-subtitle">Registro horario sencillo para pequeñas empresas</p>
 			<div class="demo-warning" role="note">
-				Demo local con datos ficticios, no válida como registro horario real.
+				Demo pública con datos ficticios. No válida como registro horario real.
 			</div>
 			<div class="login-snapshot" aria-label="Datos ficticios de la demo">
 				<div>
@@ -31,13 +31,14 @@ import Layout from '../layouts/Layout.astro';
 				</div>
 			</div>
 			<div class="demo-try">
-				<h2>Qué puedes probar en esta demo</h2>
+				<h2>Qué probar en esta demo</h2>
 				<ul>
-					<li>Fichar entrada, iniciar descanso, reanudar jornada y cerrar salida como empleado.</li>
-					<li>Solicitar vacaciones y revisar saldo, historial y calendario.</li>
-					<li>Validar vacaciones con coincidencias de equipo y aprobar o denegar solicitudes.</li>
-					<li>Gestionar usuarios, incidencias, informes y exportaciones como administrador global.</li>
-					<li>Previsualizar informes y simular programaciones por email.</li>
+					<li>Fichar entrada/salida.</li>
+					<li>Iniciar y reanudar descansos.</li>
+					<li>Solicitar vacaciones.</li>
+					<li>Validar vacaciones.</li>
+					<li>Revisar planning tipo Excel.</li>
+					<li>Consultar informes/exportaciones como administrador.</li>
 				</ul>
 			</div>
 		</section>
@@ -92,9 +93,35 @@ import Layout from '../layouts/Layout.astro';
 				</button>
 			</div>
 
+			<div class="trial-users" aria-label="Usuarios de prueba">
+				<h2>Usuarios de prueba</h2>
+				<div class="trial-user-list">
+					<div>
+						<span>Administrador global</span>
+						<strong>admin.demo@fichajesimple.es / 1234</strong>
+					</div>
+					<div>
+						<span>Validador vacaciones</span>
+						<strong>vacaciones.demo@fichajesimple.es / 1234</strong>
+					</div>
+					<div>
+						<span>Empleado</span>
+						<strong>ana.demo@fichajesimple.es / 1234</strong>
+					</div>
+				</div>
+			</div>
+
 			<p class="demo-notice">
-				Demo local con datos ficticios, no válida como registro horario real. Los cambios se guardan únicamente en tu navegador.
+				Demo pública con datos ficticios. No válida como registro horario real. Los cambios se guardan únicamente en tu navegador.
 			</p>
+
+			<div class="feedback-box">
+				<h2>Enviar feedback</h2>
+				<p>Si algo no encaja o echas de menos alguna función, anótalo y háznoslo llegar.</p>
+				<a class="button button-secondary" href="mailto:hola@fichajesimple.es?subject=Feedback%20demo%20FichajeSimple">
+					Enviar feedback
+				</a>
+			</div>
 		</section>
 	</main>
 
