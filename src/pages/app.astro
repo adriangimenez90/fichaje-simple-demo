@@ -573,20 +573,20 @@ import Layout from '../layouts/Layout.astro';
 			const weeklyOverLimit = weeklyWorked > 40 * 60;
 
 			return `
-				${sectionTitle('Fichar', 'Pantalla principal del empleado: entrada, descansos, reanudación y salida de la jornada.')}
+				${sectionTitle('Fichar', 'Entrada, descansos y salida de hoy.')}
 				<div class="grid punch-layout">
 					<section class="panel punch-panel">
 						<div class="punch-status-row">
-							<div>
+							<div class="punch-state-card">
 								<span class="meta-label">Estado actual</span>
 								<strong>${status.label}</strong>
+								<div class="top-gap-small">${pill(status.label, status.key)}</div>
 							</div>
 							<div class="clock-card">
 								<span>Hora actual</span>
 								<strong class="live-clock">${currentTimeWithSeconds()}</strong>
 							</div>
 						</div>
-						<div>${pill(status.label, status.key)}</div>
 						<div class="punch-actions">
 							<button class="button button-primary punch-button" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
 								<span>${actionLabel}</span>
@@ -630,7 +630,7 @@ import Layout from '../layouts/Layout.astro';
 					</section>
 					<section class="panel quick-actions-panel">
 						<h2>Acciones rápidas</h2>
-						<p class="helper-text">Las pausas rápidas crean inicio y fin automático. El descanso manual se inicia con el botón principal y se cierra al reanudar.</p>
+						<p class="helper-text">Usa estas pausas cuando ya estés trabajando. Para un descanso abierto, usa el botón principal.</p>
 						<div class="tab-actions">
 							<button class="button button-secondary" type="button" data-action="quick-pause" data-minutes="15">
 								Pausa 15 min
@@ -3321,9 +3321,9 @@ import Layout from '../layouts/Layout.astro';
 
 		function punchHelpText(entry?: TimeEntry) {
 			if (!entry?.start) return 'Comienza la jornada de hoy';
-			if (entry.end) return 'Ya no hay acciones pendientes';
-			if (activeBreak(entry)) return 'Cierra el descanso y vuelve a trabajar';
-			return 'Pausa el cómputo de trabajo';
+			if (entry.end) return 'Todo listo por hoy';
+			if (activeBreak(entry)) return 'Vuelve a trabajar';
+			return 'Detiene el tiempo de trabajo';
 		}
 
 		function statusForDay(employeeId: string, date: string) {
