@@ -567,7 +567,10 @@ import Layout from '../layouts/Layout.astro';
 			const status = currentWorkStatus(entry);
 			const actionLabel = punchActionLabel(entry);
 			const actionHelp = punchHelpText(entry);
+			const isOnBreak = Boolean(activeBreak(entry));
 			const canCheckout = Boolean(entry?.start && !entry.end && !activeBreak(entry));
+			const weeklyWorked = workedMinutesThisWeek(employee.id);
+			const weeklyOverLimit = weeklyWorked > 40 * 60;
 
 			return `
 				${sectionTitle('Fichar', 'Pantalla principal del empleado: entrada, descansos, reanudación y salida de la jornada.')}
@@ -584,13 +587,19 @@ import Layout from '../layouts/Layout.astro';
 							</div>
 						</div>
 						<div>${pill(status.label, status.key)}</div>
-						<button class="button button-primary punch-button" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
-							<span>${actionLabel}</span>
-							<small>${actionHelp}</small>
-						</button>
-						<button class="button button-secondary checkout-button" type="button" data-action="checkout" ${canCheckout ? '' : 'disabled'}>
-							Fichar salida
-						</button>
+						<div class="punch-actions">
+							<button class="button button-primary punch-button" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
+								<span>${actionLabel}</span>
+								<small>${actionHelp}</small>
+							</button>
+							<div class="checkout-action">
+								<button class="button button-secondary punch-button punch-button-secondary" type="button" data-action="checkout" ${canCheckout ? '' : 'disabled'}>
+									<span>Fichar salida</span>
+									<small>${canCheckout ? 'Cierra la jornada de hoy' : 'Disponible al terminar el trabajo'}</small>
+								</button>
+								${isOnBreak ? '<p class="checkout-help">Finaliza el descanso antes de fichar salida.</p>' : ''}
+							</div>
+						</div>
 						<div class="punch-kpis">
 							<div>
 								<span>Entrada</span>
@@ -605,16 +614,17 @@ import Layout from '../layouts/Layout.astro';
 								<strong>${entry?.end || '--:--'}</strong>
 							</div>
 							<div>
-								<span>Trabajado</span>
+								<span>Trabajado hoy</span>
 								<strong>${formatMinutes(workedMinutes(entry))}</strong>
 							</div>
 							<div>
 								<span>En descanso</span>
 								<strong>${formatMinutes(breakMinutes(entry))}</strong>
 							</div>
-							<div>
-								<span>Estado</span>
-								<strong>${status.label}</strong>
+							<div class="${weeklyOverLimit ? 'punch-kpi-alert' : ''}">
+								<span>Trabajado semanal</span>
+								<strong>${formatMinutes(weeklyWorked)}</strong>
+								${weeklyOverLimit ? '<small>Supera 40 h</small>' : ''}
 							</div>
 						</div>
 					</section>
@@ -3191,9 +3201,9 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function punchActionLabel(entry?: TimeEntry) {
-			if (!entry?.start) return 'Fichar entrada';
+			if (!entry?.start) return 'Iniciar jornada';
 			if (entry.end) return 'Jornada finalizada';
-			if (activeBreak(entry)) return 'Reanudar jornada';
+			if (activeBreak(entry)) return 'Finalizar descanso';
 			return 'Iniciar descanso';
 		}
 
@@ -3272,6 +3282,29 @@ import Layout from '../layouts/Layout.astro';
 				const end = pause.end || (entry.date === todayIso() ? currentTime() : pause.start);
 				return sum + Math.max(timeToMinutes(end) - timeToMinutes(pause.start), 0);
 			}, 0);
+		}
+
+		function workedMinutesThisWeek(employeeId: string) {
+			const from = startOfCurrentWorkWeekIso();
+			const to = endOfCurrentWorkWeekIso();
+
+			return timeEntries
+				.filter((entry) => entry.employeeId === employeeId && dateInRange(entry.date, from, to) && !isWeekend(entry.date))
+				.reduce((sum, entry) => sum + workedMinutes(entry), 0);
+		}
+
+		function startOfCurrentWorkWeekIso() {
+			const date = new Date(`${todayIso()}T12:00:00`);
+			const day = date.getDay();
+			const mondayOffset = day === 0 ? -6 : 1 - day;
+			date.setDate(date.getDate() + mondayOffset);
+			return isoFromDate(date);
+		}
+
+		function endOfCurrentWorkWeekIso() {
+			const date = new Date(`${startOfCurrentWorkWeekIso()}T12:00:00`);
+			date.setDate(date.getDate() + 4);
+			return isoFromDate(date);
 		}
 
 		function vacationBalance(employeeId: string) {
