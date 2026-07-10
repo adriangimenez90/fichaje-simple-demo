@@ -645,7 +645,7 @@ import Layout from '../layouts/Layout.astro';
 								Comida 2 h
 							</button>
 							<button class="button button-ghost" type="button" data-action="toggle-manual">
-								Registrar ajuste manual
+								Editar registro de hoy
 							</button>
 						</div>
 						<div class="break-summary">
@@ -1869,8 +1869,70 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function manualAdjustmentForm() {
+			const employee = currentEmployee();
+			const entry = todayEntry(employee.id);
+			const salidaNextDay = Boolean(entry?.start && entry?.end && timeToMinutes(entry.end) < timeToMinutes(entry.start));
+			const breakFields = entry?.breaks.length
+				? entry.breaks
+					.map(
+						(item, index) => `
+							<fieldset class="manual-break-field">
+								<legend>${escapeHtml(breakLabel(item))} ${index + 1}</legend>
+								<label class="field">
+									<span>Inicio de pausa</span>
+									<input type="time" name="break-start-${index}" value="${item.start || ''}" required />
+								</label>
+								<label class="field">
+									<span>Fin de pausa</span>
+									<input type="time" name="break-end-${index}" value="${item.end || ''}" />
+								</label>
+							</fieldset>
+						`,
+					)
+					.join('')
+				: '<div class="manual-empty">No hay pausas registradas para editar hoy.</div>';
+
 			return `
-				<form id="manual-form" class="form-grid top-gap">
+				<form id="manual-form" class="manual-editor top-gap">
+					<div class="manual-editor-head">
+						<div>
+							<span class="meta-label">Editar registro de hoy</span>
+							<strong>${formatDate(todayIso())}</strong>
+						</div>
+						${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}
+					</div>
+					<input type="hidden" name="date" value="${todayIso()}" />
+					<div class="manual-editor-grid">
+						<label class="field">
+							<span>Hora de entrada</span>
+							<input type="time" name="start" value="${entry?.start || ''}" required />
+						</label>
+						<label class="field">
+							<span>Hora de salida</span>
+							<input type="time" name="end" value="${entry?.end || ''}" />
+						</label>
+					</div>
+					<label class="manual-check">
+						<input type="checkbox" name="endNextDay" ${salidaNextDay ? 'checked' : ''} />
+						<span>La salida fue al día siguiente</span>
+					</label>
+					<div class="manual-breaks">
+						<div>
+							<span class="meta-label">Pausas existentes</span>
+							<p class="helper-text">Puedes corregir inicio y fin de cada pausa ya registrada.</p>
+						</div>
+						${breakFields}
+					</div>
+					<label class="field">
+						<span>Motivo del ajuste (opcional)</span>
+						<textarea name="reason" placeholder="Ejemplo: corrección solicitada por olvido al fichar"></textarea>
+					</label>
+					<p class="manual-message" data-manual-message hidden></p>
+					<div class="manual-actions">
+						<button class="button button-primary" type="submit">Guardar ajuste</button>
+						<button class="button button-secondary" type="button" data-action="toggle-manual">Cancelar</button>
+					</div>
+					<fieldset class="hidden" disabled>
 					<label class="field">
 						<span>Tipo</span>
 						<select name="type" required>
@@ -1893,6 +1955,7 @@ import Layout from '../layouts/Layout.astro';
 						<textarea name="reason" required placeholder="Describe el motivo del ajuste"></textarea>
 					</label>
 					<button class="button button-primary" type="submit">Guardar ajuste</button>
+					</fieldset>
 				</form>
 			`;
 		}
@@ -2340,6 +2403,7 @@ import Layout from '../layouts/Layout.astro';
 				feedback = `Descanso iniciado a las ${now}.`;
 			}
 
+			entry.status = recalculateTimeEntryStatus(entry);
 			saveAll();
 			showToast(feedback);
 			renderPage();
@@ -2361,7 +2425,7 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			entry.end = now;
-			entry.status = entry.status === 'incidencia' ? 'incidencia' : 'correcto';
+			entry.status = recalculateTimeEntryStatus(entry);
 			addAudit('Fichaje de salida', `${employee.name} registró salida a las ${now}`);
 			saveAll();
 			showToast(`Salida registrada a las ${now}. Jornada guardada.`);
@@ -2398,7 +2462,7 @@ import Layout from '../layouts/Layout.astro';
 			showToast(manualBox?.classList.contains('hidden') ? 'Formulario de ajuste oculto.' : 'Formulario de ajuste manual abierto.');
 		}
 
-		function saveManualAdjustment(form: HTMLFormElement) {
+		function saveManualAdjustmentLegacy(form: HTMLFormElement) {
 			const employee = currentEmployee();
 			const formData = new FormData(form);
 			const type = String(formData.get('type') || '');
@@ -2437,6 +2501,54 @@ import Layout from '../layouts/Layout.astro';
 			addAudit('Ajuste manual', `${employee.name}: ${type} el ${formatDate(date)} a las ${time}.`);
 			saveAll();
 			showToast('Ajuste guardado y enviado a incidencias.');
+			renderPage();
+		}
+
+		function saveManualAdjustment(form: HTMLFormElement) {
+			const employee = currentEmployee();
+			const formData = new FormData(form);
+			const date = String(formData.get('date') || todayIso());
+			const start = String(formData.get('start') || '').trim();
+			const end = String(formData.get('end') || '').trim();
+			const reason = String(formData.get('reason') || '').trim();
+			let entry = findEntry(employee.id, date);
+			const originalBreaks = entry?.breaks || [];
+			const adjustedBreaks = originalBreaks.map((item, index) => ({
+				...item,
+				start: String(formData.get(`break-start-${index}`) || item.start).trim(),
+				end: String(formData.get(`break-end-${index}`) || '').trim() || undefined,
+			}));
+			const validationMessage = validateManualTimeAdjustment(start, end, adjustedBreaks, Boolean(formData.get('endNextDay')));
+
+			if (validationMessage) {
+				showManualFormMessage(form, validationMessage);
+				return;
+			}
+
+			if (!entry) {
+				entry = {
+					id: uniqueId('entry'),
+					employeeId: employee.id,
+					date,
+					breaks: [],
+					status: 'correcto',
+				};
+				timeEntries.push(entry);
+			}
+
+			entry.start = start;
+			entry.end = end || undefined;
+			entry.breaks = adjustedBreaks;
+			entry.status = recalculateTimeEntryStatus(entry);
+			entry.notes = reason || 'Ajuste manual sin motivo indicado';
+
+			refreshEntryIncident(entry);
+			addAudit(
+				'Ajuste manual',
+				`${employee.name}: registro de ${formatDate(date)} actualizado. ${reason || 'Ajuste manual sin motivo indicado'}.`,
+			);
+			saveAll();
+			showToast('Registro actualizado. Los tiempos se han recalculado.');
 			renderPage();
 		}
 
@@ -3247,7 +3359,7 @@ import Layout from '../layouts/Layout.astro';
 						<div class="break-item break-${item.kind || 'manual'}">
 							<span>${breakLabel(item)}</span>
 							<strong>${item.start} - ${item.end || 'abierta'}</strong>
-							<small>${item.end ? formatMinutes(Math.max(timeToMinutes(item.end) - timeToMinutes(item.start), 0)) : 'En curso'}</small>
+							<small>${item.end ? formatMinutes(elapsedMinutes(item.start, item.end)) : 'En curso'}</small>
 						</div>
 					`).join('')}
 				</div>
@@ -3268,10 +3380,10 @@ import Layout from '../layouts/Layout.astro';
 			if (!end && entry.date === todayIso()) end = activeBreak(entry)?.start || currentTime();
 			if (!end) return 0;
 
-			let total = timeToMinutes(end) - timeToMinutes(entry.start);
+			let total = elapsedMinutes(entry.start, end);
 			entry.breaks.forEach((pause) => {
 				if (!pause.end) return;
-				total -= timeToMinutes(pause.end) - timeToMinutes(pause.start);
+				total -= elapsedMinutes(pause.start, pause.end);
 			});
 			return Math.max(total, 0);
 		}
@@ -3280,8 +3392,120 @@ import Layout from '../layouts/Layout.astro';
 			if (!entry?.breaks.length) return 0;
 			return entry.breaks.reduce((sum, pause) => {
 				const end = pause.end || (entry.date === todayIso() ? currentTime() : pause.start);
-				return sum + Math.max(timeToMinutes(end) - timeToMinutes(pause.start), 0);
+				return sum + elapsedMinutes(pause.start, end);
 			}, 0);
+		}
+
+		function elapsedMinutes(start: string, end: string) {
+			const startMinutes = timeToMinutes(start);
+			let endMinutes = timeToMinutes(end);
+			if (endMinutes < startMinutes) endMinutes += 24 * 60;
+			return Math.max(endMinutes - startMinutes, 0);
+		}
+
+		function validateManualTimeAdjustment(start: string, end: string, breaks: TimeBreak[], endNextDay: boolean) {
+			if (!start) return 'Indica una hora de entrada para guardar el ajuste.';
+			if (!isTimeValue(start)) return 'La hora de entrada no tiene un formato válido.';
+			if (end && !isTimeValue(end)) return 'La hora de salida no tiene un formato válido.';
+
+			const startMinutes = timeToMinutes(start);
+			const endMinutes = end ? relativeWorkdayMinutes(end, start, endNextDay) : undefined;
+
+			if (end && !endNextDay && timeToMinutes(end) < startMinutes) {
+				return 'La salida no debería ser anterior a la entrada. Si fue al día siguiente, marca la opción correspondiente.';
+			}
+
+			for (let index = 0; index < breaks.length; index += 1) {
+				const item = breaks[index];
+				const label = `Pausa ${index + 1}`;
+
+				if (!item.start) return `${label}: indica una hora de inicio.`;
+				if (!isTimeValue(item.start)) return `${label}: el inicio no tiene un formato válido.`;
+				if (item.end && !isTimeValue(item.end)) return `${label}: el fin no tiene un formato válido.`;
+
+				const pauseStart = relativeWorkdayMinutes(item.start, start, endNextDay);
+				const pauseEnd = item.end ? relativeWorkdayMinutes(item.end, start, endNextDay) : undefined;
+
+				if (pauseStart < startMinutes) return `${label}: la pausa no debería empezar antes de la entrada.`;
+				if (pauseEnd !== undefined && pauseEnd < pauseStart) return `${label}: el fin de pausa no debería ser anterior al inicio.`;
+				if (endMinutes !== undefined && pauseStart > endMinutes) return `${label}: la pausa no debería empezar después de la salida.`;
+				if (endMinutes !== undefined && pauseEnd === undefined) return `${label}: completa el fin de pausa antes de guardar una salida.`;
+				if (endMinutes !== undefined && pauseEnd !== undefined && pauseEnd > endMinutes) {
+					return `${label}: la pausa no debería terminar después de la salida.`;
+				}
+			}
+
+			return '';
+		}
+
+		function relativeWorkdayMinutes(value: string, start: string, allowNextDay: boolean) {
+			const minutes = timeToMinutes(value);
+			const startMinutes = timeToMinutes(start);
+			return allowNextDay && minutes < startMinutes ? minutes + 24 * 60 : minutes;
+		}
+
+		function isTimeValue(value: string) {
+			return /^\d{2}:\d{2}$/.test(value);
+		}
+
+		function showManualFormMessage(form: HTMLFormElement, message: string) {
+			const messageElement = form.querySelector<HTMLElement>('[data-manual-message]');
+			if (!messageElement) {
+				showToast(message);
+				return;
+			}
+
+			messageElement.textContent = message;
+			messageElement.hidden = false;
+		}
+
+		function recalculateTimeEntryStatus(entry: TimeEntry): EntryStatus {
+			if (!entry.start) return 'sin fichaje';
+			if (activeBreak(entry)) return 'pendiente';
+			if (!entry.end && entry.date < todayIso()) return 'incidencia';
+			return 'correcto';
+		}
+
+		function refreshEntryIncident(entry: TimeEntry) {
+			const issue = entryIssueDetail(entry);
+			const existing = incidents.find(
+				(incident) =>
+					incident.employeeId === entry.employeeId &&
+					incident.date === entry.date &&
+					incident.type === 'Revisión de fichaje' &&
+					incident.status === 'pendiente',
+			);
+
+			if (issue) {
+				if (existing) {
+					existing.detail = issue;
+					return;
+				}
+
+				incidents.push({
+					id: uniqueId('incident-manual'),
+					employeeId: entry.employeeId,
+					date: entry.date,
+					type: 'Revisión de fichaje',
+					detail: issue,
+					status: 'pendiente',
+					createdAt: new Date().toISOString(),
+				});
+				return;
+			}
+
+			if (existing) {
+				existing.status = 'revisada';
+				existing.reviewedAt = new Date().toISOString();
+			}
+		}
+
+		function entryIssueDetail(entry: TimeEntry) {
+			if (!entry.start) return 'No consta entrada registrada.';
+			if (entry.breaks.some((pause) => !pause.end) && entry.end) return 'Hay una pausa sin hora de fin.';
+			if (!entry.end && entry.date < todayIso()) return 'Jornada sin salida registrada.';
+			if (activeBreak(entry) && entry.date < todayIso()) return 'Descanso sin finalizar.';
+			return '';
 		}
 
 		function workedMinutesThisWeek(employeeId: string) {
