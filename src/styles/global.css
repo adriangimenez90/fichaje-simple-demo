@@ -312,16 +312,53 @@ textarea:focus-visible {
 	font-size: 1.05rem;
 }
 
-.demo-try ul {
+.demo-feature-grid {
 	display: grid;
-	gap: 8px;
-	margin: 0;
-	padding-left: 18px;
-	color: var(--muted-strong);
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
 }
 
-.demo-try li {
-	padding-left: 2px;
+.demo-feature-card {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	min-width: 0;
+	border: 1px solid #dce7e4;
+	border-radius: 8px;
+	background:
+		linear-gradient(180deg, #ffffff, #f8fbfa),
+		#ffffff;
+	padding: 14px;
+	box-shadow: 0 10px 26px rgba(15, 31, 28, 0.06);
+}
+
+.demo-feature-icon {
+	display: inline-flex;
+	flex: 0 0 34px;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 8px;
+	background: #e8f6f1;
+	color: var(--primary-dark);
+	font-size: 1rem;
+	font-weight: 700;
+}
+
+.demo-feature-card strong {
+	display: block;
+	color: var(--text);
+	font-size: 0.96rem;
+	font-weight: 700;
+	line-height: 1.25;
+}
+
+.demo-feature-card p {
+	margin: 4px 0 0;
+	color: var(--muted);
+	font-size: 0.88rem;
+	line-height: 1.4;
 }
 
 .login-snapshot span,
@@ -2220,6 +2257,14 @@ tr:last-child td {
 
 	.demo-warning,
 	.demo-try {
+		padding: 12px;
+	}
+
+	.demo-feature-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.demo-feature-card {
 		padding: 12px;
 	}
 
