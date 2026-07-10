@@ -378,10 +378,68 @@ textarea:focus-visible {
 	font-weight: 700;
 }
 
-.quick-login {
+.quick-login,
+.profile-login,
+.profile-grid {
 	display: grid;
-	grid-template-columns: 1fr;
 	gap: 10px;
+}
+
+.profile-grid {
+	grid-template-columns: 1fr;
+}
+
+.profile-card {
+	display: grid;
+	gap: 4px;
+	width: 100%;
+	min-height: 76px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	color: var(--text);
+	padding: 14px;
+	text-align: left;
+	transition:
+		background 160ms ease,
+		border-color 160ms ease,
+		box-shadow 160ms ease,
+		transform 160ms ease;
+}
+
+.profile-card:hover {
+	border-color: #b9c9c6;
+	background: #f8fbfa;
+	box-shadow: var(--shadow-soft);
+	transform: translateY(-1px);
+}
+
+.profile-card span {
+	color: var(--primary-dark);
+	font-size: 0.78rem;
+	font-weight: 650;
+}
+
+.profile-card strong {
+	font-size: 1rem;
+	font-weight: 720;
+}
+
+.manual-login {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 12px;
+}
+
+.manual-login summary {
+	cursor: pointer;
+	color: var(--muted-strong);
+	font-weight: 650;
+}
+
+.manual-login .login-form {
+	margin-top: 14px;
 }
 
 .trial-users,

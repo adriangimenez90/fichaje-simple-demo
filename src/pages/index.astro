@@ -44,72 +44,61 @@ import Layout from '../layouts/Layout.astro';
 		</section>
 
 		<section class="login-panel" aria-label="Acceso a la demo">
-			<form id="login-form" class="login-form">
+			<div class="profile-login">
 				<div class="form-heading">
-					<p class="eyebrow">Acceso de prueba</p>
-					<h2>Entrar en la demo</h2>
+					<p class="eyebrow">Acceso rápido</p>
+					<h2>Elige un perfil para probar la demo</h2>
 				</div>
-
-				<label>
-					<span>Email</span>
-					<input
-						id="email"
-						name="email"
-						type="email"
-						autocomplete="username"
-						placeholder="admin.demo@fichajesimple.es"
-						required
-					/>
-				</label>
-
-				<label>
-					<span>Contraseña</span>
-					<input
-						id="password"
-						name="password"
-						type="password"
-						autocomplete="current-password"
-						placeholder="1234"
-						required
-					/>
-				</label>
-
-				<p id="login-error" class="form-error" role="alert" hidden>
-					Revisa el email y la contraseña de la demo.
-				</p>
-
-				<button class="button button-primary" type="submit">Entrar</button>
-			</form>
-
-			<div class="quick-login" aria-label="Accesos rápidos">
-				<button class="button button-secondary" type="button" data-login="admin_global">
-					Entrar como administrador global
-				</button>
-				<button class="button button-secondary" type="button" data-login="validador_vacaciones">
-					Entrar como validador de vacaciones
-				</button>
-				<button class="button button-secondary" type="button" data-login="ana">
-					Entrar como empleado
-				</button>
-			</div>
-
-			<div class="trial-users" aria-label="Usuarios de prueba">
-				<h2>Usuarios de prueba</h2>
-				<div class="trial-user-list">
-					<div>
-						<span>Administrador global</span>
-						<strong>admin.demo@fichajesimple.es / 1234</strong>
-					</div>
-					<div>
-						<span>Validador vacaciones</span>
-						<strong>vacaciones.demo@fichajesimple.es / 1234</strong>
-					</div>
-					<div>
+				<div class="profile-grid" aria-label="Perfiles de prueba">
+					<button class="profile-card" type="button" data-login="admin_global">
+						<span>Administración</span>
+						<strong>Entrar como administrador</strong>
+					</button>
+					<button class="profile-card" type="button" data-login="validador_vacaciones">
+						<span>Vacaciones</span>
+						<strong>Entrar como validador de vacaciones</strong>
+					</button>
+					<button class="profile-card" type="button" data-login="ana">
 						<span>Empleado</span>
-						<strong>ana.demo@fichajesimple.es / 1234</strong>
-					</div>
+						<strong>Entrar como empleado</strong>
+					</button>
 				</div>
 			</div>
+
+			<details class="manual-login">
+				<summary>Acceso manual de demo</summary>
+				<form id="login-form" class="login-form">
+					<label>
+						<span>Email</span>
+						<input
+							id="email"
+							name="email"
+							type="email"
+							autocomplete="username"
+							placeholder="Email de demo"
+							required
+						/>
+					</label>
+
+					<label>
+						<span>Contraseña</span>
+						<input
+							id="password"
+							name="password"
+							type="password"
+							autocomplete="current-password"
+							placeholder="Contraseña de demo"
+							required
+						/>
+					</label>
+
+					<p id="login-error" class="form-error" role="alert" hidden>
+						Revisa el email y la contraseña de la demo.
+					</p>
+
+					<button class="button button-secondary" type="submit">Entrar manualmente</button>
+				</form>
+			</details>
 
 			<p class="demo-notice">
 				Demo pública con datos ficticios. No válida como registro horario real. Los cambios se guardan únicamente en tu navegador.
