@@ -10,20 +10,16 @@ import Layout from '../layouts/Layout.astro';
 					<img class="brand-icon" src="/brand/fichajesimple-icon.png" alt="FichajeSimple" />
 					<div>
 						<strong>FichajeSimple</strong>
-						<span class="muted-line">Sourcing Demo S.L. · Valencia</span>
+						<span class="muted-line">Empresa demo · Sourcing Demo S.L.</span>
 					</div>
 				</div>
-				<span class="demo-badge">Demo pública</span>
-				<div class="company-chip">
-					<span>Empresa demo</span>
-					<strong>Sourcing Demo S.L.</strong>
-				</div>
+				<span class="demo-badge">Demo pública · Datos ficticios · Navegador</span>
 			</div>
 
 			<div class="header-actions">
 				<div id="user-chip" class="user-chip"></div>
-				<button id="reset-demo" class="button button-ghost button-small" type="button">
-					Restablecer demo
+				<button id="reset-demo" class="button button-tertiary button-small reset-demo-button" type="button">
+					Reset
 				</button>
 				<button id="logout" class="button button-secondary button-small" type="button">
 					Cerrar sesión
@@ -331,6 +327,10 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'toggle-user') toggleUser(actionButton.dataset.id || '');
 				if (action === 'rotate-user-role') rotateUserRole(actionButton.dataset.id || '');
 				if (action === 'simulate-edit-user') simulateEditUser(actionButton.dataset.id || '');
+				if (action === 'reset-demo') {
+					resetDemoData();
+					showToast('Demo restablecida con datos ficticios iniciales.');
+				}
 			});
 
 			document.addEventListener('change', (event) => {
@@ -415,6 +415,7 @@ import Layout from '../layouts/Layout.astro';
 		function renderNav() {
 			const views = getViews();
 			const currentRoleLabel = roleLabel(session.role);
+			const groupedViews = navigationGroups(views);
 			const navIntro = `
 				<div class="nav-context">
 					<span>Vista activa</span>
@@ -422,23 +423,13 @@ import Layout from '../layouts/Layout.astro';
 					<small>${roleHint(session.role)}</small>
 				</div>
 			`;
-			const sidebarHtml = views
-				.map(
-					(view) => `
-						<button
-							class="button nav-button"
-							type="button"
-							data-view="${view.id}"
-							aria-current="${activeView === view.id ? 'page' : 'false'}"
-						>
-							<span class="nav-dot" aria-hidden="true"></span>
-							<span>
-								<strong>${view.label}</strong>
-								<small>${view.hint}</small>
-							</span>
-						</button>
-					`,
-				)
+			const sidebarHtml = groupedViews
+				.map((group) => `
+					<div class="nav-group">
+						${group.label ? `<span class="nav-group-label">${group.label}</span>` : ''}
+						${group.items.map(renderNavButton).join('')}
+					</div>
+				`)
 				.join('');
 			const mobileHtml = views
 				.map(
@@ -457,6 +448,23 @@ import Layout from '../layouts/Layout.astro';
 
 			if (sidebarNav) sidebarNav.innerHTML = navIntro + sidebarHtml;
 			if (mobileNav) mobileNav.innerHTML = mobileHtml;
+		}
+
+		function renderNavButton(view: { id: string; label: string; hint: string }) {
+			return `
+				<button
+					class="button nav-button"
+					type="button"
+					data-view="${view.id}"
+					aria-current="${activeView === view.id ? 'page' : 'false'}"
+				>
+					<span class="nav-dot" aria-hidden="true"></span>
+					<span>
+						<strong>${view.label}</strong>
+						<small>${view.hint}</small>
+					</span>
+				</button>
+			`;
 		}
 
 		function renderPage() {
@@ -1765,6 +1773,9 @@ import Layout from '../layouts/Layout.astro';
 					<p class="helper-text">
 						La sesión, fichajes, vacaciones, incidencias, festivos, informes programados y auditoría se guardan únicamente en el navegador.
 					</p>
+					<div class="top-gap">
+						<button class="button button-tertiary" type="button" data-action="reset-demo">Restablecer demo</button>
+					</div>
 				</section>
 			`;
 		}
@@ -3098,6 +3109,27 @@ import Layout from '../layouts/Layout.astro';
 			if (session.role === 'admin_global') return ADMIN_VIEWS;
 			if (session.role === 'validador_vacaciones') return VALIDATOR_VIEWS;
 			return EMPLOYEE_VIEWS;
+		}
+
+		function navigationGroups(views: { id: string; label: string; hint: string }[]) {
+			if (session.role === 'admin_global') {
+				return [
+					{ label: 'Principal', items: views.filter((view) => ['dashboard', 'usuarios'].includes(view.id)) },
+					{
+						label: 'Gestión',
+						items: views.filter((view) =>
+							['fichajes', 'vacaciones-admin', 'incidencias', 'informes', 'exportaciones'].includes(view.id),
+						),
+					},
+					{ label: 'Sistema', items: views.filter((view) => ['festivos', 'auditoria', 'configuracion'].includes(view.id)) },
+				].filter((group) => group.items.length);
+			}
+
+			if (session.role === 'validador_vacaciones') {
+				return [{ label: 'Vacaciones', items: views }];
+			}
+
+			return [{ label: '', items: views }];
 		}
 
 		function defaultViewForRole(role: Role) {
