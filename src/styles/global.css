@@ -1503,6 +1503,54 @@ textarea:focus-visible {
 	grid-column: 1 / -1;
 }
 
+.admin-vacation-controls {
+	grid-template-columns: repeat(3, minmax(170px, 1fr)) auto;
+	align-items: end;
+}
+
+.admin-vacation-calendar-panel {
+	display: grid;
+	gap: 14px;
+}
+
+.admin-vacation-toolbar {
+	margin-top: 2px;
+}
+
+.admin-vacation-card-list {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.admin-vacation-card {
+	display: grid;
+	gap: 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 14px;
+	box-shadow: 0 4px 14px rgba(23, 33, 31, 0.04);
+}
+
+.admin-vacation-card > div:first-child {
+	display: grid;
+	gap: 2px;
+}
+
+.admin-vacation-card strong {
+	color: var(--text);
+}
+
+.admin-vacation-card span {
+	color: var(--muted);
+	font-size: 0.88rem;
+}
+
+.admin-vacation-secondary .panel-heading {
+	margin-bottom: 12px;
+}
+
 .record-detail {
 	border: 1px solid var(--line);
 	border-radius: 8px;
@@ -2600,6 +2648,80 @@ textarea:focus-visible {
 	padding: 11px 12px;
 }
 
+.compact-export-help {
+	margin: 12px 0 0;
+}
+
+.export-reports-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.export-report-mobile-list {
+	display: none;
+	gap: 10px;
+}
+
+.export-report-mobile-card {
+	display: grid;
+	gap: 8px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 12px;
+}
+
+.export-report-mobile-card > strong {
+	color: var(--text);
+	font-size: 0.98rem;
+}
+
+.settings-reset-card {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 14px;
+	margin-top: 14px;
+	border: 1px solid #d7e6e2;
+	border-radius: 8px;
+	background: var(--surface-soft);
+	padding: 12px;
+}
+
+.settings-reset-card div {
+	display: grid;
+	gap: 2px;
+}
+
+.settings-reset-card span,
+.settings-audit-details small,
+.settings-audit-list small {
+	color: var(--muted);
+	font-size: 0.86rem;
+}
+
+.settings-audit-details summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	cursor: pointer;
+}
+
+.settings-audit-details summary span {
+	display: grid;
+	gap: 2px;
+}
+
+.settings-audit-list {
+	display: grid;
+	gap: 8px;
+	margin-top: 14px;
+}
+
+.settings-note-panel {
+	background: var(--surface-soft);
+}
+
 .table-wrap {
 	overflow-x: auto;
 	border: 1px solid var(--line);
@@ -3005,6 +3127,7 @@ tr:last-child td {
 
 	.compact-form,
 	.admin-filters,
+	.admin-vacation-controls,
 	.team-calendar-controls {
 		grid-template-columns: 1fr;
 	}
@@ -3038,6 +3161,16 @@ tr:last-child td {
 
 	.team-calendar-meta {
 		grid-template-columns: 1fr;
+	}
+
+	.admin-vacation-card-list,
+	.export-reports-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.settings-reset-card {
+		align-items: stretch;
+		flex-direction: column;
 	}
 
 	.vacation-matrix .sticky-col {
@@ -3078,6 +3211,14 @@ tr:last-child td {
 	.report-table-wrap table,
 	.report-table {
 		min-width: 640px;
+	}
+
+	.export-report-card .report-table-wrap {
+		display: none;
+	}
+
+	.export-report-mobile-list {
+		display: grid;
 	}
 
 	.status-pill {

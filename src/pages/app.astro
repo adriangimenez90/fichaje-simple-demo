@@ -45,6 +45,7 @@ import Layout from '../layouts/Layout.astro';
 		type EntryStatus = 'correcto' | 'incidencia' | 'pendiente' | 'sin fichaje';
 		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada' | 'cancelada';
 		type EmployeeVacationFilter = 'all' | 'aprobada-futura' | 'disfrutada' | VacationStatus;
+		type AdminVacationStatusFilter = 'all' | 'activa' | 'pendiente' | 'aprobada' | 'disfrutada' | 'denegada';
 		type IncidentStatus = 'pendiente' | 'revisada';
 		type TeamCalendarMode = 'month' | 'planning';
 		type AdminTodayFilter = 'all' | 'trabajando' | 'pausa' | 'sin-fichar';
@@ -220,6 +221,17 @@ import Layout from '../layouts/Layout.astro';
 		let teamCalendarMode: TeamCalendarMode = 'month';
 		let teamCalendarCursor = new Date();
 		let selectedTeamCalendarDay = '';
+		let adminVacationCursor = new Date();
+		let selectedAdminVacationDay = '';
+		let adminVacationFilters: {
+			employeeId: string;
+			department: string;
+			status: AdminVacationStatusFilter;
+		} = {
+			employeeId: 'all',
+			department: 'all',
+			status: 'activa',
+		};
 		let vacationHistoryFilters = {
 			employeeId: 'all',
 			department: 'all',
@@ -327,6 +339,9 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'employee-vacation-week-prev') shiftEmployeeVacationPreviewWeek(-7);
 				if (action === 'employee-vacation-week-next') shiftEmployeeVacationPreviewWeek(7);
 				if (action === 'cancel-employee-vacation') cancelEmployeeVacation(actionButton.dataset.id || '');
+				if (action === 'admin-vacation-prev') changeAdminVacationMonth(-1);
+				if (action === 'admin-vacation-next') changeAdminVacationMonth(1);
+				if (action === 'admin-vacation-day') selectAdminVacationDay(actionButton.dataset.date || todayIso());
 				if (action === 'team-calendar-prev') changeTeamCalendarMonth(-1);
 				if (action === 'team-calendar-next') changeTeamCalendarMonth(1);
 				if (action === 'team-calendar-day') selectTeamCalendarDay(actionButton.dataset.date || todayIso());
@@ -405,6 +420,11 @@ import Layout from '../layouts/Layout.astro';
 				if (form.matches('#team-calendar-filter-form')) {
 					event.preventDefault();
 					applyTeamCalendarFilters(form);
+				}
+
+				if (form.matches('#admin-vacation-filter-form')) {
+					event.preventDefault();
+					applyAdminVacationFilters(form);
 				}
 
 				if (form.matches('#vacation-history-filter-form')) {
@@ -1148,42 +1168,289 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderAdminVacations() {
-			const sorted = vacations.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-			const selected =
-				vacations.find((request) => request.id === selectedVacationId) ||
-				vacations.find((request) => request.status === 'pendiente') ||
-				vacations[0];
-			selectedVacationId = selected?.id || '';
+			const visibleEmployees = adminVacationEmployees();
+			const monthRequests = adminVacationMonthRequests(visibleEmployees)
+				.filter((request) => request.status === 'aprobada' || request.status === 'pendiente')
+				.sort((a, b) => a.from.localeCompare(b.from));
+			const deniedRequests = adminDeniedVacationRequests();
 
 			return `
-				${sectionTitle('Vacaciones', 'Aprueba, deniega y compara coincidencias entre empleados.')}
-				<div class="grid grid-2">
-					<section class="panel">
-						<h2>Solicitudes</h2>
-						${sorted.length ? sorted.map((request) => `
-							<button
-								class="vacation-select ${selected?.id === request.id ? 'is-active' : ''}"
-								type="button"
-								data-action="select-vacation"
-								data-id="${request.id}"
-							>
-								<span>
-									<strong>${employeeName(request.employeeId)}</strong>
-									${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días
-								</span>
-								${pill(request.status)}
-							</button>
-						`).join('') : emptyState('No hay solicitudes de vacaciones.')}
-					</section>
-					<section class="panel">
-						<h2>Detalle y coincidencias</h2>
-						${selected ? renderVacationAdminDetail(selected) : emptyState('Selecciona una solicitud.')}
-					</section>
+				${sectionTitle('Vacaciones', 'Consulta vacaciones y ausencias del equipo. La validación corresponde al responsable de vacaciones.')}
+				${renderAdminVacationCalendar(visibleEmployees)}
+				<section class="panel top-gap admin-vacation-secondary">
+					<div class="panel-heading">
+						<div>
+							<h2>Solicitudes del mes</h2>
+							<p class="helper-text">Vista de consulta sin acciones de aprobación o denegación.</p>
+						</div>
+					</div>
+					${renderAdminVacationCards(monthRequests, 'No hay solicitudes aprobadas o pendientes con estos filtros.')}
+				</section>
+				<section class="panel top-gap admin-vacation-secondary">
+					<div class="panel-heading">
+						<div>
+							<h2>Solicitudes denegadas</h2>
+							<p class="helper-text">Listado secundario con motivo y fecha de decisión, si está disponible.</p>
+						</div>
+					</div>
+					${renderAdminDeniedVacationCards(deniedRequests)}
+				</section>
+			`;
+		}
+
+		function renderAdminVacationCalendar(employees: Employee[]) {
+			const departments = departmentList();
+			const employeeOptions = adminVacationFilters.department === 'all'
+				? EMPLOYEES
+				: departmentEmployees(adminVacationFilters.department);
+			const monthLabel = adminVacationCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+			const monthRequests = adminVacationMonthRequests(employees);
+			const approvedCount = monthRequests.filter((request) => request.status === 'aprobada').length;
+			const pendingCount = monthRequests.filter((request) => request.status === 'pendiente').length;
+
+			return `
+				<section class="panel admin-vacation-calendar-panel">
+					<div class="panel-heading">
+						<div>
+							<h2>Calendario de vacaciones</h2>
+							<p class="helper-text">Consulta ocupación por días, festivos y fines de semana. Esta vista es solo lectura.</p>
+						</div>
+					</div>
+					<form id="admin-vacation-filter-form" class="form-grid admin-vacation-controls">
+						<label class="field">
+							<span>Departamento</span>
+							<select name="department">
+								<option value="all" ${adminVacationFilters.department === 'all' ? 'selected' : ''}>Todos</option>
+								${departments.map((department) => `<option value="${department}" ${adminVacationFilters.department === department ? 'selected' : ''}>${department}</option>`).join('')}
+							</select>
+						</label>
+						<label class="field">
+							<span>Empleado</span>
+							<select name="employeeId">
+								<option value="all" ${adminVacationFilters.employeeId === 'all' ? 'selected' : ''}>Todos</option>
+								${employeeOptions.map((employee) => `<option value="${employee.id}" ${adminVacationFilters.employeeId === employee.id ? 'selected' : ''}>${employee.name}</option>`).join('')}
+							</select>
+						</label>
+						<label class="field">
+							<span>Estado</span>
+							<select name="status">
+								<option value="activa" ${adminVacationFilters.status === 'activa' ? 'selected' : ''}>Aprobadas y pendientes</option>
+								<option value="all" ${adminVacationFilters.status === 'all' ? 'selected' : ''}>Todas</option>
+								<option value="aprobada" ${adminVacationFilters.status === 'aprobada' ? 'selected' : ''}>Aprobadas</option>
+								<option value="pendiente" ${adminVacationFilters.status === 'pendiente' ? 'selected' : ''}>Pendientes</option>
+								<option value="disfrutada" ${adminVacationFilters.status === 'disfrutada' ? 'selected' : ''}>Disfrutadas</option>
+								<option value="denegada" ${adminVacationFilters.status === 'denegada' ? 'selected' : ''}>Denegadas</option>
+							</select>
+						</label>
+						<button class="button button-secondary button-small" type="submit">Aplicar</button>
+					</form>
+					<div class="calendar-toolbar admin-vacation-toolbar">
+						<button class="button button-secondary button-small" type="button" data-action="admin-vacation-prev">← Mes anterior</button>
+						<h2>${monthLabel}</h2>
+						<button class="button button-secondary button-small" type="button" data-action="admin-vacation-next">Mes siguiente →</button>
+					</div>
+					${teamVacationLegend()}
+					${renderAdminVacationMonthCalendar(employees)}
+					<div class="team-calendar-meta admin-vacation-meta">
+						${metricCard('Personas visibles', String(employees.length), 'correcto')}
+						${metricCard('Aprobadas del mes', String(approvedCount), 'vacaciones')}
+						${metricCard('Pendientes del mes', String(pendingCount), pendingCount ? 'pendiente' : 'correcto')}
+					</div>
+				</section>
+			`;
+		}
+
+		function renderAdminVacationMonthCalendar(employees: Employee[]) {
+			if (!employees.length) return emptyState('No hay empleados con estos filtros.');
+
+			const year = adminVacationCursor.getFullYear();
+			const month = adminVacationCursor.getMonth();
+			const first = new Date(year, month, 1);
+			const startOffset = (first.getDay() + 6) % 7;
+			const start = new Date(year, month, 1 - startOffset);
+			const cells = Array.from({ length: 42 }, (_, index) => {
+				const date = new Date(start);
+				date.setDate(start.getDate() + index);
+				const iso = isoFromDate(date);
+				const dayData = adminVacationDayData(iso, employees);
+				const dayStatus = teamVacationDayStatus(dayData, iso);
+				const names = uniqueVacationNames([...dayData.approved, ...dayData.pending]);
+				const visibleNames = names.slice(0, 3);
+				const extraCount = Math.max(names.length - visibleNames.length, 0);
+				const isCurrentMonth = date.getMonth() === month;
+
+				return `
+					<button
+						class="team-calendar-day admin-vacation-day team-day-${dayStatus} ${isCurrentMonth ? '' : 'is-muted'} ${selectedAdminVacationDay === iso ? 'is-selected' : ''}"
+						type="button"
+						data-action="admin-vacation-day"
+						data-date="${iso}"
+						title="${teamVacationTooltip(iso, dayData)}"
+					>
+						<strong>${date.getDate()}</strong>
+						<div class="team-day-names">
+							${visibleNames.map((name) => `<span>${escapeHtml(name)}</span>`).join('')}
+							${extraCount ? `<span class="more-count">+${extraCount} más</span>` : ''}
+						</div>
+					</button>
+				`;
+			}).join('');
+
+			return `
+				<div class="team-calendar-grid top-gap" aria-label="Calendario mensual de vacaciones">
+					${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day) => `<div class="calendar-head">${day}</div>`).join('')}
+					${cells}
 				</div>
-				<div class="admin-section-stack">
-					${renderTeamCalendarContent()}
+				${selectedAdminVacationDay ? renderAdminVacationDayDetail(selectedAdminVacationDay, employees) : ''}
+			`;
+		}
+
+		function renderAdminVacationDayDetail(date: string, employees: Employee[]) {
+			const dayData = adminVacationDayData(date, employees);
+			const holiday = holidays.find((item) => item.date === date);
+			const dayStatus = teamVacationDayStatus(dayData, date);
+
+			return `
+				<section class="team-day-detail admin-vacation-day-detail top-gap" aria-live="polite">
+					<div class="day-detail-head">
+						<div>
+							<span class="meta-label">Detalle del día</span>
+							<h3>${formatDate(date)}</h3>
+						</div>
+						${pill(teamVacationDayStatusLabel(dayStatus), dayStatus)}
+					</div>
+					<div class="summary-list team-day-flags">
+						${summaryRow('Festivo', holiday ? `${escapeHtml(holiday.name)} · ${escapeHtml(holiday.center)}` : 'No')}
+						${summaryRow('Fin de semana', isWeekend(date) ? 'Sí' : 'No')}
+					</div>
+					${dayData.approved.length || dayData.pending.length ? `
+						<div class="grid grid-2">
+							<div>
+								<h4>Aprobadas</h4>
+								${renderTeamVacationList(dayData.approved)}
+							</div>
+							<div>
+								<h4>Pendientes</h4>
+								${renderTeamVacationList(dayData.pending)}
+							</div>
+						</div>
+					` : emptyState('Sin vacaciones registradas.')}
+				</section>
+			`;
+		}
+
+		function renderAdminVacationCards(requests: VacationRequest[], emptyMessage: string) {
+			if (!requests.length) return emptyState(emptyMessage);
+
+			return `
+				<div class="admin-vacation-card-list">
+					${requests.map((request) => {
+						const employee = employeeById(request.employeeId);
+						const label = request.status === 'aprobada' && isEnjoyedVacation(request) ? 'Disfrutada' : STATUS_LABELS[request.status] || request.status;
+						return `
+							<article class="admin-vacation-card">
+								<div>
+									<strong>${employeeName(request.employeeId)}</strong>
+									<span>${escapeHtml(employee?.department || 'Sin departamento')}</span>
+								</div>
+								<div class="admin-card-grid">
+									${summaryRow('Fechas', `${formatDate(request.from)} - ${formatDate(request.to)}`)}
+									${summaryRow('Días laborables', String(vacationRequestDays(request)))}
+									${summaryRow('Estado', pill(label, request.status))}
+									${summaryRow('Comentario', escapeHtml(request.comment || 'Sin comentario'))}
+								</div>
+							</article>
+						`;
+					}).join('')}
 				</div>
 			`;
+		}
+
+		function renderAdminDeniedVacationCards(requests: VacationRequest[]) {
+			if (!requests.length) return emptyState('No hay solicitudes denegadas con estos filtros.');
+
+			return `
+				<div class="admin-vacation-card-list denied-vacation-list">
+					${requests.map((request) => {
+						const employee = employeeById(request.employeeId);
+						return `
+							<article class="admin-vacation-card">
+								<div>
+									<strong>${employeeName(request.employeeId)}</strong>
+									<span>${escapeHtml(employee?.department || 'Sin departamento')}</span>
+								</div>
+								<div class="admin-card-grid">
+									${summaryRow('Fechas', `${formatDate(request.from)} - ${formatDate(request.to)}`)}
+									${summaryRow('Días laborables', String(vacationRequestDays(request)))}
+									${summaryRow('Motivo', escapeHtml(request.denialReason || 'Sin motivo registrado'))}
+									${summaryRow('Decisión', request.decidedAt ? formatDateTime(request.decidedAt) : 'Sin fecha')}
+								</div>
+							</article>
+						`;
+					}).join('')}
+				</div>
+			`;
+		}
+
+		function adminVacationEmployees() {
+			return EMPLOYEES.filter((employee) => {
+				if (adminVacationFilters.department !== 'all' && employee.department !== adminVacationFilters.department) return false;
+				if (adminVacationFilters.employeeId !== 'all' && employee.id !== adminVacationFilters.employeeId) return false;
+				return true;
+			});
+		}
+
+		function adminVacationMonthDateRange() {
+			const year = adminVacationCursor.getFullYear();
+			const month = adminVacationCursor.getMonth();
+			return dateRange(isoFromDate(new Date(year, month, 1)), isoFromDate(new Date(year, month + 1, 0)));
+		}
+
+		function adminVacationMonthRequests(employees: Employee[]) {
+			const monthDays = adminVacationMonthDateRange();
+			const from = monthDays[0];
+			const to = monthDays[monthDays.length - 1];
+			const employeeIds = new Set(employees.map((employee) => employee.id));
+			return vacations
+				.filter((request) => employeeIds.has(request.employeeId))
+				.filter(adminVacationRequestMatchesStatus)
+				.filter((request) => businessRangesOverlap(from, to, request.from, request.to));
+		}
+
+		function adminVacationRequestsForDate(date: string, employees: Employee[]) {
+			if (!isBusinessDay(date)) return [];
+
+			const employeeIds = new Set(employees.map((employee) => employee.id));
+			return vacations
+				.filter((request) => employeeIds.has(request.employeeId))
+				.filter((request) => request.status === 'aprobada' || request.status === 'pendiente')
+				.filter(adminVacationRequestMatchesStatus)
+				.filter((request) => isDateWithin(date, request.from, request.to));
+		}
+
+		function adminVacationDayData(date: string, employees: Employee[]) {
+			const dayRequests = adminVacationRequestsForDate(date, employees);
+			return {
+				approved: dayRequests.filter((request) => request.status === 'aprobada'),
+				pending: dayRequests.filter((request) => request.status === 'pendiente'),
+			};
+		}
+
+		function adminVacationRequestMatchesStatus(request: VacationRequest) {
+			if (adminVacationFilters.status === 'all') return true;
+			if (adminVacationFilters.status === 'activa') return request.status === 'aprobada' || request.status === 'pendiente';
+			if (adminVacationFilters.status === 'disfrutada') return isEnjoyedVacation(request);
+			return request.status === adminVacationFilters.status;
+		}
+
+		function adminDeniedVacationRequests() {
+			const year = String(adminVacationCursor.getFullYear());
+			const employees = new Set(adminVacationEmployees().map((employee) => employee.id));
+			return vacations
+				.filter((request) => request.status === 'denegada')
+				.filter((request) => employees.has(request.employeeId))
+				.filter((request) => request.from.startsWith(year) || request.to.startsWith(year))
+				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 		}
 
 		function renderValidatorRequests() {
@@ -1871,48 +2138,49 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			return `
-				${sectionTitle('Exportar', 'Descargas manuales e informes para responsables de empresa.')}
-				<section class="panel">
-					<p class="helper-text export-help">
-						Solo los administradores globales pueden exportar datos de fichaje, vacaciones, incidencias y auditoría.
-					</p>
-					<p class="helper-text export-help">
-						Las exportaciones manuales permiten descargar datos concretos. Los informes programados enviarían resúmenes automáticos en producción.
-					</p>
-					<form id="export-form" class="form-grid admin-filters">
-						<label class="field">
-							<span>Tipo</span>
-							<select name="type">
-								<option value="fichajes">Fichajes</option>
-								<option value="vacaciones">Vacaciones</option>
-								<option value="incidencias">Incidencias</option>
-								<option value="auditoria">Auditoría</option>
-							</select>
-						</label>
+				${sectionTitle('Exportar', 'Descarga fichajes y revisa reportes útiles de horas esperadas.')}
+				<section class="panel export-primary-panel">
+					<div class="panel-heading">
+						<div>
+							<h2>Exportación CSV de fichajes</h2>
+							<p class="helper-text">Filtra los registros y descarga un CSV. Solo los administradores globales pueden exportar datos.</p>
+						</div>
+					</div>
+					<form id="time-filter-form" class="form-grid admin-filters export-timesheet-form">
 						<label class="field">
 							<span>Empleado</span>
 							<select name="employeeId">
-								<option value="all">Todos los empleados</option>
-								${EMPLOYEES.map((employee) => `<option value="${employee.id}">${employee.name}</option>`).join('')}
+								<option value="all" ${timeFilters.employeeId === 'all' ? 'selected' : ''}>Todos los empleados</option>
+								${EMPLOYEES.map((employee) => `<option value="${employee.id}" ${timeFilters.employeeId === employee.id ? 'selected' : ''}>${employee.name}</option>`).join('')}
 							</select>
 						</label>
 						<label class="field">
 							<span>Fecha desde</span>
-							<input type="date" name="from" value="${startOfMonthIso(new Date())}" />
+							<input type="date" name="from" value="${timeFilters.from}" />
 						</label>
 						<label class="field">
 							<span>Fecha hasta</span>
-							<input type="date" name="to" value="${todayIso()}" />
+							<input type="date" name="to" value="${timeFilters.to}" />
+						</label>
+						<label class="field">
+							<span>Estado</span>
+							<select name="status">
+								<option value="all" ${timeFilters.status === 'all' ? 'selected' : ''}>Todos</option>
+								<option value="correcto" ${timeFilters.status === 'correcto' ? 'selected' : ''}>Correcto</option>
+								<option value="incidencia" ${timeFilters.status === 'incidencia' ? 'selected' : ''}>Incidencia</option>
+								<option value="pendiente" ${timeFilters.status === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+							</select>
 						</label>
 						<div class="table-actions">
-							<button class="button button-primary" type="button" data-action="export-generic">Exportar CSV</button>
-							<button class="button button-secondary" type="button" data-action="simulate-pdf">Simular PDF</button>
+							<button class="button button-secondary" type="submit">Aplicar filtros</button>
+							<button class="button button-primary" type="button" data-action="export-timesheets">Exportar CSV</button>
 						</div>
 					</form>
+					<p class="helper-text export-help compact-export-help">
+						Para todos los empleados el máximo es 31 días. Para un empleado concreto, hasta 3 meses.
+					</p>
 				</section>
-				<div class="admin-section-stack">
-					${renderReportsContent()}
-				</div>
+				${renderExportHoursReports()}
 			`;
 		}
 
@@ -1958,46 +2226,67 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderSettings() {
 			return `
-				${sectionTitle('Ajustes', 'Festivos, auditoría, configuración y datos locales de la demo.')}
+				${sectionTitle('Ajustes', 'Configuración básica de la demo y datos guardados en este navegador.')}
 				${renderSettingsContent()}
-				<div class="admin-section-stack">
-					${renderHolidaysContent()}
-					${renderAuditContent()}
-				</div>
 			`;
 		}
 
 		function renderSettingsContent() {
+			const recentAudit = auditLog.slice(0, 8);
+
 			return `
 				<div class="grid grid-2">
 					<section class="panel">
-						<h2>Empresa</h2>
+						<h2>Datos de la demo</h2>
 						<div class="summary-list">
 							${summaryRow('Razón social', 'Empresa Demo')}
 							${summaryRow('Centro', 'Centro Principal')}
-							${summaryRow('Modo de datos', 'Ficticio, localStorage')}
+							${summaryRow('Modo de datos', 'Datos en navegador')}
 							${summaryRow('Validez legal', 'Demo pública con datos ficticios. No válida como registro horario real.')}
-							${summaryRow('Backend', 'No configurado')}
+							${summaryRow('Personalización', 'Empresa y centro preparados para parametrizar en una futura versión.')}
 						</div>
 					</section>
 					<section class="panel">
-						<h2>Usuarios demo</h2>
-						<div class="summary-list">
-							${summaryRow('Administrador global', 'admin.demo@fichajesimple.es / 1234')}
-							${summaryRow('Responsable de vacaciones', 'vacaciones.demo@fichajesimple.es / 1234')}
-							${summaryRow('Empleado Ana', 'ana.demo@fichajesimple.es / 1234')}
-							${summaryRow('Empleado Miguel', 'miguel.demo@fichajesimple.es / 1234')}
+						<h2>Restablecer demo</h2>
+						<p class="helper-text">
+							La sesión, fichajes, vacaciones, incidencias y auditoría se guardan únicamente en este navegador.
+						</p>
+						<div class="settings-reset-card">
+							<div>
+								<strong>Volver a datos iniciales</strong>
+								<span>Útil para enseñar la demo desde cero después de probar acciones.</span>
+							</div>
+							<button class="button button-tertiary" type="button" data-action="reset-demo">Restablecer demo</button>
 						</div>
 					</section>
 				</div>
-				<section class="panel top-gap">
-					<h2>Persistencia</h2>
+				<details class="panel top-gap settings-audit-details">
+					<summary>
+						<span>
+							<strong>Actividad de la demo</strong>
+							<small>Auditoría reciente guardada localmente</small>
+						</span>
+						${pill(String(auditLog.length), 'correcto')}
+					</summary>
+					${recentAudit.length ? `
+						<div class="settings-audit-list">
+							${recentAudit.map((entry) => `
+								<div class="stat-row">
+									<div>
+										<strong>${escapeHtml(entry.action)}</strong>
+										<span>${formatDateTime(entry.at)} · ${escapeHtml(entry.user)}</span>
+										<small>${escapeHtml(entry.detail)}</small>
+									</div>
+								</div>
+							`).join('')}
+						</div>
+					` : emptyState('Aún no hay actividad registrada.')}
+				</details>
+				<section class="panel top-gap settings-note-panel">
+					<h2>Festivos</h2>
 					<p class="helper-text">
-						La sesión, fichajes, vacaciones, incidencias, festivos, informes programados y auditoría se guardan únicamente en el navegador.
+						La gestión de festivos está en el perfil Responsable de vacaciones, para que el administrador global mantenga estos ajustes sencillos.
 					</p>
-					<div class="top-gap">
-						<button class="button button-tertiary" type="button" data-action="reset-demo">Restablecer demo</button>
-					</div>
 				</section>
 			`;
 		}
@@ -3088,6 +3377,99 @@ import Layout from '../layouts/Layout.astro';
 			});
 		}
 
+		function renderExportHoursReports() {
+			const weeklyRows = buildExpectedHoursReport('week');
+			const monthlyRows = buildExpectedHoursReport('month');
+
+			return `
+				<section class="panel top-gap export-reports-panel">
+					<div class="panel-heading">
+						<div>
+							<h2>Reportes de horas</h2>
+							<p class="helper-text">Horas esperadas calculadas con días laborables y festivos configurados en la demo.</p>
+						</div>
+					</div>
+					<div class="reports-grid export-reports-grid">
+						${exportReportPreview(
+							'Reporte semanal de horas',
+							'Semana laboral en curso. Esperado: días laborables x 8 horas.',
+							['Empleado', 'Horas fichadas', 'Horas esperadas', 'Diferencia', 'Incidencias'],
+							weeklyRows,
+						)}
+						${exportReportPreview(
+							'Reporte mensual de horas',
+							'Mes actual. Las vacaciones aprobadas reducen las horas esperadas.',
+							['Empleado', 'Horas fichadas', 'Horas esperadas', 'Diferencia', 'Incidencias', 'Vacaciones/festivos'],
+							monthlyRows,
+						)}
+					</div>
+				</section>
+			`;
+		}
+
+		function exportReportPreview(title: string, description: string, headers: string[], rows: (string | number)[][]) {
+			return `
+				<article class="report-card export-report-card">
+					<div class="report-card-head">
+						<h3>${title}</h3>
+						<p>${description}</p>
+					</div>
+					${renderSimpleTable(headers, rows)}
+					<div class="export-report-mobile-list">
+						${rows.map((row) => `
+							<article class="export-report-mobile-card">
+								<strong>${row[0]}</strong>
+								${headers.slice(1).map((header, index) => summaryRow(header, String(row[index + 1]))).join('')}
+							</article>
+						`).join('')}
+					</div>
+				</article>
+			`;
+		}
+
+		function buildExpectedHoursReport(scope: 'week' | 'month') {
+			const from = scope === 'week' ? startOfCurrentWorkWeekIso() : startOfMonthIso(new Date());
+			const to = scope === 'week'
+				? endOfCurrentWorkWeekIso()
+				: isoFromDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
+			const holidayDays = dateRange(from, to).filter((date) => holidays.some((holiday) => holiday.date === date)).length;
+
+			return EMPLOYEES.map((employee) => {
+				const entries = timeEntries.filter(
+					(entry) => entry.employeeId === employee.id && dateInRange(entry.date, from, to),
+				);
+				const worked = entries.reduce((sum, entry) => sum + workedMinutes(entry), 0);
+				const laborDays = businessDaysBetween(from, to);
+				const vacationDays = scope === 'month' ? countVacationDaysInRange(employee.id, from, to) : 0;
+				const expectedDays = Math.max(laborDays - vacationDays, 0);
+				const expected = expectedDays * 8 * 60;
+				const employeeIncidents = incidents.filter(
+					(incident) => incident.employeeId === employee.id && dateInRange(incident.date, from, to),
+				).length;
+				const baseRow = [
+					employee.name,
+					formatMinutes(worked),
+					formatMinutes(expected),
+					formatSignedMinutes(worked - expected),
+					String(employeeIncidents),
+				];
+
+				if (scope === 'month') {
+					return [
+						...baseRow,
+						`${vacationDays} días vacaciones · ${holidayDays} festivos`,
+					];
+				}
+
+				return baseRow;
+			});
+		}
+
+		function formatSignedMinutes(minutes: number) {
+			const sign = minutes > 0 ? '+' : minutes < 0 ? '-' : '';
+			return `${sign}${formatMinutes(Math.abs(minutes))}`;
+		}
+
 		function buildMissingPunchReport() {
 			const today = todayIso();
 			return EMPLOYEES.filter((employee) => !findEntry(employee.id, today)?.start).map((employee) => [
@@ -3585,6 +3967,30 @@ import Layout from '../layouts/Layout.astro';
 			renderPage();
 		}
 
+		function applyAdminVacationFilters(form: HTMLFormElement) {
+			const formData = new FormData(form);
+			const statusValue = String(formData.get('status') || 'activa');
+			const department = String(formData.get('department') || 'all');
+			let employeeId = String(formData.get('employeeId') || 'all');
+			if (
+				employeeId !== 'all' &&
+				department !== 'all' &&
+				employeeById(employeeId)?.department !== department
+			) {
+				employeeId = 'all';
+			}
+
+			adminVacationFilters = {
+				department,
+				employeeId,
+				status: ['all', 'activa', 'pendiente', 'aprobada', 'disfrutada', 'denegada'].includes(statusValue)
+					? (statusValue as AdminVacationStatusFilter)
+					: 'activa',
+			};
+			selectedAdminVacationDay = '';
+			renderPage();
+		}
+
 		function applyTeamCalendarFilters(form: HTMLFormElement) {
 			const formData = new FormData(form);
 			teamCalendarDepartment = String(formData.get('department') || 'all');
@@ -3622,6 +4028,17 @@ import Layout from '../layouts/Layout.astro';
 			);
 			saveAll();
 			showToast('Solicitud actualizada. Email simulado enviado al empleado.');
+			renderPage();
+		}
+
+		function changeAdminVacationMonth(offset: number) {
+			adminVacationCursor = new Date(adminVacationCursor.getFullYear(), adminVacationCursor.getMonth() + offset, 1);
+			selectedAdminVacationDay = '';
+			renderPage();
+		}
+
+		function selectAdminVacationDay(date: string) {
+			selectedAdminVacationDay = date;
 			renderPage();
 		}
 
