@@ -212,6 +212,7 @@ import Layout from '../layouts/Layout.astro';
 		let activeView = 'inicio';
 		let calendarCursor = new Date();
 		let selectedCalendarDay = todayIso();
+		let calendarAdjustmentDate = '';
 		let selectedVacationId = '';
 		let employeeVacationFilter: EmployeeVacationFilter = 'all';
 		let employeeVacationPreviewWeekStart = '';
@@ -316,6 +317,8 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'calendar-prev') changeCalendarMonth(-1);
 				if (action === 'calendar-next') changeCalendarMonth(1);
 				if (action === 'calendar-day') selectCalendarDay(actionButton.dataset.date || todayIso());
+				if (action === 'open-calendar-adjustment') openCalendarAdjustment(actionButton.dataset.date || selectedCalendarDay);
+				if (action === 'close-calendar-adjustment') closeCalendarAdjustment();
 				if (action === 'employee-vacation-filter') setEmployeeVacationFilter(actionButton.dataset.filter || 'all');
 				if (action === 'employee-vacation-week-prev') shiftEmployeeVacationPreviewWeek(-7);
 				if (action === 'employee-vacation-week-next') shiftEmployeeVacationPreviewWeek(7);
@@ -715,7 +718,7 @@ import Layout from '../layouts/Layout.astro';
 						${cells}
 					</div>
 					<div class="top-gap">
-						${renderDayDetail(employee.id, selectedCalendarDay)}
+						${renderDayDetail(employee.id, selectedCalendarDay, true)}
 					</div>
 				</section>
 			`;
@@ -1928,10 +1931,21 @@ import Layout from '../layouts/Layout.astro';
 			`;
 		}
 
-		function manualAdjustmentForm() {
+		function manualAdjustmentForm(date = todayIso(), source: 'punch' | 'calendar' = 'punch') {
 			const employee = currentEmployee();
-			const entry = todayEntry(employee.id);
+			const entry = findEntry(employee.id, date);
 			const salidaNextDay = Boolean(entry?.start && entry?.end && timeToMinutes(entry.end) < timeToMinutes(entry.start));
+			const isCalendarSource = source === 'calendar';
+			const title = isCalendarSource
+				? entry
+					? 'Editar registro'
+					: 'Crear registro'
+				: 'Ajustar horas de hoy';
+			const status = entry
+				? isCalendarSource
+					? { label: STATUS_LABELS[statusForDay(employee.id, date)] || statusForDay(employee.id, date), key: statusForDay(employee.id, date) }
+					: currentWorkStatus(entry)
+				: { label: 'Sin fichaje', key: 'sin fichaje' };
 			const breakFields = entry?.breaks.length
 				? entry.breaks
 					.map(
@@ -1950,18 +1964,33 @@ import Layout from '../layouts/Layout.astro';
 						`,
 					)
 					.join('')
-				: '<div class="manual-empty">No hay pausas registradas para editar hoy.</div>';
+				: isCalendarSource && !entry
+					? `
+						<fieldset class="manual-break-field">
+							<legend>Pausa opcional</legend>
+							<label class="field">
+								<span>Inicio de pausa</span>
+								<input type="time" name="new-break-start" />
+							</label>
+							<label class="field">
+								<span>Fin de pausa</span>
+								<input type="time" name="new-break-end" />
+							</label>
+						</fieldset>
+					`
+					: `<div class="manual-empty">No hay pausas registradas para ${isCalendarSource ? 'este día' : 'editar hoy'}.</div>`;
 
 			return `
-				<form id="manual-form" class="manual-editor top-gap">
+				<form id="manual-form" class="manual-editor ${isCalendarSource ? 'calendar-manual-editor' : ''} top-gap">
 					<div class="manual-editor-head">
 						<div>
-							<span class="meta-label">Ajustar horas de hoy</span>
-							<strong>${formatDate(todayIso())}</strong>
+							<span class="meta-label">${title}</span>
+							<strong>${formatDate(date)}</strong>
 						</div>
-						${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}
+						${pill(status.label, status.key)}
 					</div>
-					<input type="hidden" name="date" value="${todayIso()}" />
+					<input type="hidden" name="date" value="${date}" />
+					<input type="hidden" name="source" value="${source}" />
 					<div class="manual-editor-grid">
 						<label class="field">
 							<span>Hora de entrada</span>
@@ -1978,8 +2007,8 @@ import Layout from '../layouts/Layout.astro';
 					</label>
 					<div class="manual-breaks">
 						<div>
-							<span class="meta-label">Pausas existentes</span>
-							<p class="helper-text">Puedes corregir inicio y fin de cada pausa ya registrada.</p>
+							<span class="meta-label">${entry ? 'Pausas existentes' : 'Pausa opcional'}</span>
+							<p class="helper-text">${entry ? 'Puedes corregir inicio y fin de cada pausa ya registrada.' : 'Puedes añadir una pausa si ese día hubo descanso.'}</p>
 						</div>
 						${breakFields}
 					</div>
@@ -1989,8 +2018,8 @@ import Layout from '../layouts/Layout.astro';
 					</label>
 					<p class="manual-message" data-manual-message hidden></p>
 					<div class="manual-actions">
-						<button class="button button-primary" type="submit">Guardar ajuste</button>
-						<button class="button button-secondary" type="button" data-action="toggle-manual">Cancelar</button>
+						<button class="button button-primary" type="submit">${entry ? 'Guardar ajuste' : 'Crear registro'}</button>
+						<button class="button button-secondary" type="button" data-action="${isCalendarSource ? 'close-calendar-adjustment' : 'toggle-manual'}">Cancelar</button>
 					</div>
 					<fieldset class="hidden" disabled>
 					<label class="field">
@@ -2004,7 +2033,7 @@ import Layout from '../layouts/Layout.astro';
 					</label>
 					<label class="field">
 						<span>Fecha</span>
-						<input type="date" name="date" value="${todayIso()}" required />
+						<input type="date" name="date" value="${date}" required />
 					</label>
 					<label class="field">
 						<span>Hora</span>
@@ -2020,7 +2049,7 @@ import Layout from '../layouts/Layout.astro';
 			`;
 		}
 
-		function renderDayDetail(employeeId: string, date: string) {
+		function renderDayDetail(employeeId: string, date: string, allowManualAdjustment = false) {
 			const entry = findEntry(employeeId, date);
 			const dayStatus = statusForDay(employeeId, date);
 			const holiday = holidays.find((item) => item.date === date);
@@ -2036,6 +2065,14 @@ import Layout from '../layouts/Layout.astro';
 			const incidentText = dayIncidents.length
 				? dayIncidents.map((item) => `${escapeHtml(item.type)}: ${escapeHtml(item.detail)}`).join('<br>')
 				: 'Sin incidencias';
+			const isFutureDay = date > todayIso();
+			const isSpecialDay = isWeekend(date) || Boolean(holiday);
+			const isAdjustmentOpen = allowManualAdjustment && calendarAdjustmentDate === date;
+			const actionLabel = dayStatus === 'incidencia' || dayIncidents.length ? 'Corregir incidencia' : 'Editar registro';
+			const actionClass = dayStatus === 'incidencia' || dayIncidents.length ? 'button-danger' : 'button-secondary';
+			const specialDayNote = isSpecialDay
+				? '<p class="calendar-day-note">Este día parece fin de semana o festivo.</p>'
+				: '';
 
 			if (!entry) {
 				return `
@@ -2048,6 +2085,17 @@ import Layout from '../layouts/Layout.astro';
 							${pill(STATUS_LABELS[dayStatus] || dayStatus, dayStatus)}
 						</div>
 						${emptyState('No hay registro de jornada para este día.')}
+						${allowManualAdjustment ? `
+							<div class="day-detail-actions">
+								${isFutureDay ? `
+									<p class="calendar-day-note">No se pueden crear registros futuros en la demo.</p>
+								` : `
+									${specialDayNote}
+									<button class="button button-primary" type="button" data-action="open-calendar-adjustment" data-date="${date}">Crear registro</button>
+								`}
+							</div>
+							${isAdjustmentOpen && !isFutureDay ? manualAdjustmentForm(date, 'calendar') : ''}
+						` : ''}
 						<div class="summary-list top-gap">
 							${summaryRow('Festivo', holiday ? escapeHtml(holiday.name) : 'No')}
 							${summaryRow('Vacaciones', vacation ? `${formatDate(vacation.from)} - ${formatDate(vacation.to)} (${vacation.status})` : 'No')}
@@ -2073,6 +2121,12 @@ import Layout from '../layouts/Layout.astro';
 						<div><span>Trabajado</span><strong>${formatMinutes(workedMinutes(entry))}</strong></div>
 						<div><span>Descanso</span><strong>${formatMinutes(breakMinutes(entry))}</strong></div>
 					</div>
+					${allowManualAdjustment ? `
+						<div class="day-detail-actions">
+							<button class="button ${actionClass}" type="button" data-action="open-calendar-adjustment" data-date="${date}">${actionLabel}</button>
+						</div>
+						${isAdjustmentOpen ? manualAdjustmentForm(date, 'calendar') : ''}
+					` : ''}
 					<div class="summary-list top-gap">
 						${summaryRow('Festivo', holiday ? escapeHtml(holiday.name) : 'No')}
 						${summaryRow('Vacaciones', vacation ? `${formatDate(vacation.from)} - ${formatDate(vacation.to)} (${vacation.status})` : 'No')}
@@ -2739,10 +2793,18 @@ import Layout from '../layouts/Layout.astro';
 			const employee = currentEmployee();
 			const formData = new FormData(form);
 			const date = String(formData.get('date') || todayIso());
+			const source = String(formData.get('source') || 'punch');
 			const start = String(formData.get('start') || '').trim();
 			const end = String(formData.get('end') || '').trim();
 			const reason = String(formData.get('reason') || '').trim();
 			let entry = findEntry(employee.id, date);
+			const isNewEntry = !entry;
+
+			if (isNewEntry && date > todayIso()) {
+				showManualFormMessage(form, 'No se pueden crear registros futuros en la demo.');
+				return;
+			}
+
 			const originalBreaks = entry?.breaks || [];
 			const openBreakIndex = originalBreaks.findIndex((item) => item.start && !item.end);
 			const adjustedBreaks = originalBreaks.map((item, index) => ({
@@ -2750,6 +2812,18 @@ import Layout from '../layouts/Layout.astro';
 				start: String(formData.get(`break-start-${index}`) || item.start).trim(),
 				end: String(formData.get(`break-end-${index}`) || '').trim() || undefined,
 			}));
+			const newBreakStart = String(formData.get('new-break-start') || '').trim();
+			const newBreakEnd = String(formData.get('new-break-end') || '').trim();
+
+			if (newBreakStart || newBreakEnd) {
+				adjustedBreaks.push({
+					start: newBreakStart,
+					end: newBreakEnd || undefined,
+					kind: 'manual',
+					label: 'Pausa manual',
+				});
+			}
+
 			const validationMessage = validateManualTimeAdjustment(
 				start,
 				end,
@@ -2782,11 +2856,15 @@ import Layout from '../layouts/Layout.astro';
 
 			refreshEntryIncident(entry);
 			addAudit(
-				'Ajuste manual',
-				`${employee.name}: registro de ${formatDate(date)} actualizado. ${reason || 'Ajuste manual sin motivo indicado'}.`,
+				isNewEntry ? 'Registro creado manualmente' : 'Ajuste manual',
+				`${employee.name}: registro de ${formatDate(date)} ${isNewEntry ? 'creado' : 'actualizado'}. ${reason || 'Ajuste manual sin motivo indicado'}.`,
 			);
+			if (source === 'calendar') {
+				selectedCalendarDay = date;
+				calendarAdjustmentDate = '';
+			}
 			saveAll();
-			showToast('Registro actualizado. Los tiempos se han recalculado.');
+			showToast(isNewEntry ? 'Registro creado. Los tiempos se han calculado.' : 'Registro actualizado. Los tiempos se han recalculado.');
 			renderPage();
 		}
 
@@ -2994,11 +3072,32 @@ import Layout from '../layouts/Layout.astro';
 		function changeCalendarMonth(offset: number) {
 			calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + offset, 1);
 			selectedCalendarDay = isoFromDate(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), 1));
+			calendarAdjustmentDate = '';
 			renderPage();
 		}
 
 		function selectCalendarDay(date: string) {
 			selectedCalendarDay = date;
+			calendarAdjustmentDate = '';
+			renderPage();
+		}
+
+		function openCalendarAdjustment(date: string) {
+			const employee = currentEmployee();
+			const entry = findEntry(employee.id, date);
+
+			if (!entry && date > todayIso()) {
+				showToast('No se pueden crear registros futuros en la demo.');
+				return;
+			}
+
+			selectedCalendarDay = date;
+			calendarAdjustmentDate = date;
+			renderPage();
+		}
+
+		function closeCalendarAdjustment() {
+			calendarAdjustmentDate = '';
 			renderPage();
 		}
 
