@@ -215,6 +215,7 @@ import Layout from '../layouts/Layout.astro';
 		let selectedCalendarDay = todayIso();
 		let selectedVacationId = '';
 		let employeeVacationFilter: EmployeeVacationFilter = 'all';
+		let employeeVacationPreviewWeekStart = '';
 		let historyMonth = todayIso().slice(0, 7);
 		let teamCalendarDepartment = 'all';
 		let teamCalendarMode: TeamCalendarMode = 'month';
@@ -317,6 +318,8 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'calendar-next') changeCalendarMonth(1);
 				if (action === 'calendar-day') selectCalendarDay(actionButton.dataset.date || todayIso());
 				if (action === 'employee-vacation-filter') setEmployeeVacationFilter(actionButton.dataset.filter || 'all');
+				if (action === 'employee-vacation-week-prev') shiftEmployeeVacationPreviewWeek(-7);
+				if (action === 'employee-vacation-week-next') shiftEmployeeVacationPreviewWeek(7);
 				if (action === 'team-calendar-prev') changeTeamCalendarMonth(-1);
 				if (action === 'team-calendar-next') changeTeamCalendarMonth(1);
 				if (action === 'team-calendar-day') selectTeamCalendarDay(actionButton.dataset.date || todayIso());
@@ -805,9 +808,6 @@ import Layout from '../layouts/Layout.astro';
 							</label>
 							<button class="button button-primary" type="submit">Solicitar vacaciones</button>
 						</form>
-						<div id="employee-vacation-preview" class="top-gap">
-							${employeeVacationPreview('', '')}
-						</div>
 					</section>
 					<section class="panel vacation-requests-panel">
 						<div class="section-head-inline">
@@ -820,6 +820,9 @@ import Layout from '../layouts/Layout.astro';
 							${filteredRequests.length ? filteredRequests.map(renderVacationRow).join('') : employeeVacationEmptyState(employeeVacationFilter)}
 						</div>
 					</section>
+				</div>
+				<div id="employee-vacation-preview" class="employee-vacation-preview-wrap top-gap">
+					${employeeVacationPreview('', '')}
 				</div>
 			`;
 		}
@@ -2205,14 +2208,41 @@ import Layout from '../layouts/Layout.astro';
 		function employeeVacationPreview(from: string, to: string) {
 			const employee = currentEmployee();
 			if (!from || !to) {
-				return emptyState('Selecciona fecha desde y hasta para ver coincidencias de tu departamento.');
+				employeeVacationPreviewWeekStart = '';
+				return `
+					<section class="vacation-preview employee-vacation-preview">
+						<div class="panel-heading">
+							<div>
+								<h3>Coincidencias con tu equipo</h3>
+								<p class="helper-text">Selecciona fechas para comprobar si coincides con alguien de tu departamento.</p>
+							</div>
+						</div>
+						${emptyState('Selecciona fechas para comprobar coincidencias con tu equipo.')}
+					</section>
+				`;
 			}
 
 			if (from > to) {
-				return emptyState('La fecha hasta debe ser igual o posterior a la fecha desde.');
+				employeeVacationPreviewWeekStart = '';
+				return `
+					<section class="vacation-preview employee-vacation-preview">
+						<div class="panel-heading">
+							<div>
+								<h3>Coincidencias con tu equipo</h3>
+								<p class="helper-text">Revisa el rango antes de comparar vacaciones.</p>
+							</div>
+						</div>
+						${emptyState('La fecha hasta debe ser igual o posterior a la fecha desde.')}
+					</section>
+				`;
 			}
 
-			const rangeDays = dateRange(from, to);
+			ensureEmployeeVacationPreviewWeek(from, to);
+			const weekStart = employeeVacationPreviewWeekStart;
+			const weekEnd = addDaysIso(weekStart, 6);
+			const weekDays = dateRange(weekStart, weekEnd);
+			const minWeekStart = startOfWeekIso(from);
+			const maxWeekStart = startOfWeekIso(to);
 			const previewRequest: VacationRequest = {
 				id: 'preview-current-request',
 				employeeId: employee.id,
@@ -2239,17 +2269,22 @@ import Layout from '../layouts/Layout.astro';
 						<strong>${peer.name}</strong>
 						<span>${peer.department}</span>
 					</th>
-					${rangeDays.map((date) => renderVacationComparisonCell(peer.id, date, previewRequest)).join('')}
+					${weekDays.map((date) => renderEmployeeVacationComparisonCell(peer.id, date, previewRequest)).join('')}
 				</tr>
 			`).join('');
 
 			return `
-				<section class="vacation-preview">
+				<section class="vacation-preview employee-vacation-preview">
 					<div class="panel-heading">
 						<div>
 							<h3>Coincidencias en ${escapeHtml(employee.department)}</h3>
 							<p class="helper-text">${formatDate(from)} - ${formatDate(to)} · ${previewRequest.days} días laborables solicitados.</p>
 						</div>
+					</div>
+					<div class="vacation-week-nav">
+						<button class="button button-tertiary button-small" type="button" data-action="employee-vacation-week-prev" ${weekStart <= minWeekStart ? 'disabled' : ''}>Semana anterior</button>
+						<strong>${formatDayHeader(weekStart)} - ${formatDayHeader(weekEnd)}</strong>
+						<button class="button button-tertiary button-small" type="button" data-action="employee-vacation-week-next" ${weekStart >= maxWeekStart ? 'disabled' : ''}>Semana siguiente</button>
 					</div>
 					${overlaps.length ? `
 						<div class="overlap-list">
@@ -2260,26 +2295,141 @@ import Layout from '../layouts/Layout.astro';
 								</div>
 							`).join('')}
 						</div>
-					` : emptyState('No hay vacaciones aprobadas o pendientes de tu departamento en esas fechas.')}
+					` : emptyState('No hay coincidencias aprobadas o pendientes en este rango.')}
 					<div class="comparison-legend top-gap">
 						<span><i class="cell-actual"></i> Solicitud actual</span>
 						<span><i class="cell-approved"></i> Vacaciones aprobadas</span>
 						<span><i class="cell-pending"></i> Solicitud pendiente</span>
 						<span><i class="cell-free"></i> Libre</span>
 					</div>
-					<div class="table-wrap vacation-matrix-wrap top-gap">
+					<div class="table-wrap vacation-matrix-wrap vacation-week-table top-gap">
 						<table class="vacation-matrix">
 							<thead>
 								<tr>
 									<th class="sticky-col">Empleado</th>
-									${rangeDays.map((date) => `<th>${formatDayHeader(date)}</th>`).join('')}
+									${weekDays.map((date) => `<th class="${isWeekend(date) ? 'is-weekend' : ''}">${formatDayHeader(date)}<span>${weekdayShort(date)}</span></th>`).join('')}
 								</tr>
 							</thead>
 							<tbody>${comparisonRows}</tbody>
 						</table>
 					</div>
+					<div class="vacation-week-cards top-gap">
+						${weekDays.map((date) => renderEmployeeVacationDayCard(date, peers, previewRequest)).join('')}
+					</div>
 				</section>
 			`;
+		}
+
+		function employeeVacationCellState(employeeId: string, date: string, request: VacationRequest) {
+			if (employeeId === request.employeeId && isDateWithin(date, request.from, request.to)) {
+				return {
+					key: 'actual',
+					short: 'Actual',
+					label: 'Solicitud actual',
+					title: 'Solicitud actual',
+				};
+			}
+
+			const overlapping = vacations.find(
+				(item) =>
+					item.id !== request.id &&
+					item.employeeId === employeeId &&
+					item.status !== 'denegada' &&
+					isDateWithin(date, item.from, item.to),
+			);
+
+			if (overlapping?.status === 'aprobada') {
+				return {
+					key: 'approved',
+					short: 'VAC',
+					label: 'Aprobada',
+					title: `Vacaciones aprobadas del ${formatDate(overlapping.from)} al ${formatDate(overlapping.to)}`,
+				};
+			}
+
+			if (overlapping?.status === 'pendiente') {
+				return {
+					key: 'pending',
+					short: 'PEN',
+					label: 'Pendiente',
+					title: `Solicitud pendiente del ${formatDate(overlapping.from)} al ${formatDate(overlapping.to)}`,
+				};
+			}
+
+			return {
+				key: 'free',
+				short: 'Libre',
+				label: 'Libre',
+				title: 'Libre',
+			};
+		}
+
+		function renderEmployeeVacationComparisonCell(employeeId: string, date: string, request: VacationRequest) {
+			const state = employeeVacationCellState(employeeId, date, request);
+			const weekendClass = isWeekend(date) ? ' is-weekend' : '';
+			return `<td class="comparison-cell employee-comparison-cell cell-${state.key}${weekendClass}" title="${escapeHtml(`${employeeName(employeeId)} Â· ${formatDate(date)} Â· ${state.title}`)}">${state.short}</td>`;
+		}
+
+		function renderEmployeeVacationDayCard(date: string, peers: Employee[], request: VacationRequest) {
+			return `
+				<article class="vacation-day-card ${isWeekend(date) ? 'is-weekend' : ''}">
+					<div class="vacation-day-card-head">
+						<strong>${formatDayHeader(date)}</strong>
+						<span>${weekdayShort(date)}</span>
+					</div>
+					<div class="vacation-day-card-list">
+						${peers.map((peer) => {
+							const state = employeeVacationCellState(peer.id, date, request);
+							return `
+								<div class="vacation-day-row">
+									<span>${peer.name}</span>
+									<strong class="employee-day-state cell-${state.key}" title="${escapeHtml(state.title)}">${state.label}</strong>
+								</div>
+							`;
+						}).join('')}
+					</div>
+				</article>
+			`;
+		}
+
+		function ensureEmployeeVacationPreviewWeek(from: string, to: string) {
+			if (!from || !to || from > to) {
+				employeeVacationPreviewWeekStart = '';
+				return;
+			}
+
+			const minWeekStart = startOfWeekIso(from);
+			const maxWeekStart = startOfWeekIso(to);
+
+			if (
+				!employeeVacationPreviewWeekStart ||
+				employeeVacationPreviewWeekStart < minWeekStart ||
+				employeeVacationPreviewWeekStart > maxWeekStart
+			) {
+				employeeVacationPreviewWeekStart = minWeekStart;
+			}
+		}
+
+		function shiftEmployeeVacationPreviewWeek(amount: number) {
+			const form = document.querySelector<HTMLFormElement>('#vacation-request-form');
+			if (!form) return;
+
+			const formData = new FormData(form);
+			const from = String(formData.get('from') || '');
+			const to = String(formData.get('to') || '');
+
+			if (!from || !to || from > to) {
+				showToast('Selecciona fechas para navegar por semanas.');
+				return;
+			}
+
+			ensureEmployeeVacationPreviewWeek(from, to);
+			employeeVacationPreviewWeekStart = clampDateIso(
+				addDaysIso(employeeVacationPreviewWeekStart, amount),
+				startOfWeekIso(from),
+				startOfWeekIso(to),
+			);
+			updateEmployeeVacationPreview();
 		}
 
 		function updateEmployeeVacationPreview() {
@@ -3692,6 +3842,13 @@ import Layout from '../layouts/Layout.astro';
 			return `${year}-${month}-${day}`;
 		}
 
+		function startOfWeekIso(date: string) {
+			const weekStart = new Date(`${date}T12:00:00`);
+			const offset = (weekStart.getDay() + 6) % 7;
+			weekStart.setDate(weekStart.getDate() - offset);
+			return isoFromDate(weekStart);
+		}
+
 		function startOfMonthIso(date: Date) {
 			return isoFromDate(new Date(date.getFullYear(), date.getMonth(), 1));
 		}
@@ -3765,6 +3922,12 @@ import Layout from '../layouts/Layout.astro';
 			const next = new Date(`${date}T12:00:00`);
 			next.setDate(next.getDate() + amount);
 			return isoFromDate(next);
+		}
+
+		function clampDateIso(date: string, min: string, max: string) {
+			if (date < min) return min;
+			if (date > max) return max;
+			return date;
 		}
 
 		function diffDays(from: string, to: string) {
