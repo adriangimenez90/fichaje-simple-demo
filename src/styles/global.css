@@ -792,6 +792,33 @@ textarea:focus-visible {
 	box-shadow: var(--shadow-soft);
 }
 
+.admin-metric-card {
+	width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	color: var(--text);
+	text-align: left;
+	cursor: default;
+}
+
+.admin-metric-card.is-clickable {
+	cursor: pointer;
+	transition:
+		border-color 160ms ease,
+		background 160ms ease,
+		box-shadow 160ms ease,
+		transform 160ms ease;
+}
+
+.admin-metric-card.is-clickable:hover,
+.admin-metric-card.is-active {
+	border-color: var(--primary);
+	background: var(--primary-soft);
+	box-shadow: var(--shadow-soft);
+	transform: translateY(-1px);
+}
+
 .metric-card span {
 	display: block;
 	color: var(--muted);
@@ -1210,6 +1237,102 @@ textarea:focus-visible {
 	display: grid;
 	gap: 16px;
 	margin-top: 16px;
+}
+
+.admin-pending-incidents,
+.admin-users-layout,
+.admin-today-card-list,
+.admin-timesheet-card-list,
+.admin-incident-card-list {
+	display: grid;
+	gap: 12px;
+}
+
+.admin-users-layout {
+	grid-template-columns: minmax(280px, 1fr) minmax(260px, 0.75fr);
+	align-items: start;
+}
+
+.admin-user-search {
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: end;
+}
+
+.admin-user-picker {
+	display: grid;
+	gap: 8px;
+	max-height: 310px;
+	overflow: auto;
+	padding-right: 4px;
+}
+
+.admin-user-option {
+	display: grid;
+	gap: 3px;
+	width: 100%;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	color: var(--text);
+	padding: 11px;
+	text-align: left;
+}
+
+.admin-user-option:hover,
+.admin-user-option.is-active {
+	border-color: var(--primary);
+	background: var(--primary-soft);
+}
+
+.admin-user-option span,
+.admin-card-head span,
+.admin-incident-card p {
+	color: var(--muted);
+	font-size: 0.86rem;
+}
+
+.admin-user-card,
+.admin-today-card,
+.admin-timesheet-card,
+.admin-incident-card {
+	display: grid;
+	gap: 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 14px;
+	box-shadow: 0 4px 14px rgba(23, 33, 31, 0.04);
+}
+
+.admin-card-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.admin-card-head strong {
+	display: block;
+}
+
+.admin-card-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0 14px;
+}
+
+.admin-today-card-list,
+.admin-timesheet-card-list,
+.admin-incident-card-list {
+	display: none;
+}
+
+.admin-incident-card {
+	border-left-width: 5px;
+}
+
+.admin-incident-filter-bar {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .row-actions .button {
@@ -2888,7 +3011,8 @@ tr:last-child td {
 
 	.punch-layout,
 	.vacation-admin-summary,
-	.responsible-requests-layout {
+	.responsible-requests-layout,
+	.admin-users-layout {
 		grid-template-columns: 1fr;
 	}
 
@@ -3133,6 +3257,36 @@ tr:last-child td {
 
 	.request-filter-bar {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.admin-user-search {
+		grid-template-columns: 1fr;
+	}
+
+	.admin-today-table,
+	.admin-timesheet-table,
+	.admin-incidents-table {
+		display: none;
+	}
+
+	.admin-today-card-list,
+	.admin-timesheet-card-list,
+	.admin-incident-card-list {
+		display: grid;
+	}
+
+	.admin-card-head,
+	.admin-user-card .row-actions {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.admin-card-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.admin-incident-filter-bar {
+		grid-template-columns: 1fr;
 	}
 
 	.responsible-filter-bar {

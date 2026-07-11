@@ -47,6 +47,8 @@ import Layout from '../layouts/Layout.astro';
 		type EmployeeVacationFilter = 'all' | 'aprobada-futura' | 'disfrutada' | VacationStatus;
 		type IncidentStatus = 'pendiente' | 'revisada';
 		type TeamCalendarMode = 'month' | 'planning';
+		type AdminTodayFilter = 'all' | 'trabajando' | 'pausa' | 'sin-fichar';
+		type AdminIncidentFilter = IncidentStatus | 'all';
 
 		type Session = {
 			id: string;
@@ -230,6 +232,10 @@ import Layout from '../layouts/Layout.astro';
 			to: todayIso(),
 			status: 'all',
 		};
+		let adminTodayFilter: AdminTodayFilter = 'all';
+		let adminIncidentFilter: AdminIncidentFilter = 'pendiente';
+		let adminUserSearch = '';
+		let selectedAdminUserId = '';
 
 		let timeEntries: TimeEntry[] = [];
 		let vacations: VacationRequest[] = [];
@@ -336,6 +342,10 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'toggle-user') toggleUser(actionButton.dataset.id || '');
 				if (action === 'rotate-user-role') rotateUserRole(actionButton.dataset.id || '');
 				if (action === 'simulate-edit-user') simulateEditUser(actionButton.dataset.id || '');
+				if (action === 'admin-today-filter') setAdminTodayFilter(actionButton.dataset.filter || 'all');
+				if (action === 'open-pending-incidents') openPendingIncidents();
+				if (action === 'select-admin-user') selectAdminUser(actionButton.dataset.id || '');
+				if (action === 'admin-incident-filter') setAdminIncidentFilter(actionButton.dataset.filter || 'pendiente');
 				if (action === 'reset-demo') {
 					resetDemoData();
 					showToast('Demo restablecida con datos ficticios iniciales.');
@@ -385,6 +395,11 @@ import Layout from '../layouts/Layout.astro';
 				if (form.matches('#user-form')) {
 					event.preventDefault();
 					saveUser(form);
+				}
+
+				if (form.matches('#user-search-form')) {
+					event.preventDefault();
+					applyUserSearch(form);
 				}
 
 				if (form.matches('#team-calendar-filter-form')) {
@@ -860,21 +875,28 @@ import Layout from '../layouts/Layout.astro';
 			const workingNow = statuses.filter(({ entry }) => currentWorkStatus(entry).key === 'trabajando').length;
 			const inPause = statuses.filter(({ entry }) => currentWorkStatus(entry).key === 'pausa').length;
 			const missing = statuses.filter(({ entry }) => !entry?.start).length;
-			const pendingIncidents = incidents.filter((incident) => incident.status === 'pendiente').length;
+			const pendingIncidentRows = incidents
+				.filter((incident) => incident.status === 'pendiente')
+				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+			const pendingIncidents = pendingIncidentRows.length;
 			const pendingVacations = vacations.filter((request) => request.status === 'pendiente').length;
+			const filteredStatuses = adminTodayFilter === 'all'
+				? statuses
+				: statuses.filter(({ entry }) => currentWorkStatus(entry).key === adminTodayFilter);
+			const filterLabel = adminTodayFilterLabel(adminTodayFilter);
 
 			return `
 				${sectionTitle('Inicio', 'Resumen operativo de hoy para Empresa Demo')}
-				${demoTryBlock()}
 				<div class="grid grid-3">
-					${metricCard('Empleados activos', String(users.filter((user) => user.role === 'empleado' && user.active).length || EMPLOYEES.length), 'correcto')}
-					${metricCard('Trabajando ahora', String(workingNow), 'trabajando')}
-					${metricCard('En descanso', String(inPause), 'pausa')}
-					${metricCard('Sin fichar hoy', String(missing), missing ? 'pendiente' : 'correcto')}
-					${metricCard('Incidencias pendientes', String(pendingIncidents), pendingIncidents ? 'incidencia' : 'correcto')}
-					${metricCard('Vacaciones pendientes', String(pendingVacations), pendingVacations ? 'pendiente' : 'correcto')}
+					${adminDashboardMetric('Empleados activos', String(users.filter((user) => user.role === 'empleado' && user.active).length || EMPLOYEES.length), 'correcto', 'Plantilla activa', 'usuarios')}
+					${adminDashboardMetric('Trabajando ahora', String(workingNow), 'trabajando', 'Ver empleados trabajando', '', 'trabajando')}
+					${adminDashboardMetric('En descanso', String(inPause), 'pausa', 'Ver empleados en descanso', '', 'pausa')}
+					${adminDashboardMetric('Sin fichar hoy', String(missing), missing ? 'pendiente' : 'correcto', 'Ver empleados sin entrada', '', 'sin-fichar')}
+					${adminDashboardMetric('Incidencias pendientes', String(pendingIncidents), pendingIncidents ? 'incidencia' : 'correcto', pendingIncidents ? 'Revisar detalles' : 'Sin pendientes', '', '', 'open-pending-incidents')}
+					${adminDashboardMetric('Vacaciones pendientes', String(pendingVacations), pendingVacations ? 'pendiente' : 'correcto', 'Ir a vacaciones', 'vacaciones-admin')}
 				</div>
-				<section class="panel top-gap">
+				${pendingIncidentRows.length ? renderDashboardPendingIncidents(pendingIncidentRows) : ''}
+				<section class="panel top-gap admin-actions-legacy hidden">
 					<div class="panel-heading">
 						<div>
 							<h2>Acciones recomendadas</h2>
@@ -889,86 +911,96 @@ import Layout from '../layouts/Layout.astro';
 					</div>
 				</section>
 				<section class="panel top-gap">
-					<h2>Estado de hoy por empleado</h2>
-					<div class="table-wrap">
+					<div class="panel-heading">
+						<div>
+							<h2>Estado de hoy por empleado</h2>
+							<p class="helper-text">Mostrando: ${filterLabel}. Usa las tarjetas superiores para filtrar la lista.</p>
+						</div>
+						${adminTodayFilter !== 'all' ? `<button class="button button-tertiary button-small" type="button" data-action="admin-today-filter" data-filter="all">Ver todos</button>` : ''}
+					</div>
+					<div class="table-wrap admin-today-table">
 						<table>
 							<thead>
 								<tr>
 									<th>Empleado</th>
-									<th>Departamento</th>
 									<th>Entrada</th>
-									<th>Descansos</th>
 									<th>Salida</th>
 									<th>Estado</th>
+									<th>Descansos</th>
+									<th>Departamento</th>
 								</tr>
 							</thead>
 							<tbody>
-								${statuses.map(({ employee, entry }) => `
+								${filteredStatuses.map(({ employee, entry }) => `
 									<tr>
 										<td><strong>${employee.name}</strong></td>
-										<td>${employee.department}</td>
 										<td>${entry?.start || 'Sin registrar'}</td>
-										<td>${formatBreaks(entry)}</td>
 										<td>${entry?.end || 'Sin registrar'}</td>
 										<td>${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}</td>
+										<td>${formatBreaks(entry)}</td>
+										<td>${employee.department}</td>
 									</tr>
 								`).join('')}
 							</tbody>
 						</table>
 					</div>
+					<div class="admin-today-card-list">
+						${filteredStatuses.map(({ employee, entry }) => renderAdminTodayCard(employee, entry)).join('')}
+					</div>
+					${filteredStatuses.length ? '' : emptyState('No hay empleados con este estado ahora mismo.')}
 				</section>
 			`;
 		}
 
 		function renderUsers() {
 			const sortedUsers = users.slice().sort((a, b) => a.name.localeCompare(b.name));
+			const query = adminUserSearch.trim().toLowerCase();
+			const filteredUsers = sortedUsers.filter((user) => {
+				if (!query) return true;
+				return [user.name, user.email, user.department || '', roleLabel(user.role)]
+					.some((value) => value.toLowerCase().includes(query));
+			});
+			const selectedUser =
+				filteredUsers.find((user) => user.id === selectedAdminUserId) ||
+				filteredUsers[0] ||
+				sortedUsers[0];
+			if (selectedUser) selectedAdminUserId = selectedUser.id;
 
 			return `
 				${sectionTitle('Empleados', 'Gestiona personas, accesos y roles ficticios de la demo. Las acciones se guardan solo en este navegador.')}
-				<div class="grid grid-2">
+				<div class="admin-users-layout">
 					<section class="panel">
 						<div class="panel-heading">
 							<div>
-								<h2>Empleados y usuarios demo</h2>
-								<p class="helper-text">Activa, desactiva o cambia roles para enseñar flujos administrativos sin tocar datos reales.</p>
+								<h2>Buscar empleado</h2>
+								<p class="helper-text">Busca por nombre, email o departamento y selecciona una persona para ver su ficha.</p>
 							</div>
 						</div>
-						<div class="table-wrap">
-							<table>
-								<thead>
-									<tr>
-										<th>Nombre</th>
-										<th>Email</th>
-										<th>Departamento</th>
-										<th>Rol</th>
-										<th>Estado</th>
-										<th>Acciones</th>
-									</tr>
-								</thead>
-								<tbody>
-									${sortedUsers.map((user) => `
-										<tr>
-											<td><strong>${escapeHtml(user.name)}</strong></td>
-											<td>${escapeHtml(user.email)}</td>
-											<td>${escapeHtml(user.department || 'General')}</td>
-											<td>${roleLabel(user.role)}</td>
-											<td>${pill(user.active ? 'Activo' : 'Inactivo', user.active ? 'activo' : 'inactivo')}</td>
-											<td>
-												<div class="row-actions">
-													<button class="button button-secondary button-small" type="button" data-action="simulate-edit-user" data-id="${user.id}">Editar</button>
-													<button class="button button-secondary button-small" type="button" data-action="toggle-user" data-id="${user.id}">${user.active ? 'Desactivar' : 'Activar'}</button>
-													<button class="button button-ghost button-small" type="button" data-action="rotate-user-role" data-id="${user.id}">Cambiar rol</button>
-												</div>
-											</td>
-										</tr>
-									`).join('')}
-								</tbody>
-							</table>
+						<form id="user-search-form" class="form-grid admin-user-search">
+							<label class="field">
+								<span>Buscar</span>
+								<input type="search" name="query" value="${escapeHtml(adminUserSearch)}" placeholder="Nombre, email o departamento" />
+							</label>
+							<button class="button button-secondary" type="submit">Buscar</button>
+						</form>
+						<div class="admin-user-picker top-gap">
+							${filteredUsers.length ? filteredUsers.map((user) => `
+								<button
+									class="admin-user-option ${selectedUser?.id === user.id ? 'is-active' : ''}"
+									type="button"
+									data-action="select-admin-user"
+									data-id="${user.id}"
+								>
+									<strong>${escapeHtml(user.name)}</strong>
+									<span>${escapeHtml(user.department || 'General')} · ${roleLabel(user.role)}</span>
+								</button>
+							`).join('') : emptyState('No hay empleados con esa búsqueda.')}
 						</div>
+						${selectedUser ? renderAdminUserCard(selectedUser) : ''}
 					</section>
 					<section class="panel">
 						<h2>Crear usuario simulado</h2>
-						<p class="helper-text">El usuario se añade a localStorage y aparece en esta tabla; no se envían invitaciones reales.</p>
+						<p class="helper-text">El usuario se añade a localStorage y aparece en el selector; no se envían invitaciones reales.</p>
 						<form id="user-form" class="form-grid top-gap">
 							<label class="field">
 								<span>Nombre</span>
@@ -1001,7 +1033,7 @@ import Layout from '../layouts/Layout.astro';
 			const rows = filteredTimeEntries();
 
 			return `
-				${sectionTitle('Fichajes', 'Filtra registros y exporta CSV con límites de demo.')}
+				${sectionTitle('Fichajes', 'Revisa registros horarios e incidencias. La descarga manual queda como acción secundaria.')}
 				<section class="panel">
 					<form id="time-filter-form" class="form-grid admin-filters">
 						<label class="field">
@@ -1032,7 +1064,7 @@ import Layout from '../layouts/Layout.astro';
 						</label>
 						<div class="table-actions">
 							<button class="button button-secondary" type="submit">Aplicar filtros</button>
-							<button class="button button-primary" type="button" data-action="export-timesheets">Exportar CSV</button>
+							<button class="button button-tertiary" type="button" data-action="export-timesheets">Descargar CSV</button>
 						</div>
 					</form>
 				</section>
@@ -1052,7 +1084,10 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderAdminIncidentsPanel(title = 'Incidencias') {
-			const rows = incidents.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+			const allRows = incidents.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+			const rows = adminIncidentFilter === 'all'
+				? allRows
+				: allRows.filter((incident) => incident.status === adminIncidentFilter);
 
 			return `
 				<section class="panel top-gap">
@@ -1062,8 +1097,13 @@ import Layout from '../layouts/Layout.astro';
 							<p class="helper-text">Ajustes, olvidos y registros que requieren revisión.</p>
 						</div>
 					</div>
+					<div class="request-filter-bar admin-incident-filter-bar" aria-label="Filtrar incidencias">
+						${adminIncidentFilterButton('Pendientes', 'pendiente', allRows.filter((incident) => incident.status === 'pendiente').length)}
+						${adminIncidentFilterButton('Revisadas', 'revisada', allRows.filter((incident) => incident.status === 'revisada').length)}
+						${adminIncidentFilterButton('Todas', 'all', allRows.length)}
+					</div>
 					${rows.length ? `
-						<div class="table-wrap">
+						<div class="table-wrap admin-incidents-table top-gap">
 							<table>
 								<thead>
 									<tr>
@@ -1099,7 +1139,10 @@ import Layout from '../layouts/Layout.astro';
 								</tbody>
 							</table>
 						</div>
-					` : emptyState('No hay incidencias registradas.')}
+						<div class="admin-incident-card-list top-gap">
+							${rows.map(renderAdminIncidentCard).join('')}
+						</div>
+					` : emptyState(adminIncidentFilter === 'pendiente' ? 'No hay incidencias pendientes.' : 'No hay incidencias con este filtro.')}
 				</section>
 			`;
 		}
@@ -2003,6 +2046,135 @@ import Layout from '../layouts/Layout.astro';
 			`;
 		}
 
+		function adminDashboardMetric(
+			label: string,
+			value: string,
+			status = 'correcto',
+			helper = '',
+			view = '',
+			todayFilter: AdminTodayFilter | '' = '',
+			action = '',
+		) {
+			const attrs = view
+				? `data-view="${view}"`
+				: todayFilter
+					? `data-action="admin-today-filter" data-filter="${todayFilter}"`
+					: action
+						? `data-action="${action}"`
+						: '';
+			const isActive = todayFilter && adminTodayFilter === todayFilter;
+			return `
+				<button class="metric-card admin-metric-card ${attrs ? 'is-clickable' : ''} ${isActive ? 'is-active' : ''}" type="button" ${attrs}>
+					<span>${label}</span>
+					<strong>${value}</strong>
+					${helper ? `<small>${helper}</small>` : ''}
+					<div class="top-gap-small">${pill(STATUS_LABELS[status] || status, status)}</div>
+				</button>
+			`;
+		}
+
+		function renderDashboardPendingIncidents(rows: Incident[]) {
+			return `
+				<section class="panel top-gap admin-pending-incidents">
+					<div class="panel-heading">
+						<div>
+							<h2>Incidencias pendientes</h2>
+							<p class="helper-text">Revisa los casos abiertos antes de cerrar el día.</p>
+						</div>
+						<button class="button button-secondary button-small" type="button" data-action="open-pending-incidents">Ver en Fichajes</button>
+					</div>
+					<div class="admin-incident-card-list">
+						${rows.slice(0, 4).map(renderAdminIncidentCard).join('')}
+					</div>
+				</section>
+			`;
+		}
+
+		function renderAdminTodayCard(employee: Employee, entry?: TimeEntry) {
+			const status = currentWorkStatus(entry);
+			return `
+				<article class="admin-today-card">
+					<div class="admin-card-head">
+						<div>
+							<strong>${employee.name}</strong>
+							<span>${employee.department}</span>
+						</div>
+						${pill(status.label, status.key)}
+					</div>
+					<div class="admin-card-grid">
+						${summaryRow('Entrada', entry?.start || 'Sin registrar')}
+						${summaryRow('Salida', entry?.end || 'Sin registrar')}
+						${summaryRow('Descansos', formatBreaks(entry))}
+						${summaryRow('Departamento', employee.department)}
+					</div>
+				</article>
+			`;
+		}
+
+		function renderAdminUserCard(user: AppUser) {
+			return `
+				<article class="admin-user-card top-gap">
+					<div class="admin-card-head">
+						<div>
+							<span class="meta-label">Ficha seleccionada</span>
+							<strong>${escapeHtml(user.name)}</strong>
+						</div>
+						${pill(user.active ? 'Activo' : 'Inactivo', user.active ? 'activo' : 'inactivo')}
+					</div>
+					<div class="summary-list">
+						${summaryRow('Email', escapeHtml(user.email))}
+						${summaryRow('Departamento', escapeHtml(user.department || 'General'))}
+						${summaryRow('Rol', roleLabel(user.role))}
+						${summaryRow('Estado', user.active ? 'Activo' : 'Inactivo')}
+					</div>
+					<div class="row-actions top-gap">
+						<button class="button button-secondary button-small" type="button" data-action="simulate-edit-user" data-id="${user.id}">Editar</button>
+						<button class="button button-secondary button-small" type="button" data-action="toggle-user" data-id="${user.id}">${user.active ? 'Desactivar' : 'Activar'}</button>
+						<button class="button button-ghost button-small" type="button" data-action="rotate-user-role" data-id="${user.id}">Cambiar rol</button>
+					</div>
+				</article>
+			`;
+		}
+
+		function adminIncidentFilterButton(label: string, filter: AdminIncidentFilter, count: number) {
+			return `
+				<button
+					class="request-filter-button ${adminIncidentFilter === filter ? 'is-active' : ''}"
+					type="button"
+					data-action="admin-incident-filter"
+					data-filter="${filter}"
+				>
+					<span>${label}</span>
+					<strong>${count}</strong>
+				</button>
+			`;
+		}
+
+		function renderAdminIncidentCard(incident: Incident) {
+			return `
+				<article class="admin-incident-card status-border-${statusClass(incident.status)}">
+					<div class="admin-card-head">
+						<div>
+							<strong>${employeeName(incident.employeeId)}</strong>
+							<span>${formatDate(incident.date)} · ${escapeHtml(incident.type)}</span>
+						</div>
+						${pill(incident.status)}
+					</div>
+					<p>${escapeHtml(incident.detail)}</p>
+					${incident.status === 'pendiente' ? `
+						<button class="button button-secondary button-small" type="button" data-action="review-incident" data-id="${incident.id}">Marcar revisada</button>
+					` : ''}
+				</article>
+			`;
+		}
+
+		function adminTodayFilterLabel(filter: AdminTodayFilter) {
+			if (filter === 'trabajando') return 'trabajando ahora';
+			if (filter === 'pausa') return 'en descanso';
+			if (filter === 'sin-fichar') return 'sin fichar hoy';
+			return 'todos';
+		}
+
 		function summaryRow(label: string, value: string) {
 			return `
 				<div class="summary-row">
@@ -2800,7 +2972,7 @@ import Layout from '../layouts/Layout.astro';
 			if (!rows.length) return emptyState('No hay registros con esos filtros.');
 
 			return `
-				<div class="table-wrap">
+				<div class="table-wrap admin-timesheet-table">
 					<table>
 						<thead>
 							<tr>
@@ -2827,6 +2999,23 @@ import Layout from '../layouts/Layout.astro';
 							`).join('')}
 						</tbody>
 					</table>
+				</div>
+				<div class="admin-timesheet-card-list">
+					${rows.map((entry) => `
+						<article class="admin-timesheet-card">
+							<div>
+								<strong>${formatDate(entry.date)}</strong>
+								<span>${employeeName(entry.employeeId)}</span>
+							</div>
+							${pill(entry.status)}
+							<div class="admin-card-grid">
+								${summaryRow('Entrada', entry.start || 'Sin registrar')}
+								${summaryRow('Salida', entry.end || 'Sin registrar')}
+								${summaryRow('Descansos', formatBreaks(entry))}
+								${summaryRow('Trabajado', formatMinutes(workedMinutes(entry)))}
+							</div>
+						</article>
+					`).join('')}
 				</div>
 			`;
 		}
@@ -3253,6 +3442,8 @@ import Layout from '../layouts/Layout.astro';
 				active: true,
 			};
 			users.push(user);
+			selectedAdminUserId = user.id;
+			adminUserSearch = '';
 			addAudit('Usuario creado', `${name} (${email}) con rol ${roleLabel(role)}.`);
 			saveAll();
 			showToast('Usuario creado en la demo pública.');
@@ -3301,6 +3492,43 @@ import Layout from '../layouts/Layout.astro';
 				status: String(formData.get('status') || 'all'),
 			};
 			showToast('Filtros aplicados.');
+			renderPage();
+		}
+
+		function setAdminTodayFilter(filter: string) {
+			adminTodayFilter = ['all', 'trabajando', 'pausa', 'sin-fichar'].includes(filter)
+				? (filter as AdminTodayFilter)
+				: 'all';
+			renderPage();
+		}
+
+		function openPendingIncidents() {
+			activeView = 'fichajes';
+			timeFilters = {
+				...timeFilters,
+				status: 'incidencia',
+			};
+			adminIncidentFilter = 'pendiente';
+			renderNav();
+			renderPage();
+		}
+
+		function selectAdminUser(id: string) {
+			selectedAdminUserId = id;
+			renderPage();
+		}
+
+		function applyUserSearch(form: HTMLFormElement) {
+			const formData = new FormData(form);
+			adminUserSearch = String(formData.get('query') || '').trim();
+			selectedAdminUserId = '';
+			renderPage();
+		}
+
+		function setAdminIncidentFilter(filter: string) {
+			adminIncidentFilter = ['pendiente', 'revisada', 'all'].includes(filter)
+				? (filter as AdminIncidentFilter)
+				: 'pendiente';
 			renderPage();
 		}
 
