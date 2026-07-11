@@ -2514,12 +2514,19 @@ import Layout from '../layouts/Layout.astro';
 			const reason = String(formData.get('reason') || '').trim();
 			let entry = findEntry(employee.id, date);
 			const originalBreaks = entry?.breaks || [];
+			const openBreakIndex = originalBreaks.findIndex((item) => item.start && !item.end);
 			const adjustedBreaks = originalBreaks.map((item, index) => ({
 				...item,
 				start: String(formData.get(`break-start-${index}`) || item.start).trim(),
 				end: String(formData.get(`break-end-${index}`) || '').trim() || undefined,
 			}));
-			const validationMessage = validateManualTimeAdjustment(start, end, adjustedBreaks, Boolean(formData.get('endNextDay')));
+			const validationMessage = validateManualTimeAdjustment(
+				start,
+				end,
+				adjustedBreaks,
+				Boolean(formData.get('endNextDay')),
+				openBreakIndex,
+			);
 
 			if (validationMessage) {
 				showManualFormMessage(form, validationMessage);
@@ -3411,7 +3418,13 @@ import Layout from '../layouts/Layout.astro';
 			return Math.max(endMinutes - startMinutes, 0);
 		}
 
-		function validateManualTimeAdjustment(start: string, end: string, breaks: TimeBreak[], endNextDay: boolean) {
+		function validateManualTimeAdjustment(
+			start: string,
+			end: string,
+			breaks: TimeBreak[],
+			endNextDay: boolean,
+			openBreakIndex: number,
+		) {
 			if (!start) return 'Indica una hora de entrada para guardar el ajuste.';
 			if (!isTimeValue(start)) return 'La hora de entrada no tiene un formato válido.';
 			if (end && !isTimeValue(end)) return 'La hora de salida no tiene un formato válido.';
@@ -3438,6 +3451,9 @@ import Layout from '../layouts/Layout.astro';
 				if (pauseEnd !== undefined && pauseEnd < pauseStart) return `${label}: el fin de pausa no debería ser anterior al inicio.`;
 				if (endMinutes !== undefined && pauseStart > endMinutes) return `${label}: la pausa no debería empezar después de la salida.`;
 				if (endMinutes !== undefined && pauseEnd === undefined) return `${label}: completa el fin de pausa antes de guardar una salida.`;
+				if (endMinutes === undefined && pauseEnd === undefined && index !== openBreakIndex) {
+					return `${label}: solo puede quedar abierta la pausa actual.`;
+				}
 				if (endMinutes !== undefined && pauseEnd !== undefined && pauseEnd > endMinutes) {
 					return `${label}: la pausa no debería terminar después de la salida.`;
 				}
