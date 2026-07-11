@@ -903,6 +903,11 @@ textarea:focus-visible {
 	color: var(--danger);
 }
 
+.status-cancelada {
+	background: #eef2f2;
+	color: var(--muted);
+}
+
 .status-pendiente,
 .status-pausa,
 .status-pending {
@@ -1519,17 +1524,22 @@ textarea:focus-visible {
 	background: var(--accent);
 }
 
+.bar-approved {
+	background: var(--success);
+}
+
 .bar-pending {
 	background: var(--pending);
 }
 
 .vacation-balance-grid {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(5, minmax(0, 1fr));
 	gap: 12px;
 }
 
-.vacation-filter-card {
+.vacation-filter-card,
+.vacation-summary-card {
 	display: grid;
 	gap: 6px;
 	min-width: 0;
@@ -1547,6 +1557,10 @@ textarea:focus-visible {
 		transform 160ms ease;
 }
 
+.vacation-summary-card {
+	cursor: default;
+}
+
 .vacation-filter-card:hover,
 .vacation-filter-card.is-active {
 	border-color: var(--primary);
@@ -1555,15 +1569,21 @@ textarea:focus-visible {
 	transform: translateY(-1px);
 }
 
-.vacation-filter-card span {
+.vacation-filter-card span,
+.vacation-summary-card span {
 	color: var(--muted);
 	font-size: 0.78rem;
 	font-weight: 600;
 }
 
-.vacation-filter-card strong {
+.vacation-filter-card strong,
+.vacation-summary-card strong {
 	font-size: 1.08rem;
 	line-height: 1.2;
+}
+
+.employee-request-filter-bar {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .employee-vacation-layout {
@@ -1575,6 +1595,13 @@ textarea:focus-visible {
 	display: grid;
 	align-content: start;
 	gap: 14px;
+}
+
+.vacation-request-panel input,
+.vacation-request-panel textarea,
+.employee-vacation-form .field {
+	min-width: 0;
+	max-width: 100%;
 }
 
 .section-head-inline {
@@ -1608,13 +1635,28 @@ textarea:focus-visible {
 }
 
 .vacation-card-main {
+	flex: 1 1 auto;
 	display: grid;
 	gap: 3px;
+	min-width: 0;
 }
 
 .vacation-card-main > span:last-child {
 	color: var(--muted);
 	font-size: 0.88rem;
+}
+
+.vacation-card-side {
+	display: grid;
+	justify-items: end;
+	gap: 8px;
+}
+
+.vacation-card-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 8px;
 }
 
 .vacation-preview {
@@ -1703,7 +1745,8 @@ textarea:focus-visible {
 }
 
 .employee-vacation-preview .vacation-matrix th.is-weekend,
-.employee-vacation-preview .comparison-cell.is-weekend.cell-free {
+.employee-vacation-preview .comparison-cell.is-weekend.cell-free,
+.employee-vacation-preview .comparison-cell.is-weekend.cell-off {
 	background: #f3f5f4;
 }
 
@@ -1813,6 +1856,10 @@ textarea:focus-visible {
 
 .status-border-denegada {
 	border-left-color: var(--danger);
+}
+
+.status-border-cancelada {
+	border-left-color: #9caaa7;
 }
 
 .vacation-admin-summary {
@@ -2006,6 +2053,11 @@ textarea:focus-visible {
 .cell-free {
 	background: #f6f8f8;
 	color: var(--muted);
+}
+
+.cell-off {
+	background: #eef2f2;
+	color: #7a8885;
 }
 
 .team-legend-approved {
@@ -2203,7 +2255,7 @@ textarea:focus-visible {
 }
 
 .calendar-summary {
-	margin: 0 0 14px;
+	margin: 16px 0 0;
 }
 
 .report-overview {
@@ -2382,14 +2434,20 @@ tr:last-child td {
 	background: var(--pending);
 }
 
-.legend-dot.status-festivo,
 .legend-dot.status-vacaciones {
 	background: var(--accent);
 }
 
-.legend-dot.status-sin-fichaje,
-.legend-dot.status-fin-de-semana {
+.legend-dot.status-festivo {
+	background: var(--danger);
+}
+
+.legend-dot.status-sin-fichaje {
 	background: #9caaa7;
+}
+
+.legend-dot.status-fin-de-semana {
+	background: #c7d1cf;
 }
 
 .calendar-grid {
@@ -2461,15 +2519,24 @@ tr:last-child td {
 	background: #fffaf0;
 }
 
-.calendar-day.status-festivo,
 .calendar-day.status-vacaciones {
 	border-left: 4px solid var(--accent);
 	background: #f3f8fc;
 }
 
-.calendar-day.status-sin-fichaje,
+.calendar-day.status-festivo {
+	border-left: 4px solid var(--danger);
+	background: #fff3f5;
+}
+
+.calendar-day.status-sin-fichaje {
+	border-left: 4px solid #9caaa7;
+}
+
 .calendar-day.status-fin-de-semana {
 	border-left: 4px solid #c7d1cf;
+	background: #f7f9f8;
+	color: var(--muted);
 }
 
 .day-detail,
@@ -2899,6 +2966,17 @@ tr:last-child td {
 		flex-direction: column;
 	}
 
+	.vacation-card-side,
+	.vacation-card-actions {
+		width: 100%;
+		justify-items: start;
+		justify-content: flex-start;
+	}
+
+	.vacation-card-actions .button {
+		flex: 1 1 100%;
+	}
+
 	.vacation-filter-card {
 		padding: 12px;
 	}
@@ -3186,6 +3264,10 @@ tr:last-child td {
 	.employee-day-state {
 		padding: 4px 7px;
 		font-size: 0.72rem;
+	}
+
+	.employee-request-filter-bar {
+		grid-template-columns: 1fr;
 	}
 
 	.mobile-nav .nav-button {

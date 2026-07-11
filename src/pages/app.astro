@@ -43,8 +43,8 @@ import Layout from '../layouts/Layout.astro';
 	<script>
 		type Role = 'admin_global' | 'validador_vacaciones' | 'empleado';
 		type EntryStatus = 'correcto' | 'incidencia' | 'pendiente' | 'sin fichaje';
-		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada';
-		type EmployeeVacationFilter = 'all' | VacationStatus;
+		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada' | 'cancelada';
+		type EmployeeVacationFilter = 'all' | 'aprobada-futura' | 'disfrutada' | VacationStatus;
 		type IncidentStatus = 'pendiente' | 'revisada';
 		type TeamCalendarMode = 'month' | 'planning';
 
@@ -196,6 +196,7 @@ import Layout from '../layouts/Layout.astro';
 			'fin de semana': 'Fin de semana',
 			aprobada: 'Aprobada',
 			denegada: 'Denegada',
+			cancelada: 'Cancelada',
 			revisada: 'Revisada',
 			trabajando: 'Trabajando',
 			pausa: 'En descanso',
@@ -206,7 +207,7 @@ import Layout from '../layouts/Layout.astro';
 		let session: Session;
 		let activeView = 'inicio';
 		let calendarCursor = new Date();
-		let selectedCalendarDay = todayIso();
+		let selectedCalendarDay = '';
 		let calendarAdjustmentDate = '';
 		let selectedVacationId = '';
 		let employeeVacationFilter: EmployeeVacationFilter = 'all';
@@ -318,6 +319,7 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'employee-vacation-filter') setEmployeeVacationFilter(actionButton.dataset.filter || 'all');
 				if (action === 'employee-vacation-week-prev') shiftEmployeeVacationPreviewWeek(-7);
 				if (action === 'employee-vacation-week-next') shiftEmployeeVacationPreviewWeek(7);
+				if (action === 'cancel-employee-vacation') cancelEmployeeVacation(actionButton.dataset.id || '');
 				if (action === 'team-calendar-prev') changeTeamCalendarMonth(-1);
 				if (action === 'team-calendar-next') changeTeamCalendarMonth(1);
 				if (action === 'team-calendar-day') selectTeamCalendarDay(actionButton.dataset.date || todayIso());
@@ -694,7 +696,7 @@ import Layout from '../layouts/Layout.astro';
 						data-date="${iso}"
 					>
 						<strong>${date.getDate()}</strong>
-						<span class="calendar-day-label">${STATUS_LABELS[dayStatus] || dayStatus}</span>
+						<span class="calendar-day-label" title="${STATUS_LABELS[dayStatus] || dayStatus}">${calendarStatusLabel(dayStatus)}</span>
 					</button>
 				`;
 			}).join('');
@@ -707,18 +709,18 @@ import Layout from '../layouts/Layout.astro';
 						<h2>${calendarCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
 						<button class="button button-secondary button-small" type="button" data-action="calendar-next">Mes siguiente</button>
 					</div>
-					<div class="history-summary calendar-summary">
-						${metricCard('Días con fichaje', String(monthEntries.length), monthEntries.length ? 'correcto' : 'sin fichaje')}
-						${metricCard('Horas registradas', formatMinutes(monthWorked), 'trabajando')}
-						${metricCard('Incidencias', String(monthIncidents), monthIncidents ? 'incidencia' : 'correcto')}
-					</div>
 					${statusLegend(['correcto', 'incidencia', 'festivo', 'vacaciones', 'pendiente', 'sin fichaje', 'fin de semana'])}
 					<div class="calendar-grid" aria-label="Calendario mensual">
 						${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day) => `<div class="calendar-head">${day}</div>`).join('')}
 						${cells}
 					</div>
-					<div class="top-gap">
+					${selectedCalendarDay ? `<div class="top-gap">
 						${renderDayDetail(employee.id, selectedCalendarDay, true)}
+					</div>` : ''}
+					<div class="history-summary calendar-summary">
+						${metricCard('Días con fichaje', String(monthEntries.length), monthEntries.length ? 'correcto' : 'sin fichaje')}
+						${metricCard('Horas registradas', formatMinutes(monthWorked), 'trabajando')}
+						${metricCard('Incidencias', String(monthIncidents), monthIncidents ? 'incidencia' : 'correcto')}
 					</div>
 				</section>
 			`;
@@ -776,9 +778,7 @@ import Layout from '../layouts/Layout.astro';
 			const requests = vacations
 				.filter((request) => request.employeeId === employee.id)
 				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-			const filteredRequests = employeeVacationFilter === 'all'
-				? requests
-				: requests.filter((request) => request.status === employeeVacationFilter);
+			const filteredRequests = filterEmployeeVacationRequests(requests, employeeVacationFilter);
 			const filterLabel = employeeVacationFilterLabel(employeeVacationFilter);
 
 			return `
@@ -787,24 +787,26 @@ import Layout from '../layouts/Layout.astro';
 					<div>
 						<span class="meta-label">Saldo anual</span>
 						<strong>${balance.available} días disponibles</strong>
-						<p class="helper-text">${balance.used} usados · ${balance.pending} pendientes · ${balance.denied} denegados de ${employee.vacationDays} días anuales.</p>
+						<p class="helper-text">${balance.enjoyed} disfrutadas · ${balance.futureApproved} aprobadas futuras · ${balance.pending} pendientes · ${balance.denied} denegadas de ${employee.vacationDays} días anuales.</p>
 					</div>
 					<div class="vacation-bar" aria-label="Distribución de vacaciones">
-						<span class="bar-used" style="width: ${Math.min((balance.used / employee.vacationDays) * 100, 100)}%"></span>
+						<span class="bar-used" style="width: ${Math.min((balance.enjoyed / employee.vacationDays) * 100, 100)}%"></span>
+						<span class="bar-approved" style="width: ${Math.min((balance.futureApproved / employee.vacationDays) * 100, 100)}%"></span>
 						<span class="bar-pending" style="width: ${Math.min((balance.pending / employee.vacationDays) * 100, 100)}%"></span>
 					</div>
 					<div class="vacation-balance-grid">
-						${employeeVacationFilterCard('Disponibles', 'Ver todas', 'all', employeeVacationFilter, 'correcto')}
-						${employeeVacationFilterCard('Usados / aprobados', `${balance.used} días`, 'aprobada', employeeVacationFilter, 'vacaciones')}
-						${employeeVacationFilterCard('Pendientes', `${balance.pending} días`, 'pendiente', employeeVacationFilter, 'pendiente')}
-						${employeeVacationFilterCard('Denegados', `${balance.denied} días`, 'denegada', employeeVacationFilter, 'incidencia')}
+						${vacationSummaryCard('Disponibles', `${balance.available} días`, 'correcto')}
+						${vacationSummaryCard('Disfrutadas', `${balance.enjoyed} días`, 'vacaciones')}
+						${vacationSummaryCard('Aprobadas futuras', `${balance.futureApproved} días`, 'aprobada')}
+						${vacationSummaryCard('Pendientes', `${balance.pending} días`, 'pendiente')}
+						${vacationSummaryCard('Denegadas', `${balance.denied} días`, 'incidencia')}
 					</div>
 				</section>
 				<div class="grid grid-2 top-gap employee-vacation-layout">
 					<section class="panel vacation-request-panel">
 						<h2>Nueva solicitud</h2>
 						<p class="helper-text">Selecciona un rango para comprobar si alguien de tu departamento ya tiene vacaciones aprobadas o pendientes.</p>
-						<form id="vacation-request-form" class="form-grid">
+						<form id="vacation-request-form" class="form-grid employee-vacation-form">
 							<label class="field">
 								<span>Fecha desde</span>
 								<input type="date" name="from" required />
@@ -826,6 +828,14 @@ import Layout from '../layouts/Layout.astro';
 								<h2>Solicitudes</h2>
 								<p class="helper-text">Filtro activo: ${filterLabel}</p>
 							</div>
+						</div>
+						<div class="request-filter-bar employee-request-filter-bar" aria-label="Filtrar solicitudes de vacaciones">
+							${employeeVacationFilterButton('Todas', 'all', employeeVacationFilter, requests.length)}
+							${employeeVacationFilterButton('Aprobadas futuras', 'aprobada-futura', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'aprobada-futura').length)}
+							${employeeVacationFilterButton('Disfrutadas', 'disfrutada', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'disfrutada').length)}
+							${employeeVacationFilterButton('Pendientes', 'pendiente', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'pendiente').length)}
+							${employeeVacationFilterButton('Denegadas', 'denegada', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'denegada').length)}
+							${employeeVacationFilterButton('Canceladas', 'cancelada', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'cancelada').length)}
 						</div>
 						<div class="vacation-list">
 							${filteredRequests.length ? filteredRequests.map(renderVacationRow).join('') : employeeVacationEmptyState(employeeVacationFilter)}
@@ -1447,7 +1457,7 @@ import Layout from '../layouts/Layout.astro';
 			const to = monthDays[monthDays.length - 1];
 			const employeeIds = new Set(employees.map((employee) => employee.id));
 			return vacations
-				.filter((request) => request.status !== 'denegada')
+				.filter(isActiveVacationRequest)
 				.filter((request) => employeeIds.has(request.employeeId))
 				.filter((request) => rangesOverlap(from, to, request.from, request.to));
 		}
@@ -1455,7 +1465,7 @@ import Layout from '../layouts/Layout.astro';
 		function teamVacationRequestsForDate(date: string, employees: Employee[]) {
 			const employeeIds = new Set(employees.map((employee) => employee.id));
 			return vacations
-				.filter((request) => request.status !== 'denegada')
+				.filter(isActiveVacationRequest)
 				.filter((request) => employeeIds.has(request.employeeId))
 				.filter((request) => isDateWithin(date, request.from, request.to));
 		}
@@ -1973,6 +1983,34 @@ import Layout from '../layouts/Layout.astro';
 			return `<span class="status-pill status-${statusClass(status)}">${STATUS_LABELS[label] || label}</span>`;
 		}
 
+		function vacationSummaryCard(label: string, value: string, status: string) {
+			return `
+				<div class="vacation-summary-card status-border-${statusClass(status)}">
+					<span>${label}</span>
+					<strong>${value}</strong>
+				</div>
+			`;
+		}
+
+		function employeeVacationFilterButton(
+			label: string,
+			filter: EmployeeVacationFilter,
+			activeFilter: EmployeeVacationFilter,
+			count: number,
+		) {
+			return `
+				<button
+					class="request-filter-button ${activeFilter === filter ? 'is-active' : ''}"
+					type="button"
+					data-action="employee-vacation-filter"
+					data-filter="${filter}"
+				>
+					<span>${label}</span>
+					<strong>${count}</strong>
+				</button>
+			`;
+		}
+
 		function employeeVacationFilterCard(
 			label: string,
 			value: string,
@@ -1994,17 +2032,40 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function employeeVacationFilterLabel(filter: EmployeeVacationFilter) {
+			if (filter === 'aprobada-futura') return 'Aprobadas futuras';
+			if (filter === 'disfrutada') return 'Disfrutadas';
 			if (filter === 'pendiente') return 'Pendientes';
-			if (filter === 'aprobada') return 'Aprobadas';
 			if (filter === 'denegada') return 'Denegadas';
+			if (filter === 'cancelada') return 'Canceladas';
 			return 'Todas';
 		}
 
 		function employeeVacationEmptyState(filter: EmployeeVacationFilter) {
 			if (filter === 'pendiente') return emptyState('No tienes solicitudes pendientes.');
-			if (filter === 'aprobada') return emptyState('No tienes solicitudes aprobadas.');
+			if (filter === 'aprobada-futura') return emptyState('No tienes vacaciones aprobadas futuras.');
+			if (filter === 'disfrutada') return emptyState('No tienes vacaciones disfrutadas.');
 			if (filter === 'denegada') return emptyState('No tienes solicitudes denegadas.');
+			if (filter === 'cancelada') return emptyState('No tienes solicitudes canceladas.');
 			return emptyState('Aún no has solicitado vacaciones.');
+		}
+
+		function filterEmployeeVacationRequests(requests: VacationRequest[], filter: EmployeeVacationFilter) {
+			if (filter === 'all') return requests;
+			if (filter === 'aprobada-futura') return requests.filter(isFutureApprovedVacation);
+			if (filter === 'disfrutada') return requests.filter(isEnjoyedVacation);
+			return requests.filter((request) => request.status === filter);
+		}
+
+		function isFutureApprovedVacation(request: VacationRequest) {
+			return request.status === 'aprobada' && request.from > todayIso();
+		}
+
+		function isEnjoyedVacation(request: VacationRequest) {
+			return request.status === 'aprobada' && request.from <= todayIso();
+		}
+
+		function vacationRequestDays(request: VacationRequest) {
+			return businessDaysBetween(request.from, request.to);
 		}
 
 		function statusLegend(statuses: string[]) {
@@ -2149,7 +2210,8 @@ import Layout from '../layouts/Layout.astro';
 			const vacation = vacations.find(
 				(request) =>
 					request.employeeId === employeeId &&
-					request.status !== 'denegada' &&
+					isActiveVacationRequest(request) &&
+					isBusinessDay(date) &&
 					isDateWithin(date, request.from, request.to),
 			);
 			const dayIncidents = incidents.filter(
@@ -2230,16 +2292,39 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderVacationRow(request: VacationRequest) {
+			const days = vacationRequestDays(request);
+			const canCancel = canCancelEmployeeVacation(request);
+			const reminderHref = vacationReminderMailto(request);
 			return `
 				<div class="vacation-card status-border-${statusClass(request.status)}">
 					<div class="vacation-card-main">
-						<span class="meta-label">${request.days} días solicitados</span>
+						<span class="meta-label">${days} días laborables solicitados</span>
 						<strong>${formatDate(request.from)} - ${formatDate(request.to)}</strong>
 						${request.comment ? `<span>${escapeHtml(request.comment)}</span>` : ''}
 					</div>
-					${pill(request.status)}
+					<div class="vacation-card-side">
+						${pill(request.status)}
+						<div class="vacation-card-actions">
+							${request.status === 'pendiente' ? `<a class="button button-secondary button-small" href="${reminderHref}">Enviar recordatorio</a>` : ''}
+							${canCancel ? `<button class="button button-danger button-small" type="button" data-action="cancel-employee-vacation" data-id="${request.id}">${request.status === 'aprobada' ? 'Cancelar vacaciones' : 'Cancelar solicitud'}</button>` : ''}
+						</div>
+					</div>
 				</div>
 			`;
+		}
+
+		function canCancelEmployeeVacation(request: VacationRequest) {
+			if (request.status === 'pendiente') return true;
+			return isFutureApprovedVacation(request);
+		}
+
+		function vacationReminderMailto(request: VacationRequest) {
+			const employee = employeeName(request.employeeId);
+			const subject = encodeURIComponent('Recordatorio de vacaciones pendientes');
+			const body = encodeURIComponent(
+				`Hola,\n\n${employee} tiene una solicitud de vacaciones pendiente de revisión.\n\nFechas: ${formatDate(request.from)} - ${formatDate(request.to)}\nDías laborables solicitados: ${vacationRequestDays(request)}\n\n¿Podéis revisarla cuando sea posible?\n\nGracias.`,
+			);
+			return `mailto:responsable.vacaciones@empresa-demo.es?subject=${subject}&body=${body}`;
 		}
 
 		function renderVacationAdminDetail(request: VacationRequest, scopeEmployees = EMPLOYEES) {
@@ -2369,7 +2454,8 @@ import Layout from '../layouts/Layout.astro';
 				(item) =>
 					item.id !== request.id &&
 					item.employeeId === employeeId &&
-					item.status !== 'denegada' &&
+					isActiveVacationRequest(item) &&
+					isBusinessDay(date) &&
 					isDateWithin(date, item.from, item.to),
 			);
 
@@ -2436,9 +2522,9 @@ import Layout from '../layouts/Layout.astro';
 				.filter(
 					(request) =>
 						request.employeeId !== employee.id &&
-						request.status !== 'denegada' &&
+						isActiveVacationRequest(request) &&
 						peers.some((peer) => peer.id === request.employeeId) &&
-						rangesOverlap(from, to, request.from, request.to),
+						businessRangesOverlap(from, to, request.from, request.to),
 				)
 				.sort((a, b) => a.from.localeCompare(b.from));
 
@@ -2480,13 +2566,14 @@ import Layout from '../layouts/Layout.astro';
 						<span><i class="cell-approved"></i> Vacaciones aprobadas</span>
 						<span><i class="cell-pending"></i> Solicitud pendiente</span>
 						<span><i class="cell-free"></i> Libre</span>
+						<span><i class="cell-off"></i> No laborable</span>
 					</div>
 					<div class="table-wrap vacation-matrix-wrap vacation-week-table top-gap">
 						<table class="vacation-matrix">
 							<thead>
 								<tr>
 									<th class="sticky-col">Empleado</th>
-									${weekDays.map((date) => `<th class="${isWeekend(date) ? 'is-weekend' : ''}">${formatDayHeader(date)}<span>${weekdayShort(date)}</span></th>`).join('')}
+									${weekDays.map((date) => `<th class="${!isBusinessDay(date) ? 'is-weekend' : ''}">${formatDayHeader(date)}<span>${weekdayShort(date)}</span></th>`).join('')}
 								</tr>
 							</thead>
 							<tbody>${comparisonRows}</tbody>
@@ -2500,6 +2587,16 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function employeeVacationCellState(employeeId: string, date: string, request: VacationRequest) {
+			if (!isBusinessDay(date)) {
+				const holiday = holidays.find((item) => item.date === date);
+				return {
+					key: 'off',
+					short: '-',
+					label: holiday ? 'Festivo' : 'No laborable',
+					title: holiday ? `Festivo: ${holiday.name}` : 'Fin de semana',
+				};
+			}
+
 			if (employeeId === request.employeeId && isDateWithin(date, request.from, request.to)) {
 				return {
 					key: 'actual',
@@ -2513,7 +2610,7 @@ import Layout from '../layouts/Layout.astro';
 				(item) =>
 					item.id !== request.id &&
 					item.employeeId === employeeId &&
-					item.status !== 'denegada' &&
+					isActiveVacationRequest(item) &&
 					isDateWithin(date, item.from, item.to),
 			);
 
@@ -2545,13 +2642,13 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderEmployeeVacationComparisonCell(employeeId: string, date: string, request: VacationRequest) {
 			const state = employeeVacationCellState(employeeId, date, request);
-			const weekendClass = isWeekend(date) ? ' is-weekend' : '';
+			const weekendClass = !isBusinessDay(date) ? ' is-weekend' : '';
 			return `<td class="comparison-cell employee-comparison-cell cell-${state.key}${weekendClass}" title="${escapeHtml(`${employeeName(employeeId)} Â· ${formatDate(date)} Â· ${state.title}`)}">${state.short}</td>`;
 		}
 
 		function renderEmployeeVacationDayCard(date: string, peers: Employee[], request: VacationRequest) {
 			return `
-				<article class="vacation-day-card ${isWeekend(date) ? 'is-weekend' : ''}">
+				<article class="vacation-day-card ${!isBusinessDay(date) ? 'is-weekend' : ''}">
 					<div class="vacation-day-card-head">
 						<strong>${formatDayHeader(date)}</strong>
 						<span>${weekdayShort(date)}</span>
@@ -2973,12 +3070,18 @@ import Layout from '../layouts/Layout.astro';
 				return;
 			}
 
+			const days = businessDaysBetween(from, to);
+			if (days <= 0) {
+				showToast('El rango seleccionado no incluye días laborables.');
+				return;
+			}
+
 			const request: VacationRequest = {
 				id: uniqueId('vac'),
 				employeeId: employee.id,
 				from,
 				to,
-				days: businessDaysBetween(from, to),
+				days,
 				status: 'pendiente',
 				comment,
 				createdAt: new Date().toISOString(),
@@ -3132,9 +3235,30 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function setEmployeeVacationFilter(filter: string) {
-			employeeVacationFilter = ['pendiente', 'aprobada', 'denegada'].includes(filter)
+			employeeVacationFilter = ['pendiente', 'aprobada', 'denegada', 'cancelada', 'aprobada-futura', 'disfrutada'].includes(filter)
 				? (filter as EmployeeVacationFilter)
 				: 'all';
+			renderPage();
+		}
+
+		function cancelEmployeeVacation(id: string) {
+			const employee = currentEmployee();
+			const request = vacations.find((item) => item.id === id && item.employeeId === employee.id);
+
+			if (!request || !canCancelEmployeeVacation(request)) {
+				showToast('Esta solicitud ya no se puede cancelar.');
+				return;
+			}
+
+			const wasApproved = request.status === 'aprobada';
+			request.status = 'cancelada';
+			request.decidedAt = new Date().toISOString();
+			addAudit(
+				wasApproved ? 'Vacaciones canceladas' : 'Solicitud cancelada',
+				`${employee.name}: ${formatDate(request.from)} - ${formatDate(request.to)} (${vacationRequestDays(request)} días laborables).`,
+			);
+			saveAll();
+			showToast(wasApproved ? 'Vacaciones futuras canceladas.' : 'Solicitud cancelada.');
 			renderPage();
 		}
 
@@ -3172,7 +3296,7 @@ import Layout from '../layouts/Layout.astro';
 
 		function changeCalendarMonth(offset: number) {
 			calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + offset, 1);
-			selectedCalendarDay = isoFromDate(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), 1));
+			selectedCalendarDay = '';
 			calendarAdjustmentDate = '';
 			renderPage();
 		}
@@ -3773,7 +3897,8 @@ import Layout from '../layouts/Layout.astro';
 			const vacation = vacations.find(
 				(request) =>
 					request.employeeId === employeeId &&
-					request.status !== 'denegada' &&
+					isActiveVacationRequest(request) &&
+					isBusinessDay(date) &&
 					isDateWithin(date, request.from, request.to),
 			);
 			const entry = findEntry(employeeId, date);
@@ -3784,6 +3909,17 @@ import Layout from '../layouts/Layout.astro';
 			if (entry) return entry.status;
 			if (isWeekend(date)) return 'fin de semana';
 			return 'sin fichaje';
+		}
+
+		function calendarStatusLabel(status: string) {
+			if (status === 'correcto') return 'Correcto';
+			if (status === 'incidencia') return 'Incidencia';
+			if (status === 'pendiente') return 'Pendiente';
+			if (status === 'vacaciones') return 'Vacaciones';
+			if (status === 'festivo') return 'Festivo';
+			if (status === 'fin de semana') return 'Finde';
+			if (status === 'sin fichaje') return 'Sin fichaje';
+			return STATUS_LABELS[status] || status;
 		}
 
 		function formatBreaks(entry?: TimeEntry) {
@@ -3986,14 +4122,20 @@ import Layout from '../layouts/Layout.astro';
 		function vacationBalance(employeeId: string) {
 			const employee = EMPLOYEES.find((item) => item.id === employeeId) || EMPLOYEES[0];
 			const own = vacations.filter((request) => request.employeeId === employeeId);
-			const used = own.filter((request) => request.status === 'aprobada').reduce((sum, item) => sum + item.days, 0);
-			const pending = own.filter((request) => request.status === 'pendiente').reduce((sum, item) => sum + item.days, 0);
-			const denied = own.filter((request) => request.status === 'denegada').reduce((sum, item) => sum + item.days, 0);
+			const enjoyed = own.filter(isEnjoyedVacation).reduce((sum, item) => sum + vacationRequestDays(item), 0);
+			const futureApproved = own.filter(isFutureApprovedVacation).reduce((sum, item) => sum + vacationRequestDays(item), 0);
+			const pending = own.filter((request) => request.status === 'pendiente').reduce((sum, item) => sum + vacationRequestDays(item), 0);
+			const denied = own.filter((request) => request.status === 'denegada').reduce((sum, item) => sum + vacationRequestDays(item), 0);
+			const canceled = own.filter((request) => request.status === 'cancelada').reduce((sum, item) => sum + vacationRequestDays(item), 0);
+			const committed = enjoyed + futureApproved + pending;
 			return {
-				available: Math.max(employee.vacationDays - used - pending, 0),
-				used,
+				available: Math.max(employee.vacationDays - committed, 0),
+				used: enjoyed,
+				enjoyed,
+				futureApproved,
 				pending,
 				denied,
+				canceled,
 			};
 		}
 
@@ -4165,7 +4307,11 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function businessDaysBetween(from: string, to: string) {
-			return dateRange(from, to).filter((date) => !isWeekend(date) && !holidays.some((holiday) => holiday.date === date)).length;
+			return dateRange(from, to).filter(isBusinessDay).length;
+		}
+
+		function isBusinessDay(date: string) {
+			return !isWeekend(date) && !holidays.some((holiday) => holiday.date === date);
 		}
 
 		function isWeekend(date: string) {
@@ -4179,6 +4325,15 @@ import Layout from '../layouts/Layout.astro';
 
 		function rangesOverlap(fromA: string, toA: string, fromB: string, toB: string) {
 			return fromA <= toB && fromB <= toA;
+		}
+
+		function businessRangesOverlap(fromA: string, toA: string, fromB: string, toB: string) {
+			if (!rangesOverlap(fromA, toA, fromB, toB)) return false;
+			return dateRange(maxDate(fromA, fromB), minDate(toA, toB)).some(isBusinessDay);
+		}
+
+		function isActiveVacationRequest(request: VacationRequest) {
+			return request.status === 'aprobada' || request.status === 'pendiente';
 		}
 
 		function dateInRange(date: string, from: string, to: string) {
@@ -4197,7 +4352,7 @@ import Layout from '../layouts/Layout.astro';
 					return (
 						sum +
 						dateRange(maxDate(from, request.from), minDate(to, request.to)).filter(
-							(date) => !isWeekend(date) && !holidays.some((holiday) => holiday.date === date),
+							isBusinessDay,
 						).length
 					);
 				}, 0);
