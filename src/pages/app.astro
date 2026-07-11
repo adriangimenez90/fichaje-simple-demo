@@ -569,6 +569,7 @@ import Layout from '../layouts/Layout.astro';
 			const actionHelp = punchHelpText(entry);
 			const isOnBreak = Boolean(activeBreak(entry));
 			const canCheckout = Boolean(entry?.start && !entry.end && !activeBreak(entry));
+			const checkoutHelp = checkoutHelpText(entry);
 			const weeklyWorked = workedMinutesThisWeek(employee.id);
 			const weeklyOverLimit = weeklyWorked > 40 * 60;
 
@@ -595,7 +596,7 @@ import Layout from '../layouts/Layout.astro';
 							<div class="checkout-action">
 								<button class="button button-secondary punch-button punch-button-secondary" type="button" data-action="checkout" ${canCheckout ? '' : 'disabled'}>
 									<span>Fichar salida</span>
-									<small>${canCheckout ? 'Cierra la jornada de hoy' : 'Disponible al terminar el trabajo'}</small>
+									<small>${checkoutHelp}</small>
 								</button>
 								${isOnBreak ? '<p class="checkout-help">Finaliza el descanso antes de fichar salida.</p>' : ''}
 							</div>
@@ -3324,6 +3325,13 @@ import Layout from '../layouts/Layout.astro';
 			if (entry.end) return 'Todo listo por hoy';
 			if (activeBreak(entry)) return 'Vuelve a trabajar';
 			return 'Detiene el tiempo de trabajo';
+		}
+
+		function checkoutHelpText(entry?: TimeEntry) {
+			if (!entry?.start) return 'Primero inicia la jornada';
+			if (entry.end) return 'Salida registrada';
+			if (activeBreak(entry)) return 'Finaliza el descanso antes';
+			return 'Cierra la jornada de hoy';
 		}
 
 		function statusForDay(employeeId: string, date: string) {

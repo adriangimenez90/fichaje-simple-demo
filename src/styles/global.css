@@ -1053,6 +1053,11 @@ textarea:focus-visible {
 	height: 100%;
 }
 
+.punch-actions .punch-button:disabled {
+	box-shadow: none;
+	transform: none;
+}
+
 .punch-button span {
 	font-weight: 760;
 }
