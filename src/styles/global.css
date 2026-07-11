@@ -1469,6 +1469,70 @@ textarea:focus-visible {
 	gap: 12px;
 }
 
+.vacation-filter-card {
+	display: grid;
+	gap: 6px;
+	min-width: 0;
+	border: 1px solid var(--line);
+	border-left-width: 5px;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.92);
+	color: var(--text);
+	padding: 13px;
+	text-align: left;
+	transition:
+		background 160ms ease,
+		border-color 160ms ease,
+		box-shadow 160ms ease,
+		transform 160ms ease;
+}
+
+.vacation-filter-card:hover,
+.vacation-filter-card.is-active {
+	border-color: var(--primary);
+	background: #f0fbf7;
+	box-shadow: var(--shadow-soft);
+	transform: translateY(-1px);
+}
+
+.vacation-filter-card span {
+	color: var(--muted);
+	font-size: 0.78rem;
+	font-weight: 600;
+}
+
+.vacation-filter-card strong {
+	font-size: 1.08rem;
+	line-height: 1.2;
+}
+
+.employee-vacation-layout {
+	align-items: start;
+}
+
+.vacation-request-panel,
+.vacation-requests-panel {
+	display: grid;
+	align-content: start;
+	gap: 14px;
+}
+
+.section-head-inline {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.section-head-inline h2 {
+	margin: 0;
+}
+
+.vacation-list {
+	display: grid;
+	gap: 10px;
+}
+
 .vacation-card {
 	display: flex;
 	align-items: center;
@@ -2570,10 +2634,15 @@ tr:last-child td {
 	.summary-row,
 	.stat-row,
 	.vacation-select,
+	.section-head-inline,
 	.vacation-card,
 	.day-detail-head {
 		align-items: flex-start;
 		flex-direction: column;
+	}
+
+	.vacation-filter-card {
+		padding: 12px;
 	}
 
 	.summary-row strong {

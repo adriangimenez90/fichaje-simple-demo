@@ -44,6 +44,7 @@ import Layout from '../layouts/Layout.astro';
 		type Role = 'admin_global' | 'validador_vacaciones' | 'empleado';
 		type EntryStatus = 'correcto' | 'incidencia' | 'pendiente' | 'sin fichaje';
 		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada';
+		type EmployeeVacationFilter = 'all' | VacationStatus;
 		type IncidentStatus = 'pendiente' | 'revisada';
 		type TeamCalendarMode = 'month' | 'planning';
 
@@ -213,6 +214,7 @@ import Layout from '../layouts/Layout.astro';
 		let calendarCursor = new Date();
 		let selectedCalendarDay = todayIso();
 		let selectedVacationId = '';
+		let employeeVacationFilter: EmployeeVacationFilter = 'all';
 		let historyMonth = todayIso().slice(0, 7);
 		let teamCalendarDepartment = 'all';
 		let teamCalendarMode: TeamCalendarMode = 'month';
@@ -314,6 +316,7 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'calendar-prev') changeCalendarMonth(-1);
 				if (action === 'calendar-next') changeCalendarMonth(1);
 				if (action === 'calendar-day') selectCalendarDay(actionButton.dataset.date || todayIso());
+				if (action === 'employee-vacation-filter') setEmployeeVacationFilter(actionButton.dataset.filter || 'all');
 				if (action === 'team-calendar-prev') changeTeamCalendarMonth(-1);
 				if (action === 'team-calendar-next') changeTeamCalendarMonth(1);
 				if (action === 'team-calendar-day') selectTeamCalendarDay(actionButton.dataset.date || todayIso());
@@ -759,6 +762,10 @@ import Layout from '../layouts/Layout.astro';
 			const requests = vacations
 				.filter((request) => request.employeeId === employee.id)
 				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+			const filteredRequests = employeeVacationFilter === 'all'
+				? requests
+				: requests.filter((request) => request.status === employeeVacationFilter);
+			const filterLabel = employeeVacationFilterLabel(employeeVacationFilter);
 
 			return `
 				${sectionTitle('Mis vacaciones', 'Solicita días y revisa tu saldo. Antes de guardar puedes ver coincidencias de tu departamento.')}
@@ -773,14 +780,14 @@ import Layout from '../layouts/Layout.astro';
 						<span class="bar-pending" style="width: ${Math.min((balance.pending / employee.vacationDays) * 100, 100)}%"></span>
 					</div>
 					<div class="vacation-balance-grid">
-						${metricCard('Disponibles', String(balance.available), 'correcto')}
-						${metricCard('Usados', String(balance.used), 'vacaciones')}
-						${metricCard('Pendientes', String(balance.pending), 'pendiente')}
-						${metricCard('Denegados', String(balance.denied), 'incidencia')}
+						${employeeVacationFilterCard('Disponibles', 'Ver todas', 'all', employeeVacationFilter, 'correcto')}
+						${employeeVacationFilterCard('Usados / aprobados', `${balance.used} días`, 'aprobada', employeeVacationFilter, 'vacaciones')}
+						${employeeVacationFilterCard('Pendientes', `${balance.pending} días`, 'pendiente', employeeVacationFilter, 'pendiente')}
+						${employeeVacationFilterCard('Denegados', `${balance.denied} días`, 'denegada', employeeVacationFilter, 'incidencia')}
 					</div>
 				</section>
-				<div class="grid grid-2 top-gap">
-					<section class="panel">
+				<div class="grid grid-2 top-gap employee-vacation-layout">
+					<section class="panel vacation-request-panel">
 						<h2>Nueva solicitud</h2>
 						<p class="helper-text">Selecciona un rango para comprobar si alguien de tu departamento ya tiene vacaciones aprobadas o pendientes.</p>
 						<form id="vacation-request-form" class="form-grid">
@@ -802,9 +809,16 @@ import Layout from '../layouts/Layout.astro';
 							${employeeVacationPreview('', '')}
 						</div>
 					</section>
-					<section class="panel">
-						<h2>Mis solicitudes</h2>
-						${requests.length ? requests.map(renderVacationRow).join('') : emptyState('Aún no has solicitado vacaciones.')}
+					<section class="panel vacation-requests-panel">
+						<div class="section-head-inline">
+							<div>
+								<h2>Solicitudes</h2>
+								<p class="helper-text">Filtro activo: ${filterLabel}</p>
+							</div>
+						</div>
+						<div class="vacation-list">
+							${filteredRequests.length ? filteredRequests.map(renderVacationRow).join('') : employeeVacationEmptyState(employeeVacationFilter)}
+						</div>
 					</section>
 				</div>
 			`;
@@ -1852,6 +1866,40 @@ import Layout from '../layouts/Layout.astro';
 			return `<span class="status-pill status-${statusClass(status)}">${STATUS_LABELS[label] || label}</span>`;
 		}
 
+		function employeeVacationFilterCard(
+			label: string,
+			value: string,
+			filter: EmployeeVacationFilter,
+			activeFilter: EmployeeVacationFilter,
+			status: string,
+		) {
+			return `
+				<button
+					class="vacation-filter-card status-border-${statusClass(status)} ${activeFilter === filter ? 'is-active' : ''}"
+					type="button"
+					data-action="employee-vacation-filter"
+					data-filter="${filter}"
+				>
+					<span>${label}</span>
+					<strong>${value}</strong>
+				</button>
+			`;
+		}
+
+		function employeeVacationFilterLabel(filter: EmployeeVacationFilter) {
+			if (filter === 'pendiente') return 'Pendientes';
+			if (filter === 'aprobada') return 'Aprobadas';
+			if (filter === 'denegada') return 'Denegadas';
+			return 'Todas';
+		}
+
+		function employeeVacationEmptyState(filter: EmployeeVacationFilter) {
+			if (filter === 'pendiente') return emptyState('No tienes solicitudes pendientes.');
+			if (filter === 'aprobada') return emptyState('No tienes solicitudes aprobadas.');
+			if (filter === 'denegada') return emptyState('No tienes solicitudes denegadas.');
+			return emptyState('Aún no has solicitado vacaciones.');
+		}
+
 		function statusLegend(statuses: string[]) {
 			return `
 				<div class="status-legend" aria-label="Leyenda de estados">
@@ -2005,7 +2053,7 @@ import Layout from '../layouts/Layout.astro';
 					<div class="vacation-card-main">
 						<span class="meta-label">${request.days} días solicitados</span>
 						<strong>${formatDate(request.from)} - ${formatDate(request.to)}</strong>
-						<span>${escapeHtml(request.comment || 'Sin comentario')}</span>
+						${request.comment ? `<span>${escapeHtml(request.comment)}</span>` : ''}
 					</div>
 					${pill(request.status)}
 				</div>
@@ -2727,6 +2775,13 @@ import Layout from '../layouts/Layout.astro';
 
 		function selectVacation(id: string) {
 			selectedVacationId = id;
+			renderPage();
+		}
+
+		function setEmployeeVacationFilter(filter: string) {
+			employeeVacationFilter = ['pendiente', 'aprobada', 'denegada'].includes(filter)
+				? (filter as EmployeeVacationFilter)
+				: 'all';
 			renderPage();
 		}
 
