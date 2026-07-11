@@ -853,6 +853,7 @@ textarea:focus-visible {
 .summary-row strong {
 	text-align: right;
 	font-weight: 650;
+	overflow-wrap: anywhere;
 }
 
 .stat-row {
@@ -2142,6 +2143,10 @@ textarea:focus-visible {
 	margin-top: 16px;
 }
 
+.calendar-summary {
+	margin: 0 0 14px;
+}
+
 .report-overview {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2353,8 +2358,10 @@ tr:last-child td {
 .calendar-day {
 	display: grid;
 	align-content: space-between;
+	min-width: 0;
 	border: 1px solid var(--line);
 	background: #ffffff;
+	cursor: pointer;
 	text-align: left;
 	box-shadow: 0 3px 10px rgba(23, 33, 31, 0.03);
 }
@@ -2425,6 +2432,8 @@ tr:last-child td {
 	background:
 		linear-gradient(180deg, #ffffff, #f8fbfa),
 		#ffffff;
+	border: 1px solid var(--line);
+	border-radius: 8px;
 }
 
 .day-detail-head {
@@ -2444,6 +2453,16 @@ tr:last-child td {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 	gap: 10px;
+}
+
+.day-detail .empty-state {
+	border: 1px dashed #cddbd7;
+	border-radius: 8px;
+	background: #ffffff;
+}
+
+.day-detail-grid strong {
+	overflow-wrap: anywhere;
 }
 
 .toast {
@@ -2824,6 +2843,7 @@ tr:last-child td {
 	.calendar-day span {
 		max-width: 100%;
 		font-size: 0.62rem;
+		line-height: 1.1;
 	}
 
 	.team-day-names span {
@@ -2839,6 +2859,10 @@ tr:last-child td {
 	.calendar-toolbar h2 {
 		grid-column: 1 / -1;
 		grid-row: 1;
+	}
+
+	.calendar-toolbar .button {
+		width: 100%;
 	}
 
 	.punch-button {
@@ -3015,6 +3039,33 @@ tr:last-child td {
 
 	.quick-actions-panel .tab-actions {
 		gap: 8px;
+	}
+
+	.calendar-grid {
+		gap: 3px;
+	}
+
+	.calendar-head,
+	.calendar-day {
+		min-height: 46px;
+		border-radius: 6px;
+		padding: 5px 3px;
+	}
+
+	.calendar-head {
+		font-size: 0.68rem;
+	}
+
+	.calendar-day strong {
+		font-size: 0.82rem;
+	}
+
+	.calendar-day span {
+		font-size: 0.55rem;
+	}
+
+	.day-detail {
+		padding: 12px;
 	}
 
 	.employee-vacation-preview {

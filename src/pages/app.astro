@@ -168,9 +168,8 @@ import Layout from '../layouts/Layout.astro';
 
 		const EMPLOYEE_VIEWS = [
 			{ id: 'fichar', label: 'Fichar', hint: 'Entrada, descanso y salida' },
-			{ id: 'vacaciones', label: 'Mis vacaciones', hint: 'Saldo y solicitudes' },
-			{ id: 'calendario', label: 'Mi calendario', hint: 'Estados por día' },
-			{ id: 'historial', label: 'Mi historial', hint: 'Registros mensuales' },
+			{ id: 'vacaciones', label: 'Vacaciones', hint: 'Saldo y solicitudes' },
+			{ id: 'calendario', label: 'Calendario', hint: 'Registros del mes' },
 		];
 
 		const VALIDATOR_VIEWS = [
@@ -671,6 +670,10 @@ import Layout from '../layouts/Layout.astro';
 			const employee = currentEmployee();
 			const year = calendarCursor.getFullYear();
 			const month = calendarCursor.getMonth();
+			const monthKey = isoFromDate(new Date(year, month, 1)).slice(0, 7);
+			const monthEntries = timeEntries.filter((entry) => entry.employeeId === employee.id && entry.date.startsWith(monthKey));
+			const monthWorked = monthEntries.reduce((sum, entry) => sum + workedMinutes(entry), 0);
+			const monthIncidents = monthEntries.filter((entry) => entry.status === 'incidencia').length;
 			const first = new Date(year, month, 1);
 			const startOffset = (first.getDay() + 6) % 7;
 			const start = new Date(year, month, 1 - startOffset);
@@ -694,12 +697,17 @@ import Layout from '../layouts/Layout.astro';
 			}).join('');
 
 			return `
-				${sectionTitle('Mi calendario', 'Vista mensual con tus fichajes, vacaciones, festivos e incidencias. Pulsa cualquier día para ver el detalle.')}
+				${sectionTitle('Calendario', 'Consulta tus registros del mes, vacaciones e incidencias. Pulsa un día para ver el detalle.')}
 				<section class="panel calendar-panel">
 					<div class="calendar-toolbar">
 						<button class="button button-secondary button-small" type="button" data-action="calendar-prev">Mes anterior</button>
 						<h2>${calendarCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
 						<button class="button button-secondary button-small" type="button" data-action="calendar-next">Mes siguiente</button>
+					</div>
+					<div class="history-summary calendar-summary">
+						${metricCard('Días con fichaje', String(monthEntries.length), monthEntries.length ? 'correcto' : 'sin fichaje')}
+						${metricCard('Horas registradas', formatMinutes(monthWorked), 'trabajando')}
+						${metricCard('Incidencias', String(monthIncidents), monthIncidents ? 'incidencia' : 'correcto')}
 					</div>
 					${statusLegend(['correcto', 'incidencia', 'festivo', 'vacaciones', 'pendiente', 'sin fichaje', 'fin de semana'])}
 					<div class="calendar-grid" aria-label="Calendario mensual">
@@ -771,7 +779,7 @@ import Layout from '../layouts/Layout.astro';
 			const filterLabel = employeeVacationFilterLabel(employeeVacationFilter);
 
 			return `
-				${sectionTitle('Mis vacaciones', 'Solicita días y revisa tu saldo. Antes de guardar puedes ver coincidencias de tu departamento.')}
+				${sectionTitle('Vacaciones', 'Solicita días y revisa tu saldo. Antes de guardar puedes ver coincidencias de tu departamento.')}
 				<section class="panel vacation-balance">
 					<div>
 						<span class="meta-label">Saldo anual</span>
@@ -2014,6 +2022,7 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderDayDetail(employeeId: string, date: string) {
 			const entry = findEntry(employeeId, date);
+			const dayStatus = statusForDay(employeeId, date);
 			const holiday = holidays.find((item) => item.date === date);
 			const vacation = vacations.find(
 				(request) =>
@@ -2024,6 +2033,29 @@ import Layout from '../layouts/Layout.astro';
 			const dayIncidents = incidents.filter(
 				(incident) => incident.employeeId === employeeId && incident.date === date,
 			);
+			const incidentText = dayIncidents.length
+				? dayIncidents.map((item) => `${escapeHtml(item.type)}: ${escapeHtml(item.detail)}`).join('<br>')
+				: 'Sin incidencias';
+
+			if (!entry) {
+				return `
+					<div class="day-detail">
+						<div class="day-detail-head">
+							<div>
+								<span class="meta-label">Detalle del día</span>
+								<h3>${formatDate(date)}</h3>
+							</div>
+							${pill(STATUS_LABELS[dayStatus] || dayStatus, dayStatus)}
+						</div>
+						${emptyState('No hay registro de jornada para este día.')}
+						<div class="summary-list top-gap">
+							${summaryRow('Festivo', holiday ? escapeHtml(holiday.name) : 'No')}
+							${summaryRow('Vacaciones', vacation ? `${formatDate(vacation.from)} - ${formatDate(vacation.to)} (${vacation.status})` : 'No')}
+							${summaryRow('Incidencia', incidentText)}
+						</div>
+					</div>
+				`;
+			}
 
 			return `
 				<div class="day-detail">
@@ -2032,19 +2064,19 @@ import Layout from '../layouts/Layout.astro';
 							<span class="meta-label">Detalle del día</span>
 							<h3>${formatDate(date)}</h3>
 						</div>
-						${pill(STATUS_LABELS[statusForDay(employeeId, date)] || statusForDay(employeeId, date), statusForDay(employeeId, date))}
+						${pill(STATUS_LABELS[dayStatus] || dayStatus, dayStatus)}
 					</div>
 					<div class="day-detail-grid">
-						<div><span>Entrada</span><strong>${entry?.start || 'Sin registrar'}</strong></div>
-						<div><span>Descansos</span><strong>${formatBreaks(entry)}</strong></div>
-						<div><span>Salida</span><strong>${entry?.end || 'Sin registrar'}</strong></div>
-						<div><span>Tiempo trabajado</span><strong>${formatMinutes(workedMinutes(entry))}</strong></div>
-						<div><span>Tiempo en descanso</span><strong>${formatMinutes(breakMinutes(entry))}</strong></div>
+						<div><span>Entrada</span><strong>${entry.start || 'Sin registrar'}</strong></div>
+						<div><span>Pausas / descansos</span><strong>${formatBreaks(entry)}</strong></div>
+						<div><span>Salida</span><strong>${entry.end || 'Sin registrar'}</strong></div>
+						<div><span>Trabajado</span><strong>${formatMinutes(workedMinutes(entry))}</strong></div>
+						<div><span>Descanso</span><strong>${formatMinutes(breakMinutes(entry))}</strong></div>
 					</div>
 					<div class="summary-list top-gap">
 						${summaryRow('Festivo', holiday ? escapeHtml(holiday.name) : 'No')}
 						${summaryRow('Vacaciones', vacation ? `${formatDate(vacation.from)} - ${formatDate(vacation.to)} (${vacation.status})` : 'No')}
-						${summaryRow('Incidencias', dayIncidents.length ? dayIncidents.map((item) => escapeHtml(item.type)).join(', ') : 'Sin incidencias')}
+						${summaryRow('Incidencia', incidentText)}
 					</div>
 				</div>
 			`;
@@ -3482,7 +3514,7 @@ import Layout from '../layouts/Layout.astro';
 		function roleHint(role: Role) {
 			if (role === 'admin_global') return 'Gestión completa de usuarios, fichajes, informes y configuración';
 			if (role === 'validador_vacaciones') return 'Validación de vacaciones y calendario del equipo';
-			return 'Fichaje personal, vacaciones, calendario e historial';
+			return 'Fichaje personal, vacaciones y calendario';
 		}
 
 		function currentEmployee() {
