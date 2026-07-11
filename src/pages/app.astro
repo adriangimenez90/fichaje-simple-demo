@@ -604,7 +604,7 @@ import Layout from '../layouts/Layout.astro';
 						<div class="punch-kpis">
 							<div>
 								<span>Entrada</span>
-								<strong>${entry?.start || '--:--'}</strong>
+								<strong>${entry?.start || 'Sin registrar'}</strong>
 							</div>
 							<div>
 								<span>Descansos</span>
@@ -612,7 +612,7 @@ import Layout from '../layouts/Layout.astro';
 							</div>
 							<div>
 								<span>Salida</span>
-								<strong>${entry?.end || '--:--'}</strong>
+								<strong>${entry?.end || 'Sin registrar'}</strong>
 							</div>
 							<div>
 								<span>Trabajado hoy</span>
@@ -645,8 +645,8 @@ import Layout from '../layouts/Layout.astro';
 							<button class="button button-secondary" type="button" data-action="quick-pause" data-minutes="120">
 								Comida 2 h
 							</button>
-							<button class="button button-ghost" type="button" data-action="toggle-manual">
-								Editar registro de hoy
+							<button class="button button-ghost adjust-hours-button" type="button" data-action="toggle-manual">
+								Ajustar horas
 							</button>
 						</div>
 						<div class="break-summary">
@@ -1897,7 +1897,7 @@ import Layout from '../layouts/Layout.astro';
 				<form id="manual-form" class="manual-editor top-gap">
 					<div class="manual-editor-head">
 						<div>
-							<span class="meta-label">Editar registro de hoy</span>
+							<span class="meta-label">Ajustar horas de hoy</span>
 							<strong>${formatDate(todayIso())}</strong>
 						</div>
 						${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}
