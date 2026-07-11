@@ -10,7 +10,7 @@ import Layout from '../layouts/Layout.astro';
 					<img class="brand-icon" src="/brand/fichajesimple-icon.png" alt="FichajeSimple" />
 					<div>
 						<strong>FichajeSimple</strong>
-						<span class="muted-line">Empresa demo · Sourcing Demo S.L.</span>
+						<span class="muted-line">Empresa Demo · Centro Principal</span>
 					</div>
 				</div>
 				<span class="demo-badge">Demo pública · Datos ficticios · Navegador</span>
@@ -822,7 +822,7 @@ import Layout from '../layouts/Layout.astro';
 			const pendingVacations = vacations.filter((request) => request.status === 'pendiente').length;
 
 			return `
-				${sectionTitle('Resumen', 'Estado operativo de hoy para Sourcing Demo S.L.')}
+				${sectionTitle('Resumen', 'Estado operativo de hoy para Empresa Demo')}
 				${demoTryBlock()}
 				<div class="grid grid-3">
 					${metricCard('Empleados activos', String(users.filter((user) => user.role === 'empleado' && user.active).length || EMPLOYEES.length), 'correcto')}
@@ -1495,7 +1495,7 @@ import Layout from '../layouts/Layout.astro';
 			const sorted = holidays.slice().sort((a, b) => a.date.localeCompare(b.date));
 
 			return `
-				${sectionTitle('Festivos', 'Mantén el calendario local del centro de Valencia.')}
+				${sectionTitle('Festivos', 'Mantén el calendario local de Centro Principal.')}
 				<div class="grid grid-2">
 					<section class="panel">
 						<h2>Festivos configurados</h2>
@@ -1522,7 +1522,7 @@ import Layout from '../layouts/Layout.astro';
 							</label>
 							<label class="field">
 								<span>Centro</span>
-								<input type="text" name="center" value="Valencia" required />
+								<input type="text" name="center" value="Centro Principal" required />
 							</label>
 							<button class="button button-primary" type="submit">Guardar festivo</button>
 						</form>
@@ -1761,8 +1761,8 @@ import Layout from '../layouts/Layout.astro';
 					<section class="panel">
 						<h2>Empresa</h2>
 						<div class="summary-list">
-							${summaryRow('Razón social', 'Sourcing Demo S.L.')}
-							${summaryRow('Centro', 'Valencia')}
+							${summaryRow('Razón social', 'Empresa Demo')}
+							${summaryRow('Centro', 'Centro Principal')}
 							${summaryRow('Modo de datos', 'Ficticio, localStorage')}
 							${summaryRow('Validez legal', 'Demo pública con datos ficticios. No válida como registro horario real.')}
 							${summaryRow('Backend', 'No configurado')}
@@ -2586,7 +2586,7 @@ import Layout from '../layouts/Layout.astro';
 			const formData = new FormData(form);
 			const date = String(formData.get('date') || '');
 			const name = String(formData.get('name') || '').trim();
-			const center = String(formData.get('center') || 'Valencia').trim();
+			const center = String(formData.get('center') || 'Centro Principal').trim();
 
 			if (!date || !name || !center) {
 				showToast('Completa fecha, nombre y centro.');
@@ -3153,11 +3153,11 @@ import Layout from '../layouts/Layout.astro';
 			];
 
 			const holidaysSeed: Holiday[] = [
-				{ id: 'holiday-2026-01-01', date: '2026-01-01', name: 'Año Nuevo', center: 'Valencia' },
-				{ id: 'holiday-2026-01-06', date: '2026-01-06', name: 'Reyes', center: 'Valencia' },
-				{ id: 'holiday-2026-03-19', date: '2026-03-19', name: 'San José', center: 'Valencia' },
-				{ id: 'holiday-2026-10-09', date: '2026-10-09', name: 'Día de la Comunidad Valenciana', center: 'Valencia' },
-				{ id: 'holiday-2026-12-25', date: '2026-12-25', name: 'Navidad', center: 'Valencia' },
+				{ id: 'holiday-2026-01-01', date: '2026-01-01', name: 'Año Nuevo', center: 'Centro Principal' },
+				{ id: 'holiday-2026-01-06', date: '2026-01-06', name: 'Reyes', center: 'Centro Principal' },
+				{ id: 'holiday-2026-03-19', date: '2026-03-19', name: 'San José', center: 'Centro Principal' },
+				{ id: 'holiday-2026-10-09', date: '2026-10-09', name: 'Día de la Comunidad Valenciana', center: 'Centro Principal' },
+				{ id: 'holiday-2026-12-25', date: '2026-12-25', name: 'Navidad', center: 'Centro Principal' },
 			];
 
 			const auditSeed: AuditEntry[] = [
@@ -3166,7 +3166,7 @@ import Layout from '../layouts/Layout.astro';
 					at: new Date().toISOString(),
 					user: 'Sistema demo',
 					action: 'Datos iniciales',
-					detail: 'Se cargaron datos ficticios de Sourcing Demo S.L.',
+					detail: 'Se cargaron datos ficticios de Empresa Demo.',
 				},
 			];
 
