@@ -179,16 +179,12 @@ import Layout from '../layouts/Layout.astro';
 		];
 
 		const ADMIN_VIEWS = [
-			{ id: 'dashboard', label: 'Resumen', hint: 'Estado del equipo' },
-			{ id: 'usuarios', label: 'Usuarios', hint: 'Altas y roles demo' },
-			{ id: 'fichajes', label: 'Fichajes', hint: 'Consulta y CSV' },
-			{ id: 'vacaciones-admin', label: 'Vacaciones', hint: 'Aprobaciones y solapes' },
-			{ id: 'incidencias', label: 'Incidencias', hint: 'Pendientes de revisar' },
-			{ id: 'informes', label: 'Informes', hint: 'Reportes y envíos simulados' },
-			{ id: 'exportaciones', label: 'Exportaciones', hint: 'Descarga manual' },
-			{ id: 'festivos', label: 'Festivos', hint: 'Calendario del centro' },
-			{ id: 'auditoria', label: 'Auditoría', hint: 'Actividad local' },
-			{ id: 'configuracion', label: 'Configuración', hint: 'Datos de demo' },
+			{ id: 'dashboard', label: 'Inicio', hint: 'Resumen de hoy' },
+			{ id: 'usuarios', label: 'Empleados', hint: 'Personas y roles' },
+			{ id: 'fichajes', label: 'Fichajes', hint: 'Registros e incidencias' },
+			{ id: 'vacaciones-admin', label: 'Vacaciones', hint: 'Solicitudes y planning' },
+			{ id: 'exportaciones', label: 'Exportar', hint: 'Informes y descargas' },
+			{ id: 'configuracion', label: 'Ajustes', hint: 'Festivos y demo' },
 		];
 
 		const STATUS_LABELS: Record<string, string> = {
@@ -851,7 +847,7 @@ import Layout from '../layouts/Layout.astro';
 			const pendingVacations = vacations.filter((request) => request.status === 'pendiente').length;
 
 			return `
-				${sectionTitle('Resumen', 'Estado operativo de hoy para Empresa Demo')}
+				${sectionTitle('Inicio', 'Resumen operativo de hoy para Empresa Demo')}
 				${demoTryBlock()}
 				<div class="grid grid-3">
 					${metricCard('Empleados activos', String(users.filter((user) => user.role === 'empleado' && user.active).length || EMPLOYEES.length), 'correcto')}
@@ -864,15 +860,15 @@ import Layout from '../layouts/Layout.astro';
 				<section class="panel top-gap">
 					<div class="panel-heading">
 						<div>
-							<h2>Acciones rápidas</h2>
-							<p class="helper-text">Atajos habituales para una persona administradora global.</p>
+							<h2>Acciones recomendadas</h2>
+							<p class="helper-text">Atajos para resolver lo más habitual al empezar el día.</p>
 						</div>
 					</div>
 					<div class="quick-admin-actions">
-						<button class="button button-secondary" type="button" data-view="usuarios">Crear usuario</button>
+						<button class="button button-secondary" type="button" data-view="fichajes">Revisar incidencias</button>
 						<button class="button button-secondary" type="button" data-view="vacaciones-admin">Revisar vacaciones</button>
-						<button class="button button-secondary" type="button" data-view="incidencias">Ver incidencias</button>
-						<button class="button button-primary" type="button" data-view="exportaciones">Exportar fichajes</button>
+						<button class="button button-primary" type="button" data-view="exportaciones">Exportar registros del mes</button>
+						<button class="button button-secondary" type="button" data-view="usuarios">Gestionar empleados</button>
 					</div>
 				</section>
 				<section class="panel top-gap">
@@ -911,12 +907,12 @@ import Layout from '../layouts/Layout.astro';
 			const sortedUsers = users.slice().sort((a, b) => a.name.localeCompare(b.name));
 
 			return `
-				${sectionTitle('Usuarios', 'Gestiona usuarios y roles ficticios de la demo. Las acciones se guardan solo en este navegador.')}
+				${sectionTitle('Empleados', 'Gestiona personas, accesos y roles ficticios de la demo. Las acciones se guardan solo en este navegador.')}
 				<div class="grid grid-2">
 					<section class="panel">
 						<div class="panel-heading">
 							<div>
-								<h2>Usuarios demo</h2>
+								<h2>Empleados y usuarios demo</h2>
 								<p class="helper-text">Activa, desactiva o cambia roles para enseñar flujos administrativos sin tocar datos reales.</p>
 							</div>
 						</div>
@@ -1027,15 +1023,28 @@ import Layout from '../layouts/Layout.astro';
 					<h2>Registros encontrados</h2>
 					${renderTimesheetTable(rows)}
 				</section>
+				${renderAdminIncidentsPanel('Incidencias de fichaje')}
 			`;
 		}
 
 		function renderAdminIncidents() {
+			return `
+				${sectionTitle('Incidencias', 'Revisa ajustes manuales, olvidos y correcciones.')}
+				${renderAdminIncidentsPanel('Incidencias')}
+			`;
+		}
+
+		function renderAdminIncidentsPanel(title = 'Incidencias') {
 			const rows = incidents.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 			return `
-				${sectionTitle('Incidencias', 'Revisa ajustes manuales, olvidos y correcciones.')}
-				<section class="panel">
+				<section class="panel top-gap">
+					<div class="panel-heading">
+						<div>
+							<h2>${title}</h2>
+							<p class="helper-text">Ajustes, olvidos y registros que requieren revisión.</p>
+						</div>
+					</div>
 					${rows.length ? `
 						<div class="table-wrap">
 							<table>
@@ -1111,6 +1120,9 @@ import Layout from '../layouts/Layout.astro';
 						${selected ? renderVacationAdminDetail(selected) : emptyState('Selecciona una solicitud.')}
 					</section>
 				</div>
+				<div class="admin-section-stack">
+					${renderTeamCalendarContent()}
+				</div>
 			`;
 		}
 
@@ -1171,13 +1183,25 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderTeamCalendar() {
+			return `
+				${sectionTitle('Calendario equipo', 'Vista visual de vacaciones aprobadas y solicitudes pendientes por departamento.')}
+				${renderTeamCalendarContent()}
+			`;
+		}
+
+		function renderTeamCalendarContent() {
 			const departments = departmentList();
 			const visibleEmployees = teamCalendarEmployees();
 			const monthLabel = teamCalendarCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
 			return `
-				${sectionTitle('Calendario equipo', 'Vista visual de vacaciones aprobadas y solicitudes pendientes por departamento.')}
 				<section class="panel">
+					<div class="panel-heading">
+						<div>
+							<h2>Planning del equipo</h2>
+							<p class="helper-text">Revisa ocupación por departamento con calendario mensual o planning por empleado.</p>
+						</div>
+					</div>
 					<form id="team-calendar-filter-form" class="form-grid team-calendar-controls">
 						<label class="field">
 							<span>Departamento</span>
@@ -1521,10 +1545,16 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderHolidays() {
+			return `
+				${sectionTitle('Festivos', 'Mantén el calendario local de Centro Principal.')}
+				${renderHolidaysContent()}
+			`;
+		}
+
+		function renderHolidaysContent() {
 			const sorted = holidays.slice().sort((a, b) => a.date.localeCompare(b.date));
 
 			return `
-				${sectionTitle('Festivos', 'Mantén el calendario local de Centro Principal.')}
 				<div class="grid grid-2">
 					<section class="panel">
 						<h2>Festivos configurados</h2>
@@ -1561,6 +1591,13 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderReports() {
+			return `
+				${sectionTitle('Informes', 'Previsualiza reportes de control horario y programa envíos simulados por email.')}
+				${renderReportsContent()}
+			`;
+		}
+
+		function renderReportsContent() {
 			const weeklyRows = buildHoursReport(7);
 			const monthlyRows = buildHoursReport(30);
 			const missingRows = buildMissingPunchReport();
@@ -1590,7 +1627,6 @@ import Layout from '../layouts/Layout.astro';
 			const pendingVacationCount = vacations.filter((request) => request.status === 'pendiente').length;
 
 			return `
-				${sectionTitle('Informes', 'Previsualiza reportes de control horario y programa envíos simulados por email.')}
 				<div class="report-overview">
 					${metricCard('Incidencias pendientes', String(pendingIncidentsCount), pendingIncidentsCount ? 'incidencia' : 'correcto', 'Requieren revisión administrativa')}
 					${metricCard('Sin fichaje hoy', String(missingTodayCount), missingTodayCount ? 'pendiente' : 'correcto', 'Personas sin entrada registrada')}
@@ -1699,7 +1735,7 @@ import Layout from '../layouts/Layout.astro';
 		function renderExports() {
 			if (session.role !== 'admin_global') {
 				return `
-					${sectionTitle('Exportaciones', 'Acceso restringido a administración global.')}
+					${sectionTitle('Exportar', 'Acceso restringido a administración global.')}
 					<section class="panel">
 						${emptyState('Tu rol no tiene acceso a exportaciones manuales.')}
 					</section>
@@ -1707,7 +1743,7 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			return `
-				${sectionTitle('Exportaciones', 'Descarga manual de datos concretos de la demo.')}
+				${sectionTitle('Exportar', 'Descargas manuales e informes para responsables de empresa.')}
 				<section class="panel">
 					<p class="helper-text export-help">
 						Solo los administradores globales pueden exportar datos de fichaje, vacaciones, incidencias y auditoría.
@@ -1746,14 +1782,23 @@ import Layout from '../layouts/Layout.astro';
 						</div>
 					</form>
 				</section>
+				<div class="admin-section-stack">
+					${renderReportsContent()}
+				</div>
 			`;
 		}
 
 		function renderAudit() {
+			return `
+				${sectionTitle('Auditoría', 'Registro local de acciones realizadas en la demo.')}
+				${renderAuditContent()}
+			`;
+		}
+
+		function renderAuditContent() {
 			const rows = auditLog.slice().sort((a, b) => b.at.localeCompare(a.at));
 
 			return `
-				${sectionTitle('Auditoría', 'Registro local de acciones realizadas en la demo.')}
 				<section class="panel">
 					${rows.length ? `
 						<div class="table-wrap">
@@ -1785,7 +1830,17 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderSettings() {
 			return `
-				${sectionTitle('Configuración', 'Datos de empresa, usuarios demo y almacenamiento local.')}
+				${sectionTitle('Ajustes', 'Festivos, auditoría, configuración y datos locales de la demo.')}
+				${renderSettingsContent()}
+				<div class="admin-section-stack">
+					${renderHolidaysContent()}
+					${renderAuditContent()}
+				</div>
+			`;
+		}
+
+		function renderSettingsContent() {
+			return `
 				<div class="grid grid-2">
 					<section class="panel">
 						<h2>Empresa</h2>
@@ -3579,16 +3634,7 @@ import Layout from '../layouts/Layout.astro';
 
 		function navigationGroups(views: { id: string; label: string; hint: string }[]) {
 			if (session.role === 'admin_global') {
-				return [
-					{ label: 'Principal', items: views.filter((view) => ['dashboard', 'usuarios'].includes(view.id)) },
-					{
-						label: 'Gestión',
-						items: views.filter((view) =>
-							['fichajes', 'vacaciones-admin', 'incidencias', 'informes', 'exportaciones'].includes(view.id),
-						),
-					},
-					{ label: 'Sistema', items: views.filter((view) => ['festivos', 'auditoria', 'configuracion'].includes(view.id)) },
-				].filter((group) => group.items.length);
+				return [{ label: '', items: views }];
 			}
 
 			if (session.role === 'validador_vacaciones') {
@@ -3611,7 +3657,7 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function roleHint(role: Role) {
-			if (role === 'admin_global') return 'Gestión completa de usuarios, fichajes, informes y configuración';
+			if (role === 'admin_global') return 'Gestión diaria de empleados, fichajes, vacaciones y exportaciones';
 			if (role === 'validador_vacaciones') return 'Validación de vacaciones y calendario del equipo';
 			return 'Fichaje personal, vacaciones y calendario';
 		}

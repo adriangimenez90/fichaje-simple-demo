@@ -1191,6 +1191,12 @@ textarea:focus-visible {
 	flex: 1 1 170px;
 }
 
+.admin-section-stack {
+	display: grid;
+	gap: 16px;
+	margin-top: 16px;
+}
+
 .row-actions .button {
 	width: auto;
 }
