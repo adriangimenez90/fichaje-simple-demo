@@ -352,6 +352,7 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'deny-vacation') resolveVacation('denegada', actionButton.dataset.id || '');
 				if (action === 'delete-holiday') deleteHoliday(actionButton.dataset.id || '');
 				if (action === 'export-timesheets') exportTimesheets();
+				if (action === 'export-timesheets-simple') exportTimesheetsFromExportForm();
 				if (action === 'simulate-pdf') showToast('PDF simulado listo. En producción se generaría un documento firmado.');
 				if (action === 'export-generic') exportGeneric();
 				if (action === 'toggle-user') toggleUser(actionButton.dataset.id || '');
@@ -906,35 +907,24 @@ import Layout from '../layouts/Layout.astro';
 			const filterLabel = adminTodayFilterLabel(adminTodayFilter);
 
 			return `
-				${sectionTitle('Inicio', 'Resumen operativo de hoy para Empresa Demo')}
-				<div class="grid grid-3">
-					${adminDashboardMetric('Empleados activos', String(users.filter((user) => user.role === 'empleado' && user.active).length || EMPLOYEES.length), 'correcto', 'Plantilla activa', 'usuarios')}
-					${adminDashboardMetric('Trabajando ahora', String(workingNow), 'trabajando', 'Ver empleados trabajando', '', 'trabajando')}
-					${adminDashboardMetric('En descanso', String(inPause), 'pausa', 'Ver empleados en descanso', '', 'pausa')}
-					${adminDashboardMetric('Sin fichar hoy', String(missing), missing ? 'pendiente' : 'correcto', 'Ver empleados sin entrada', '', 'sin-fichar')}
-					${adminDashboardMetric('Incidencias pendientes', String(pendingIncidents), pendingIncidents ? 'incidencia' : 'correcto', pendingIncidents ? 'Revisar detalles' : 'Sin pendientes', '', '', 'open-pending-incidents')}
-					${adminDashboardMetric('Vacaciones pendientes', String(pendingVacations), pendingVacations ? 'pendiente' : 'correcto', 'Ir a vacaciones', 'vacaciones-admin')}
+				${sectionTitle('Inicio', 'Qué pasa hoy en Empresa Demo')}
+				<div class="grid grid-4 admin-status-strip">
+					${adminDashboardMetric('Trabajando', String(workingNow), 'trabajando', '', '', 'trabajando')}
+					${adminDashboardMetric('En descanso', String(inPause), 'pausa', '', '', 'pausa')}
+					${adminDashboardMetric('Sin fichar', String(missing), missing ? 'pendiente' : 'correcto', '', '', 'sin-fichar')}
+					${adminDashboardMetric('Incidencias', String(pendingIncidents), pendingIncidents ? 'incidencia' : 'correcto', '', '', '', 'open-pending-incidents')}
 				</div>
-				${pendingIncidentRows.length ? renderDashboardPendingIncidents(pendingIncidentRows) : ''}
-				<section class="panel top-gap admin-actions-legacy hidden">
+				${pendingVacations ? `
+					<section class="admin-notice top-gap">
+						<span>${pendingVacations} solicitud${pendingVacations === 1 ? '' : 'es'} de vacaciones pendiente${pendingVacations === 1 ? '' : 's'}.</span>
+						<button class="button button-tertiary button-small" type="button" data-view="vacaciones-admin">Ver vacaciones</button>
+					</section>
+				` : ''}
+				<section class="panel top-gap admin-primary-list">
 					<div class="panel-heading">
 						<div>
-							<h2>Acciones recomendadas</h2>
-							<p class="helper-text">Atajos para resolver lo más habitual al empezar el día.</p>
-						</div>
-					</div>
-					<div class="quick-admin-actions">
-						<button class="button button-secondary" type="button" data-view="fichajes">Revisar incidencias</button>
-						<button class="button button-secondary" type="button" data-view="vacaciones-admin">Revisar vacaciones</button>
-						<button class="button button-primary" type="button" data-view="exportaciones">Exportar registros del mes</button>
-						<button class="button button-secondary" type="button" data-view="usuarios">Gestionar empleados</button>
-					</div>
-				</section>
-				<section class="panel top-gap">
-					<div class="panel-heading">
-						<div>
-							<h2>Estado de hoy por empleado</h2>
-							<p class="helper-text">Mostrando: ${filterLabel}. Usa las tarjetas superiores para filtrar la lista.</p>
+							<h2>Estado de hoy</h2>
+							<p class="helper-text">Mostrando: ${filterLabel}.</p>
 						</div>
 						${adminTodayFilter !== 'all' ? `<button class="button button-tertiary button-small" type="button" data-action="admin-today-filter" data-filter="all">Ver todos</button>` : ''}
 					</div>
@@ -943,10 +933,10 @@ import Layout from '../layouts/Layout.astro';
 							<thead>
 								<tr>
 									<th>Empleado</th>
+									<th>Estado</th>
 									<th>Entrada</th>
 									<th>Salida</th>
-									<th>Estado</th>
-									<th>Descansos</th>
+									<th>Descanso</th>
 									<th>Departamento</th>
 								</tr>
 							</thead>
@@ -954,9 +944,9 @@ import Layout from '../layouts/Layout.astro';
 								${filteredStatuses.map(({ employee, entry }) => `
 									<tr>
 										<td><strong>${employee.name}</strong></td>
+										<td>${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}</td>
 										<td>${entry?.start || 'Sin registrar'}</td>
 										<td>${entry?.end || 'Sin registrar'}</td>
-										<td>${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}</td>
 										<td>${formatBreaks(entry)}</td>
 										<td>${employee.department}</td>
 									</tr>
@@ -987,13 +977,13 @@ import Layout from '../layouts/Layout.astro';
 			if (selectedUser) selectedAdminUserId = selectedUser.id;
 
 			return `
-				${sectionTitle('Empleados', 'Gestiona personas, accesos y roles ficticios de la demo. Las acciones se guardan solo en este navegador.')}
-				<div class="admin-users-layout">
+				${sectionTitle('Empleados', 'Busca una persona y revisa su ficha. Todo es ficticio y local.')}
+				<div class="admin-users-layout admin-users-simple">
 					<section class="panel">
 						<div class="panel-heading">
 							<div>
-								<h2>Buscar empleado</h2>
-								<p class="helper-text">Busca por nombre, email o departamento y selecciona una persona para ver su ficha.</p>
+								<h2>Buscar</h2>
+								<p class="helper-text">Nombre, email o departamento.</p>
 							</div>
 						</div>
 						<form id="user-search-form" class="form-grid admin-user-search">
@@ -1016,34 +1006,41 @@ import Layout from '../layouts/Layout.astro';
 								</button>
 							`).join('') : emptyState('No hay empleados con esa búsqueda.')}
 						</div>
-						${selectedUser ? renderAdminUserCard(selectedUser) : ''}
 					</section>
 					<section class="panel">
-						<h2>Crear usuario simulado</h2>
-						<p class="helper-text">El usuario se añade a localStorage y aparece en el selector; no se envían invitaciones reales.</p>
-						<form id="user-form" class="form-grid top-gap">
-							<label class="field">
-								<span>Nombre</span>
-								<input type="text" name="name" placeholder="Nombre y apellidos" required />
-							</label>
-							<label class="field">
-								<span>Email</span>
-								<input type="email" name="email" placeholder="persona@sourcingdemo.es" required />
-							</label>
-							<label class="field">
-								<span>Departamento</span>
-								<input type="text" name="department" placeholder="Administración" required />
-							</label>
-							<label class="field">
-								<span>Rol</span>
-								<select name="role">
-									<option value="empleado">Usuario normal</option>
-									<option value="validador_vacaciones">Responsable de vacaciones</option>
-									<option value="admin_global">Administrador global</option>
-								</select>
-							</label>
-							<button class="button button-primary" type="submit">Crear usuario</button>
-						</form>
+						<h2>Ficha</h2>
+						${selectedUser ? renderAdminUserCard(selectedUser) : emptyState('Selecciona un empleado.')}
+						<details class="admin-create-user top-gap">
+							<summary>
+								<span>
+									<strong>Crear empleado</strong>
+									<small>Alta simulada para probar la demo</small>
+								</span>
+							</summary>
+							<form id="user-form" class="form-grid top-gap">
+								<label class="field">
+									<span>Nombre</span>
+									<input type="text" name="name" placeholder="Nombre y apellidos" required />
+								</label>
+								<label class="field">
+									<span>Email</span>
+									<input type="email" name="email" placeholder="persona@empresa-demo.es" required />
+								</label>
+								<label class="field">
+									<span>Departamento</span>
+									<input type="text" name="department" placeholder="Administración" required />
+								</label>
+								<label class="field">
+									<span>Rol</span>
+									<select name="role">
+										<option value="empleado">Usuario normal</option>
+										<option value="validador_vacaciones">Responsable de vacaciones</option>
+										<option value="admin_global">Administrador global</option>
+									</select>
+								</label>
+								<button class="button button-primary" type="submit">Crear usuario</button>
+							</form>
+						</details>
 					</section>
 				</div>
 			`;
@@ -1053,7 +1050,7 @@ import Layout from '../layouts/Layout.astro';
 			const rows = filteredTimeEntries();
 
 			return `
-				${sectionTitle('Fichajes', 'Revisa registros horarios e incidencias. La descarga manual queda como acción secundaria.')}
+				${sectionTitle('Fichajes', 'Revisa registros e incidencias.')}
 				<section class="panel">
 					<form id="time-filter-form" class="form-grid admin-filters">
 						<label class="field">
@@ -1084,7 +1081,7 @@ import Layout from '../layouts/Layout.astro';
 						</label>
 						<div class="table-actions">
 							<button class="button button-secondary" type="submit">Aplicar filtros</button>
-							<button class="button button-tertiary" type="button" data-action="export-timesheets">Descargar CSV</button>
+							<button class="button button-tertiary" type="button" data-view="exportaciones">Ir a Exportar</button>
 						</div>
 					</form>
 				</section>
@@ -2138,47 +2135,34 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			return `
-				${sectionTitle('Exportar', 'Descarga fichajes y revisa reportes útiles de horas esperadas.')}
+				${sectionTitle('Exportar', 'Saca el informe de fichajes.')}
 				<section class="panel export-primary-panel">
 					<div class="panel-heading">
 						<div>
-							<h2>Exportación CSV de fichajes</h2>
-							<p class="helper-text">Filtra los registros y descarga un CSV. Solo los administradores globales pueden exportar datos.</p>
+							<h2>Exportar fichajes CSV</h2>
+							<p class="helper-text">Elige empleado y rango de fechas.</p>
 						</div>
 					</div>
-					<form id="time-filter-form" class="form-grid admin-filters export-timesheet-form">
+					<form id="export-timesheet-form" class="form-grid export-timesheet-form">
 						<label class="field">
 							<span>Empleado</span>
 							<select name="employeeId">
-								<option value="all" ${timeFilters.employeeId === 'all' ? 'selected' : ''}>Todos los empleados</option>
-								${EMPLOYEES.map((employee) => `<option value="${employee.id}" ${timeFilters.employeeId === employee.id ? 'selected' : ''}>${employee.name}</option>`).join('')}
+								<option value="all">Todos los empleados</option>
+								${EMPLOYEES.map((employee) => `<option value="${employee.id}">${employee.name}</option>`).join('')}
 							</select>
 						</label>
 						<label class="field">
 							<span>Fecha desde</span>
-							<input type="date" name="from" value="${timeFilters.from}" />
+							<input type="date" name="from" value="${startOfMonthIso(new Date())}" />
 						</label>
 						<label class="field">
 							<span>Fecha hasta</span>
-							<input type="date" name="to" value="${timeFilters.to}" />
-						</label>
-						<label class="field">
-							<span>Estado</span>
-							<select name="status">
-								<option value="all" ${timeFilters.status === 'all' ? 'selected' : ''}>Todos</option>
-								<option value="correcto" ${timeFilters.status === 'correcto' ? 'selected' : ''}>Correcto</option>
-								<option value="incidencia" ${timeFilters.status === 'incidencia' ? 'selected' : ''}>Incidencia</option>
-								<option value="pendiente" ${timeFilters.status === 'pendiente' ? 'selected' : ''}>Pendiente</option>
-							</select>
+							<input type="date" name="to" value="${todayIso()}" />
 						</label>
 						<div class="table-actions">
-							<button class="button button-secondary" type="submit">Aplicar filtros</button>
-							<button class="button button-primary" type="button" data-action="export-timesheets">Exportar CSV</button>
+							<button class="button button-primary" type="button" data-action="export-timesheets-simple">Exportar CSV</button>
 						</div>
 					</form>
-					<p class="helper-text export-help compact-export-help">
-						Para todos los empleados el máximo es 31 días. Para un empleado concreto, hasta 3 meses.
-					</p>
 				</section>
 				${renderExportHoursReports()}
 			`;
@@ -2232,7 +2216,7 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderSettingsContent() {
-			const recentAudit = auditLog.slice(0, 8);
+			const recentAudit = auditLog.slice(0, 5);
 
 			return `
 				<div class="grid grid-2">
@@ -2282,12 +2266,6 @@ import Layout from '../layouts/Layout.astro';
 						</div>
 					` : emptyState('Aún no hay actividad registrada.')}
 				</details>
-				<section class="panel top-gap settings-note-panel">
-					<h2>Festivos</h2>
-					<p class="helper-text">
-						La gestión de festivos está en el perfil Responsable de vacaciones, para que el administrador global mantenga estos ajustes sencillos.
-					</p>
-				</section>
 			`;
 		}
 
@@ -4105,6 +4083,44 @@ import Layout from '../layouts/Layout.astro';
 				tiempo: formatMinutes(workedMinutes(entry)),
 				estado: entry.status,
 			}));
+
+			downloadCsv('fichajes-demo.csv', rows);
+			addAudit('Exportación CSV', `Fichajes exportados (${rows.length} registros).`);
+			saveAll();
+			showToast('CSV de fichajes descargado.');
+		}
+
+		function exportTimesheetsFromExportForm() {
+			const form = document.querySelector<HTMLFormElement>('#export-timesheet-form');
+			if (!form) return;
+
+			const formData = new FormData(form);
+			const employeeId = String(formData.get('employeeId') || 'all');
+			const from = String(formData.get('from') || startOfMonthIso(new Date()));
+			const to = String(formData.get('to') || todayIso());
+			const totalDays = diffDays(from, to) + 1;
+
+			if (employeeId === 'all' && totalDays > 31) {
+				showToast('Para todos los empleados el máximo es 31 días.');
+				return;
+			}
+			if (employeeId !== 'all' && totalDays > 92) {
+				showToast('Para un empleado concreto el máximo es 3 meses.');
+				return;
+			}
+
+			const rows = timeEntries
+				.filter((entry) => employeeId === 'all' || entry.employeeId === employeeId)
+				.filter((entry) => dateInRange(entry.date, from, to))
+				.map((entry) => ({
+					fecha: entry.date,
+					empleado: employeeName(entry.employeeId),
+					entrada: entry.start || '',
+					descansos: formatBreaks(entry),
+					salida: entry.end || '',
+					tiempo: formatMinutes(workedMinutes(entry)),
+					estado: entry.status,
+				}));
 
 			downloadCsv('fichajes-demo.csv', rows);
 			addAudit('Exportación CSV', `Fichajes exportados (${rows.length} registros).`);

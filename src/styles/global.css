@@ -1233,6 +1233,42 @@ textarea:focus-visible {
 	flex: 1 1 170px;
 }
 
+.admin-status-strip {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.admin-status-strip .admin-metric-card {
+	padding: 14px;
+}
+
+.admin-status-strip .metric-card strong {
+	font-size: 1.48rem;
+}
+
+.admin-status-strip .top-gap-small,
+.admin-status-strip .metric-card small {
+	display: none;
+}
+
+.admin-notice {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	border: 1px solid #ead59b;
+	border-radius: 8px;
+	background: #fffaf0;
+	color: var(--pending);
+	padding: 11px 12px;
+	font-size: 0.92rem;
+	font-weight: 650;
+}
+
+.admin-primary-list .panel-heading {
+	margin-bottom: 10px;
+}
+
 .admin-section-stack {
 	display: grid;
 	gap: 16px;
@@ -1251,6 +1287,10 @@ textarea:focus-visible {
 .admin-users-layout {
 	grid-template-columns: minmax(280px, 1fr) minmax(260px, 0.75fr);
 	align-items: start;
+}
+
+.admin-users-simple {
+	grid-template-columns: minmax(280px, 0.9fr) minmax(300px, 1fr);
 }
 
 .admin-user-search {
@@ -1333,6 +1373,31 @@ textarea:focus-visible {
 
 .admin-incident-filter-bar {
 	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-create-user {
+	border: 1px dashed #cfdcda;
+	border-radius: 8px;
+	background: var(--surface-soft);
+	padding: 12px;
+}
+
+.admin-create-user summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	cursor: pointer;
+}
+
+.admin-create-user summary span {
+	display: grid;
+	gap: 2px;
+}
+
+.admin-create-user small {
+	color: var(--muted);
+	font-size: 0.84rem;
 }
 
 .row-actions .button {
@@ -1501,6 +1566,15 @@ textarea:focus-visible {
 
 .admin-filters .table-actions {
 	grid-column: 1 / -1;
+}
+
+.export-timesheet-form {
+	grid-template-columns: minmax(190px, 1fr) repeat(2, minmax(150px, 0.8fr)) auto;
+	align-items: end;
+}
+
+.export-timesheet-form .table-actions {
+	justify-content: flex-end;
 }
 
 .admin-vacation-controls {
@@ -2718,10 +2792,6 @@ textarea:focus-visible {
 	margin-top: 14px;
 }
 
-.settings-note-panel {
-	background: var(--surface-soft);
-}
-
 .table-wrap {
 	overflow-x: auto;
 	border: 1px solid var(--line);
@@ -3127,6 +3197,7 @@ tr:last-child td {
 
 	.compact-form,
 	.admin-filters,
+	.export-timesheet-form,
 	.admin-vacation-controls,
 	.team-calendar-controls {
 		grid-template-columns: 1fr;
@@ -3137,6 +3208,18 @@ tr:last-child td {
 	.responsible-requests-layout,
 	.admin-users-layout {
 		grid-template-columns: 1fr;
+	}
+
+	.admin-status-strip {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.export-timesheet-form .table-actions {
+		justify-content: stretch;
+	}
+
+	.export-timesheet-form .button {
+		width: 100%;
 	}
 
 	.quick-punch-card {
@@ -3402,6 +3485,19 @@ tr:last-child td {
 
 	.admin-user-search {
 		grid-template-columns: 1fr;
+	}
+
+	.admin-notice {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.admin-status-strip {
+		gap: 8px;
+	}
+
+	.admin-status-strip .admin-metric-card {
+		padding: 12px;
 	}
 
 	.admin-today-table,
