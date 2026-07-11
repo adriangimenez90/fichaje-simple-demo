@@ -173,9 +173,8 @@ import Layout from '../layouts/Layout.astro';
 		];
 
 		const VALIDATOR_VIEWS = [
-			{ id: 'solicitudes', label: 'Solicitudes', hint: 'Validación de vacaciones' },
-			{ id: 'calendario-equipo', label: 'Calendario equipo', hint: 'Vacaciones por departamento' },
-			{ id: 'historico-vacaciones', label: 'Histórico vacaciones', hint: 'Solicitudes y estados' },
+			{ id: 'solicitudes', label: 'Solicitudes', hint: 'Aprobar o denegar' },
+			{ id: 'calendario-equipo', label: 'Calendario equipo', hint: 'Vacaciones del equipo' },
 		];
 
 		const ADMIN_VIEWS = [
@@ -222,6 +221,7 @@ import Layout from '../layouts/Layout.astro';
 			department: 'all',
 			status: 'all',
 		};
+		let validatorRequestFilter: VacationStatus | 'all' = 'pendiente';
 		let timeFilters = {
 			employeeId: 'all',
 			from: startOfMonthIso(new Date()),
@@ -323,6 +323,7 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'team-calendar-day') selectTeamCalendarDay(actionButton.dataset.date || todayIso());
 				if (action === 'review-incident') reviewIncident(actionButton.dataset.id || '');
 				if (action === 'select-vacation') selectVacation(actionButton.dataset.id || '');
+				if (action === 'validator-request-filter') setValidatorRequestFilter(actionButton.dataset.filter || 'pendiente');
 				if (action === 'approve-vacation') resolveVacation('aprobada');
 				if (action === 'deny-vacation') resolveVacation('denegada');
 				if (action === 'export-timesheets') exportTimesheets();
@@ -408,9 +409,12 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderShell() {
 			if (userChip) {
+				const displayName = session.role === 'validador_vacaciones' && session.name.toLowerCase().includes('validador')
+					? 'Responsable de equipo'
+					: session.name;
 				userChip.innerHTML = `
 					<span>${roleLabel(session.role)}</span>
-					<strong>${escapeHtml(session.name)}</strong>
+					<strong>${escapeHtml(displayName)}</strong>
 				`;
 			}
 			renderNav();
@@ -969,7 +973,7 @@ import Layout from '../layouts/Layout.astro';
 								<span>Rol</span>
 								<select name="role">
 									<option value="empleado">Usuario normal</option>
-									<option value="validador_vacaciones">Validador de vacaciones</option>
+									<option value="validador_vacaciones">Responsable de equipo</option>
 									<option value="admin_global">Administrador global</option>
 								</select>
 							</label>
@@ -1127,41 +1131,75 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderValidatorRequests() {
-			const pending = vacations
-				.filter((request) => request.status === 'pendiente')
+			const requests = vacations
 				.sort((a, b) => a.from.localeCompare(b.from));
+			const filteredRequests = validatorRequestFilter === 'all'
+				? requests
+				: requests.filter((request) => request.status === validatorRequestFilter);
 			const selected =
-				pending.find((request) => request.id === selectedVacationId) ||
-				pending[0] ||
-				vacations.find((request) => request.id === selectedVacationId);
+				filteredRequests.find((request) => request.id === selectedVacationId) ||
+				filteredRequests[0] ||
+				requests.find((request) => request.id === selectedVacationId);
 			selectedVacationId = selected?.id || '';
 			const scopedEmployees = selected ? departmentEmployees(employeeById(selected.employeeId)?.department || '') : [];
 			const balance = selected ? vacationBalance(selected.employeeId) : undefined;
 			const conflictCounts = selected ? vacationConflictCounts(selected, scopedEmployees) : { approved: 0, pending: 0 };
+			const filterButtons = [
+				{ filter: 'pendiente', label: 'Pendientes' },
+				{ filter: 'aprobada', label: 'Aprobadas' },
+				{ filter: 'denegada', label: 'Denegadas' },
+				{ filter: 'all', label: 'Todas' },
+			]
+				.map(({ filter, label }) => {
+					const count = filter === 'all'
+						? requests.length
+						: requests.filter((request) => request.status === filter).length;
+					return `
+						<button
+							class="request-filter-button ${validatorRequestFilter === filter ? 'is-active' : ''}"
+							type="button"
+							data-action="validator-request-filter"
+							data-filter="${filter}"
+						>
+							<span>${label}</span>
+							<strong>${count}</strong>
+						</button>
+					`;
+				})
+				.join('');
 
 			return `
-				${sectionTitle('Solicitudes', 'Revisa solicitudes pendientes con saldo y coincidencias del departamento.')}
+				${sectionTitle('Solicitudes', 'Revisa vacaciones del equipo y decide con una vista clara de solapes.')}
 				<div class="grid grid-2">
 					<section class="panel">
-						<h2>Solicitudes pendientes</h2>
-						<p class="helper-text">Selecciona una solicitud para validar el impacto en el equipo antes de aprobar o denegar.</p>
-						${pending.length ? pending.map((request) => `
-							<button
-								class="vacation-select ${selected?.id === request.id ? 'is-active' : ''}"
-								type="button"
-								data-action="select-vacation"
-								data-id="${request.id}"
-							>
-								<span>
-									<strong>${employeeName(request.employeeId)}</strong>
-									${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días
-								</span>
-								${pill(request.status)}
-							</button>
-						`).join('') : emptyState('No hay solicitudes pendientes para validar.')}
+						<div class="panel-heading">
+							<div>
+								<h2>Vacaciones solicitadas</h2>
+								<p class="helper-text">Filtra por estado y selecciona una solicitud para ver solapes del equipo.</p>
+							</div>
+						</div>
+						<div class="request-filter-bar" aria-label="Filtrar solicitudes">
+							${filterButtons}
+						</div>
+						<div class="responsible-request-list top-gap">
+							${filteredRequests.length ? filteredRequests.map((request) => `
+								<button
+									class="vacation-select ${selected?.id === request.id ? 'is-active' : ''}"
+									type="button"
+									data-action="select-vacation"
+									data-id="${request.id}"
+								>
+									<span>
+										<strong>${employeeName(request.employeeId)}</strong>
+										${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días
+									</span>
+									${pill(request.status)}
+								</button>
+							`).join('') : emptyState(`No hay solicitudes ${validatorRequestFilter === 'all' ? 'registradas' : STATUS_LABELS[validatorRequestFilter]?.toLowerCase() || 'con este estado'}.`)}
+						</div>
 					</section>
 					<section class="panel">
-						<h2>Detalle de validación</h2>
+						<h2>Detalle y solapes</h2>
 						${selected ? `
 							<div class="summary-list">
 								${summaryRow('Solicitante', employeeName(selected.employeeId))}
@@ -1176,7 +1214,7 @@ import Layout from '../layouts/Layout.astro';
 							<div class="top-gap">
 								${renderVacationAdminDetail(selected, scopedEmployees)}
 							</div>
-						` : emptyState('Selecciona una solicitud pendiente.')}
+						` : emptyState('Selecciona una solicitud.')}
 					</section>
 				</div>
 			`;
@@ -1184,7 +1222,7 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderTeamCalendar() {
 			return `
-				${sectionTitle('Calendario equipo', 'Vista visual de vacaciones aprobadas y solicitudes pendientes por departamento.')}
+				${sectionTitle('Calendario del equipo', 'Consulta vacaciones y posibles solapes de forma visual.')}
 				${renderTeamCalendarContent()}
 			`;
 		}
@@ -1199,7 +1237,7 @@ import Layout from '../layouts/Layout.astro';
 					<div class="panel-heading">
 						<div>
 							<h2>Planning del equipo</h2>
-							<p class="helper-text">Revisa ocupación por departamento con calendario mensual o planning por empleado.</p>
+							<p class="helper-text">Elige un departamento y revisa quién coincide en vacaciones.</p>
 						</div>
 					</div>
 					<form id="team-calendar-filter-form" class="form-grid team-calendar-controls">
@@ -1229,8 +1267,8 @@ import Layout from '../layouts/Layout.astro';
 					${teamVacationLegend()}
 					<p class="helper-text">
 						${teamCalendarMode === 'month'
-							? 'Usa el calendario para revisar ocupación por días. En móvil, toca un día para ver el detalle debajo.'
-							: 'Usa el planning para comparar empleados por fechas. Desplázate horizontalmente si el mes no cabe completo.'}
+							? 'Usa el calendario para ver vacaciones por días. En móvil, toca un día para ver el detalle debajo.'
+							: 'Usa el planning para comparar personas por fechas.'}
 					</p>
 					<div class="team-calendar-meta">
 						${metricCard('Personas visibles', String(visibleEmployees.length), 'correcto')}
@@ -1478,7 +1516,7 @@ import Layout from '../layouts/Layout.astro';
 				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 			return `
-				${sectionTitle('Histórico vacaciones', 'Consulta solicitudes aprobadas, denegadas y pendientes con filtros sencillos.')}
+				${sectionTitle('Solicitudes', 'Consulta solicitudes aprobadas, denegadas y pendientes con filtros sencillos.')}
 				<section class="panel">
 					<form id="vacation-history-filter-form" class="form-grid admin-filters">
 						<label class="field">
@@ -1856,7 +1894,7 @@ import Layout from '../layouts/Layout.astro';
 						<h2>Usuarios demo</h2>
 						<div class="summary-list">
 							${summaryRow('Administrador global', 'admin.demo@fichajesimple.es / 1234')}
-							${summaryRow('Validador vacaciones', 'vacaciones.demo@fichajesimple.es / 1234')}
+							${summaryRow('Responsable de equipo', 'vacaciones.demo@fichajesimple.es / 1234')}
 							${summaryRow('Empleado Ana', 'ana.demo@fichajesimple.es / 1234')}
 							${summaryRow('Empleado Miguel', 'miguel.demo@fichajesimple.es / 1234')}
 						</div>
@@ -3100,6 +3138,14 @@ import Layout from '../layouts/Layout.astro';
 			renderPage();
 		}
 
+		function setValidatorRequestFilter(filter: string) {
+			validatorRequestFilter = ['pendiente', 'aprobada', 'denegada'].includes(filter)
+				? (filter as VacationStatus)
+				: 'all';
+			selectedVacationId = '';
+			renderPage();
+		}
+
 		function resolveVacation(status: VacationStatus) {
 			const request = vacations.find((item) => item.id === selectedVacationId);
 			if (!request || request.status !== 'pendiente') return;
@@ -3312,7 +3358,7 @@ import Layout from '../layouts/Layout.astro';
 				},
 				{
 					id: 'validador_vacaciones',
-					name: 'Validador vacaciones',
+					name: 'Responsable de equipo',
 					email: 'vacaciones.demo@fichajesimple.es',
 					department: 'Administración',
 					role: 'validador_vacaciones',
@@ -3652,13 +3698,13 @@ import Layout from '../layouts/Layout.astro';
 
 		function roleLabel(role: Role) {
 			if (role === 'admin_global') return 'Administrador global';
-			if (role === 'validador_vacaciones') return 'Validador de vacaciones';
+			if (role === 'validador_vacaciones') return 'Responsable de equipo';
 			return 'Usuario normal';
 		}
 
 		function roleHint(role: Role) {
 			if (role === 'admin_global') return 'Gestión diaria de empleados, fichajes, vacaciones y exportaciones';
-			if (role === 'validador_vacaciones') return 'Validación de vacaciones y calendario del equipo';
+			if (role === 'validador_vacaciones') return 'Solicitudes y calendario del equipo';
 			return 'Fichaje personal, vacaciones y calendario';
 		}
 
