@@ -175,6 +175,7 @@ import Layout from '../layouts/Layout.astro';
 		const VALIDATOR_VIEWS = [
 			{ id: 'solicitudes', label: 'Solicitudes', hint: 'Aprobar o denegar' },
 			{ id: 'calendario-equipo', label: 'Calendario equipo', hint: 'Vacaciones del equipo' },
+			{ id: 'festivos', label: 'Festivos', hint: 'Calendario local' },
 		];
 
 		const ADMIN_VIEWS = [
@@ -216,7 +217,7 @@ import Layout from '../layouts/Layout.astro';
 		let teamCalendarDepartment = 'all';
 		let teamCalendarMode: TeamCalendarMode = 'month';
 		let teamCalendarCursor = new Date();
-		let selectedTeamCalendarDay = todayIso();
+		let selectedTeamCalendarDay = '';
 		let vacationHistoryFilters = {
 			employeeId: 'all',
 			department: 'all',
@@ -326,8 +327,9 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'review-incident') reviewIncident(actionButton.dataset.id || '');
 				if (action === 'select-vacation') selectVacation(actionButton.dataset.id || '');
 				if (action === 'validator-request-filter') setValidatorRequestFilter(actionButton.dataset.filter || 'pendiente');
-				if (action === 'approve-vacation') resolveVacation('aprobada');
-				if (action === 'deny-vacation') resolveVacation('denegada');
+				if (action === 'approve-vacation') resolveVacation('aprobada', actionButton.dataset.id || '');
+				if (action === 'deny-vacation') resolveVacation('denegada', actionButton.dataset.id || '');
+				if (action === 'delete-holiday') deleteHoliday(actionButton.dataset.id || '');
 				if (action === 'export-timesheets') exportTimesheets();
 				if (action === 'simulate-pdf') showToast('PDF simulado listo. En producción se generaría un documento firmado.');
 				if (action === 'export-generic') exportGeneric();
@@ -344,6 +346,11 @@ import Layout from '../layouts/Layout.astro';
 				const target = event.target as HTMLElement;
 				if (target.matches('#vacation-request-form input[name="from"], #vacation-request-form input[name="to"]')) {
 					updateEmployeeVacationPreview();
+				}
+
+				const teamCalendarForm = target.closest<HTMLFormElement>('#team-calendar-filter-form');
+				if (teamCalendarForm && target.matches('select')) {
+					applyTeamCalendarFilters(teamCalendarForm);
 				}
 			});
 
@@ -382,11 +389,7 @@ import Layout from '../layouts/Layout.astro';
 
 				if (form.matches('#team-calendar-filter-form')) {
 					event.preventDefault();
-					const formData = new FormData(form);
-					teamCalendarDepartment = String(formData.get('department') || 'all');
-					const nextMode = String(formData.get('mode') || 'month');
-					teamCalendarMode = nextMode === 'planning' ? 'planning' : 'month';
-					renderPage();
+					applyTeamCalendarFilters(form);
 				}
 
 				if (form.matches('#vacation-history-filter-form')) {
@@ -412,7 +415,7 @@ import Layout from '../layouts/Layout.astro';
 		function renderShell() {
 			if (userChip) {
 				const displayName = session.role === 'validador_vacaciones' && session.name.toLowerCase().includes('validador')
-					? 'Responsable de equipo'
+					? 'Responsable de vacaciones'
 					: session.name;
 				userChip.innerHTML = `
 					<span>${roleLabel(session.role)}</span>
@@ -983,7 +986,7 @@ import Layout from '../layouts/Layout.astro';
 								<span>Rol</span>
 								<select name="role">
 									<option value="empleado">Usuario normal</option>
-									<option value="validador_vacaciones">Responsable de equipo</option>
+									<option value="validador_vacaciones">Responsable de vacaciones</option>
 									<option value="admin_global">Administrador global</option>
 								</select>
 							</label>
@@ -1154,7 +1157,7 @@ import Layout from '../layouts/Layout.astro';
 			const scopedEmployees = selected ? departmentEmployees(employeeById(selected.employeeId)?.department || '') : [];
 			const balance = selected ? vacationBalance(selected.employeeId) : undefined;
 			const conflictCounts = selected ? vacationConflictCounts(selected, scopedEmployees) : { approved: 0, pending: 0 };
-			const filterButtons = [
+			const filterButtons: Array<{ filter: VacationStatus | 'all'; label: string }> = [
 				{ filter: 'pendiente', label: 'Pendientes' },
 				{ filter: 'aprobada', label: 'Aprobadas' },
 				{ filter: 'denegada', label: 'Denegadas' },
@@ -1164,58 +1167,59 @@ import Layout from '../layouts/Layout.astro';
 					const count = filter === 'all'
 						? requests.length
 						: requests.filter((request) => request.status === filter).length;
-					return `
-						<button
-							class="request-filter-button ${validatorRequestFilter === filter ? 'is-active' : ''}"
-							type="button"
-							data-action="validator-request-filter"
-							data-filter="${filter}"
-						>
-							<span>${label}</span>
-							<strong>${count}</strong>
-						</button>
-					`;
+					return validatorFilterButton(label, filter, validatorRequestFilter, count);
 				})
 				.join('');
 
 			return `
-				${sectionTitle('Solicitudes', 'Revisa vacaciones del equipo y decide con una vista clara de solapes.')}
-				<div class="grid grid-2">
-					<section class="panel">
+				${sectionTitle('Solicitudes', 'Valida vacaciones pendientes y revisa solapes del departamento antes de decidir.')}
+				<div class="responsible-requests-layout">
+					<section class="panel responsible-list-panel">
 						<div class="panel-heading">
 							<div>
-								<h2>Vacaciones solicitadas</h2>
-								<p class="helper-text">Filtra por estado y selecciona una solicitud para ver solapes del equipo.</p>
+								<h2>Solicitudes de vacaciones</h2>
+								<p class="helper-text">Filtra por estado y selecciona una solicitud para ver detalle y coincidencias.</p>
 							</div>
 						</div>
-						<div class="request-filter-bar" aria-label="Filtrar solicitudes">
+						<div class="request-filter-bar responsible-filter-bar" aria-label="Filtrar solicitudes">
 							${filterButtons}
 						</div>
 						<div class="responsible-request-list top-gap">
 							${filteredRequests.length ? filteredRequests.map((request) => `
+								<article class="responsible-request-shell ${selected?.id === request.id ? 'is-active' : ''}">
 								<button
-									class="vacation-select ${selected?.id === request.id ? 'is-active' : ''}"
+									class="vacation-select responsible-request-card ${selected?.id === request.id ? 'is-active' : ''}"
 									type="button"
 									data-action="select-vacation"
 									data-id="${request.id}"
 								>
 									<span>
 										<strong>${employeeName(request.employeeId)}</strong>
-										${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días
+										<small>${escapeHtml(employeeById(request.employeeId)?.department || 'Sin departamento')}</small>
+										${formatDate(request.from)} - ${formatDate(request.to)} · ${vacationRequestDays(request)} días laborables
+										${request.comment ? `<small>${escapeHtml(request.comment)}</small>` : ''}
+										${responsibleConflictLine(request)}
 									</span>
 									${pill(request.status)}
 								</button>
+								${request.status === 'pendiente' ? `
+									<div class="responsible-card-actions">
+										<button class="button button-primary button-small" type="button" data-action="approve-vacation" data-id="${request.id}">Aprobar</button>
+										<button class="button button-danger button-small" type="button" data-action="deny-vacation" data-id="${request.id}">Denegar</button>
+									</div>
+								` : ''}
+								</article>
 							`).join('') : emptyState(`No hay solicitudes ${validatorRequestFilter === 'all' ? 'registradas' : STATUS_LABELS[validatorRequestFilter]?.toLowerCase() || 'con este estado'}.`)}
 						</div>
 					</section>
-					<section class="panel">
+					<section class="panel responsible-detail-panel" ${selected ? `data-selected-vacation-id="${selected.id}"` : ''}>
 						<h2>Detalle y solapes</h2>
 						${selected ? `
 							<div class="summary-list">
 								${summaryRow('Solicitante', employeeName(selected.employeeId))}
 								${summaryRow('Departamento', escapeHtml(employeeById(selected.employeeId)?.department || 'Sin departamento'))}
 								${summaryRow('Fechas', `${formatDate(selected.from)} - ${formatDate(selected.to)}`)}
-								${summaryRow('Días solicitados', String(selected.days))}
+								${summaryRow('Días laborables', String(vacationRequestDays(selected)))}
 								${summaryRow('Coincidencias aprobadas', String(conflictCounts.approved))}
 								${summaryRow('Coincidencias pendientes', String(conflictCounts.pending))}
 								${summaryRow('Comentario', escapeHtml(selected.comment || 'Sin comentario'))}
@@ -1265,14 +1269,14 @@ import Layout from '../layouts/Layout.astro';
 								<option value="planning" ${teamCalendarMode === 'planning' ? 'selected' : ''}>Planning por empleado</option>
 							</select>
 						</label>
-						<button class="button button-secondary" type="submit">Aplicar filtro</button>
+						<button class="button button-secondary button-small" type="submit">Aplicar filtro</button>
 					</form>
 				</section>
 				<section class="panel top-gap team-calendar-panel">
 					<div class="calendar-toolbar">
-						<button class="button button-secondary button-small" type="button" data-action="team-calendar-prev">Mes anterior</button>
+						<button class="button button-secondary button-small" type="button" data-action="team-calendar-prev">← Mes anterior</button>
 						<h2>${monthLabel}</h2>
-						<button class="button button-secondary button-small" type="button" data-action="team-calendar-next">Mes siguiente</button>
+						<button class="button button-secondary button-small" type="button" data-action="team-calendar-next">Mes siguiente →</button>
 					</div>
 					${teamVacationLegend()}
 					<p class="helper-text">
@@ -1280,12 +1284,12 @@ import Layout from '../layouts/Layout.astro';
 							? 'Usa el calendario para ver vacaciones por días. En móvil, toca un día para ver el detalle debajo.'
 							: 'Usa el planning para comparar personas por fechas.'}
 					</p>
+					${teamCalendarMode === 'month' ? renderTeamMonthCalendar(visibleEmployees) : renderTeamPlanning(visibleEmployees)}
 					<div class="team-calendar-meta">
 						${metricCard('Personas visibles', String(visibleEmployees.length), 'correcto')}
 						${metricCard('Vacaciones aprobadas del mes', String(teamMonthRequests(visibleEmployees).filter((request) => request.status === 'aprobada').length), 'vacaciones')}
 						${metricCard('Solicitudes pendientes del mes', String(teamMonthRequests(visibleEmployees).filter((request) => request.status === 'pendiente').length), 'pendiente')}
 					</div>
-					${teamCalendarMode === 'month' ? renderTeamMonthCalendar(visibleEmployees) : renderTeamPlanning(visibleEmployees)}
 				</section>
 			`;
 		}
@@ -1303,7 +1307,7 @@ import Layout from '../layouts/Layout.astro';
 				date.setDate(start.getDate() + index);
 				const iso = isoFromDate(date);
 				const dayData = teamVacationDayData(iso, employees);
-				const dayStatus = teamVacationDayStatus(dayData);
+				const dayStatus = teamVacationDayStatus(dayData, iso);
 				const names = uniqueVacationNames([...dayData.approved, ...dayData.pending]);
 				const visibleNames = names.slice(0, 3);
 				const extraCount = Math.max(names.length - visibleNames.length, 0);
@@ -1331,7 +1335,7 @@ import Layout from '../layouts/Layout.astro';
 					${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day) => `<div class="calendar-head">${day}</div>`).join('')}
 					${cells}
 				</div>
-				${renderTeamDayDetail(selectedTeamCalendarDay, employees)}
+				${selectedTeamCalendarDay ? renderTeamDayDetail(selectedTeamCalendarDay, employees) : ''}
 			`;
 		}
 
@@ -1347,7 +1351,7 @@ import Layout from '../layouts/Layout.astro';
 							<tr>
 								<th class="sticky-col">Empleado</th>
 								${monthDays.map((date) => `
-									<th class="${isWeekend(date) ? 'is-weekend' : ''}">
+									<th class="${!isBusinessDay(date) ? 'is-weekend' : ''}">
 										<span>${formatDayHeader(date)}</span>
 										<small>${weekdayShort(date)}</small>
 									</th>
@@ -1371,6 +1375,19 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderTeamPlanningCell(employee: Employee, date: string) {
+			if (!isBusinessDay(date)) {
+				const holiday = holidays.find((item) => item.date === date);
+				const state = holiday ? 'holiday' : 'weekend';
+				return `
+					<td
+						class="planning-cell planning-${state} is-weekend"
+						title="${escapeHtml(`${employee.name}\n${formatDate(date)}\n${holiday ? `Festivo: ${holiday.name}` : 'Fin de semana'}`)}"
+					>
+						${holiday ? 'FES' : ''}
+					</td>
+				`;
+			}
+
 			const requests = teamVacationRequestsForDate(date, [employee]);
 			const approved = requests.filter((request) => request.status === 'aprobada');
 			const pending = requests.filter((request) => request.status === 'pendiente');
@@ -1389,6 +1406,9 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderTeamDayDetail(date: string, employees: Employee[]) {
 			const dayData = teamVacationDayData(date, employees);
+			const holiday = holidays.find((item) => item.date === date);
+			const isWeekendDay = isWeekend(date);
+			const dayStatus = teamVacationDayStatus(dayData, date);
 
 			return `
 				<section class="team-day-detail top-gap" aria-live="polite">
@@ -1397,7 +1417,11 @@ import Layout from '../layouts/Layout.astro';
 							<span class="meta-label">Detalle del día</span>
 							<h3>${formatDate(date)}</h3>
 						</div>
-						${pill(teamVacationDayStatusLabel(teamVacationDayStatus(dayData)), teamVacationDayStatus(dayData))}
+						${pill(teamVacationDayStatusLabel(dayStatus), dayStatus)}
+					</div>
+					<div class="summary-list team-day-flags">
+						${summaryRow('Festivo', holiday ? `${escapeHtml(holiday.name)} · ${escapeHtml(holiday.center)}` : 'No')}
+						${summaryRow('Fin de semana', isWeekendDay ? 'Sí' : 'No')}
 					</div>
 					${dayData.approved.length || dayData.pending.length ? `
 						<div class="grid grid-2">
@@ -1423,7 +1447,7 @@ import Layout from '../layouts/Layout.astro';
 					${requests.map((request) => `
 						<div>
 							<strong>${employeeName(request.employeeId)}</strong>
-							<span>${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días</span>
+							<span>${formatDate(request.from)} - ${formatDate(request.to)} · ${vacationRequestDays(request)} días laborables</span>
 						</div>
 					`).join('')}
 				</div>
@@ -1437,6 +1461,8 @@ import Layout from '../layouts/Layout.astro';
 					<span><i class="team-legend-pending"></i> Pendientes</span>
 					<span><i class="team-legend-mixed"></i> Mixto</span>
 					<span><i class="team-legend-free"></i> Libre</span>
+					<span><i class="team-legend-weekend"></i> Fin de semana</span>
+					<span><i class="team-legend-holiday"></i> Festivo</span>
 				</div>
 			`;
 		}
@@ -1459,10 +1485,12 @@ import Layout from '../layouts/Layout.astro';
 			return vacations
 				.filter(isActiveVacationRequest)
 				.filter((request) => employeeIds.has(request.employeeId))
-				.filter((request) => rangesOverlap(from, to, request.from, request.to));
+				.filter((request) => businessRangesOverlap(from, to, request.from, request.to));
 		}
 
 		function teamVacationRequestsForDate(date: string, employees: Employee[]) {
+			if (!isBusinessDay(date)) return [];
+
 			const employeeIds = new Set(employees.map((employee) => employee.id));
 			return vacations
 				.filter(isActiveVacationRequest)
@@ -1478,7 +1506,9 @@ import Layout from '../layouts/Layout.astro';
 			};
 		}
 
-		function teamVacationDayStatus(dayData: { approved: VacationRequest[]; pending: VacationRequest[] }) {
+		function teamVacationDayStatus(dayData: { approved: VacationRequest[]; pending: VacationRequest[] }, date = '') {
+			if (date && holidays.some((holiday) => holiday.date === date)) return 'holiday';
+			if (date && isWeekend(date)) return 'weekend';
 			if (dayData.approved.length && dayData.pending.length) return 'mixed';
 			if (dayData.approved.length) return 'approved';
 			if (dayData.pending.length) return 'pending';
@@ -1489,6 +1519,8 @@ import Layout from '../layouts/Layout.astro';
 			if (status === 'approved') return 'Aprobadas';
 			if (status === 'pending') return 'Pendientes';
 			if (status === 'mixed') return 'Mixto';
+			if (status === 'holiday') return 'Festivo';
+			if (status === 'weekend') return 'Fin de semana';
 			return 'Libre';
 		}
 
@@ -1496,7 +1528,9 @@ import Layout from '../layouts/Layout.astro';
 			const approvedNames = uniqueVacationNames(dayData.approved).join(', ') || 'Ninguna';
 			const pendingNames = uniqueVacationNames(dayData.pending).join(', ') || 'Ninguna';
 			const empty = !dayData.approved.length && !dayData.pending.length ? '\nSin vacaciones registradas' : '';
-			return escapeHtml(`${formatDate(date)}\nAprobadas: ${approvedNames}\nPendientes: ${pendingNames}${empty}`);
+			const holiday = holidays.find((item) => item.date === date);
+			const special = holiday ? `\nFestivo: ${holiday.name}` : isWeekend(date) ? '\nFin de semana' : '';
+			return escapeHtml(`${formatDate(date)}${special}\nAprobadas: ${approvedNames}\nPendientes: ${pendingNames}${empty}`);
 		}
 
 		function teamPlanningTooltip(employee: Employee, date: string, requests: VacationRequest[]) {
@@ -1606,15 +1640,18 @@ import Layout from '../layouts/Layout.astro';
 				<div class="grid grid-2">
 					<section class="panel">
 						<h2>Festivos configurados</h2>
-						${sorted.map((holiday) => `
+						${sorted.length ? sorted.map((holiday) => `
 							<div class="stat-row">
 								<div>
 									<strong>${formatDate(holiday.date)}</strong>
 									<span>${escapeHtml(holiday.name)} · ${escapeHtml(holiday.center)}</span>
 								</div>
-								${pill('Festivo', 'festivo')}
+								<div class="holiday-row-actions">
+									${pill('Festivo', 'festivo')}
+									<button class="button button-tertiary button-small" type="button" data-action="delete-holiday" data-id="${holiday.id}">Eliminar</button>
+								</div>
 							</div>
-						`).join('')}
+						`).join('') : emptyState('No hay festivos configurados.')}
 					</section>
 					<section class="panel">
 						<h2>Añadir festivo</h2>
@@ -1904,7 +1941,7 @@ import Layout from '../layouts/Layout.astro';
 						<h2>Usuarios demo</h2>
 						<div class="summary-list">
 							${summaryRow('Administrador global', 'admin.demo@fichajesimple.es / 1234')}
-							${summaryRow('Responsable de equipo', 'vacaciones.demo@fichajesimple.es / 1234')}
+							${summaryRow('Responsable de vacaciones', 'vacaciones.demo@fichajesimple.es / 1234')}
 							${summaryRow('Empleado Ana', 'ana.demo@fichajesimple.es / 1234')}
 							${summaryRow('Empleado Miguel', 'miguel.demo@fichajesimple.es / 1234')}
 						</div>
@@ -2009,6 +2046,40 @@ import Layout from '../layouts/Layout.astro';
 					<strong>${count}</strong>
 				</button>
 			`;
+		}
+
+		function validatorFilterButton(
+			label: string,
+			filter: VacationStatus | 'all',
+			activeFilter: VacationStatus | 'all',
+			count: number,
+		) {
+			return `
+				<button
+					class="request-filter-button responsible-filter-${statusClass(filter)} ${count > 0 ? 'has-count' : 'no-count'} ${activeFilter === filter ? 'is-active' : ''}"
+					type="button"
+					data-action="validator-request-filter"
+					data-filter="${filter}"
+				>
+					<span>${label}</span>
+					<strong>${count}</strong>
+				</button>
+			`;
+		}
+
+		function responsibleConflictLine(request: VacationRequest) {
+			const employee = employeeById(request.employeeId);
+			const scope = employee ? departmentEmployees(employee.department) : EMPLOYEES;
+			const counts = vacationConflictCounts(request, scope);
+			if (!counts.approved && !counts.pending) return '<small>Sin solapes del departamento</small>';
+			return `<small>${counts.approved} aprobadas · ${counts.pending} pendientes en el departamento</small>`;
+		}
+
+		function responsibleRequestEmptyState(filter: VacationStatus | 'all') {
+			if (filter === 'pendiente') return emptyState('No hay solicitudes pendientes.');
+			if (filter === 'aprobada') return emptyState('No hay solicitudes aprobadas.');
+			if (filter === 'denegada') return emptyState('No hay solicitudes denegadas.');
+			return emptyState('No hay solicitudes registradas.');
 		}
 
 		function employeeVacationFilterCard(
@@ -2338,7 +2409,7 @@ import Layout from '../layouts/Layout.astro';
 							item.employeeId !== request.employeeId &&
 							scopeIds.has(item.employeeId) &&
 							item.status === 'aprobada' &&
-							rangesOverlap(request.from, request.to, item.from, item.to),
+							businessRangesOverlap(request.from, request.to, item.from, item.to),
 					)
 					.map((item) => item.employeeId),
 			);
@@ -2350,7 +2421,7 @@ import Layout from '../layouts/Layout.astro';
 							item.employeeId !== request.employeeId &&
 							scopeIds.has(item.employeeId) &&
 							item.status === 'pendiente' &&
-							rangesOverlap(request.from, request.to, item.from, item.to),
+							businessRangesOverlap(request.from, request.to, item.from, item.to),
 					)
 					.map((item) => item.employeeId),
 			);
@@ -2369,7 +2440,7 @@ import Layout from '../layouts/Layout.astro';
 					<div>
 						<span class="meta-label">Solicitud seleccionada</span>
 						<strong>${employeeName(request.employeeId)}</strong>
-						<p>${formatDate(request.from)} - ${formatDate(request.to)} · ${request.days} días · ${escapeHtml(employeeById(request.employeeId)?.department || 'Sin departamento')}</p>
+						<p>${formatDate(request.from)} - ${formatDate(request.to)} · ${vacationRequestDays(request)} días laborables · ${escapeHtml(employeeById(request.employeeId)?.department || 'Sin departamento')}</p>
 						${pill(request.status)}
 					</div>
 					<div class="conflict-meter ${approvedConflictEmployees.size ? 'has-conflict' : ''}">
@@ -2386,6 +2457,7 @@ import Layout from '../layouts/Layout.astro';
 					<span><i class="cell-approved"></i> Vacaciones aprobadas</span>
 					<span><i class="cell-pending"></i> Solicitud pendiente</span>
 					<span><i class="cell-free"></i> Libre</span>
+					<span><i class="cell-off"></i> No laborable</span>
 				</div>
 				<p class="helper-text top-gap">Tabla comparativa por empleado y día. Si el rango es largo, desplázate horizontalmente para revisar todas las fechas.</p>
 				<div class="table-wrap vacation-matrix-wrap top-gap">
@@ -2399,14 +2471,14 @@ import Layout from '../layouts/Layout.astro';
 						<tbody>${comparisonRows}</tbody>
 					</table>
 				</div>
-				<div class="form-grid top-gap">
+				<div class="form-grid top-gap responsible-decision-form ${request.status !== 'pendiente' ? 'hidden' : ''}">
 					<label class="field">
 						<span>Motivo de denegación</span>
 						<textarea id="denial-reason" placeholder="Obligatorio solo si se deniega">${escapeHtml(request.denialReason || '')}</textarea>
 					</label>
 					<div class="tab-actions">
-						<button class="button button-primary" type="button" data-action="approve-vacation" ${request.status !== 'pendiente' ? 'disabled' : ''}>Aprobar</button>
-						<button class="button button-danger" type="button" data-action="deny-vacation" ${request.status !== 'pendiente' ? 'disabled' : ''}>Denegar</button>
+						<button class="button button-primary" type="button" data-action="approve-vacation" data-id="${request.id}" ${request.status !== 'pendiente' ? 'disabled' : ''}>Aprobar</button>
+						<button class="button button-danger" type="button" data-action="deny-vacation" data-id="${request.id}" ${request.status !== 'pendiente' ? 'disabled' : ''}>Denegar</button>
 					</div>
 				</div>
 			`;
@@ -2422,7 +2494,7 @@ import Layout from '../layouts/Layout.astro';
 							item.employeeId !== request.employeeId &&
 							scopeIds.has(item.employeeId) &&
 							item.status === 'aprobada' &&
-							rangesOverlap(request.from, request.to, item.from, item.to),
+							businessRangesOverlap(request.from, request.to, item.from, item.to),
 					)
 					.map((item) => item.employeeId),
 			);
@@ -2434,7 +2506,7 @@ import Layout from '../layouts/Layout.astro';
 							item.employeeId !== request.employeeId &&
 							scopeIds.has(item.employeeId) &&
 							item.status === 'pendiente' &&
-							rangesOverlap(request.from, request.to, item.from, item.to),
+							businessRangesOverlap(request.from, request.to, item.from, item.to),
 					)
 					.map((item) => item.employeeId),
 			);
@@ -2446,6 +2518,10 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderVacationComparisonCell(employeeId: string, date: string, request: VacationRequest) {
+			if (!isBusinessDay(date)) {
+				return `<td class="comparison-cell cell-off">--</td>`;
+			}
+
 			if (employeeId === request.employeeId && isDateWithin(date, request.from, request.to)) {
 				return `<td class="comparison-cell cell-actual">Actual</td>`;
 			}
@@ -3112,6 +3188,17 @@ import Layout from '../layouts/Layout.astro';
 			renderPage();
 		}
 
+		function deleteHoliday(id: string) {
+			const holiday = holidays.find((item) => item.id === id);
+			if (!holiday) return;
+
+			holidays = holidays.filter((item) => item.id !== id);
+			addAudit('Festivo eliminado', `${holiday.name} en ${holiday.center} (${formatDate(holiday.date)}).`);
+			saveAll();
+			showToast('Festivo eliminado de la demo.');
+			renderPage();
+		}
+
 		function saveScheduledReport(form: HTMLFormElement) {
 			const formData = new FormData(form);
 			const report: ScheduledReport = {
@@ -3270,11 +3357,27 @@ import Layout from '../layouts/Layout.astro';
 			renderPage();
 		}
 
-		function resolveVacation(status: VacationStatus) {
+		function applyTeamCalendarFilters(form: HTMLFormElement) {
+			const formData = new FormData(form);
+			teamCalendarDepartment = String(formData.get('department') || 'all');
+			const nextMode = String(formData.get('mode') || 'month');
+			teamCalendarMode = nextMode === 'planning' ? 'planning' : 'month';
+			selectedTeamCalendarDay = '';
+			renderPage();
+		}
+
+		function resolveVacation(status: VacationStatus, id = '') {
+			if (id) selectedVacationId = id;
 			const request = vacations.find((item) => item.id === selectedVacationId);
 			if (!request || request.status !== 'pendiente') return;
 
 			if (status === 'denegada') {
+				const selectedMarker = document.querySelector<HTMLElement>('[data-selected-vacation-id]');
+				if (id && selectedMarker && id !== selectedMarker.dataset.selectedVacationId) {
+					renderPage();
+					showToast('Selecciona la solicitud e indica el motivo para denegar.');
+					return;
+				}
 				const reason = document.querySelector<HTMLTextAreaElement>('#denial-reason')?.value.trim() || '';
 				if (!reason) {
 					showToast('El motivo es obligatorio para denegar una solicitud.');
@@ -3328,7 +3431,7 @@ import Layout from '../layouts/Layout.astro';
 
 		function changeTeamCalendarMonth(offset: number) {
 			teamCalendarCursor = new Date(teamCalendarCursor.getFullYear(), teamCalendarCursor.getMonth() + offset, 1);
-			selectedTeamCalendarDay = isoFromDate(new Date(teamCalendarCursor.getFullYear(), teamCalendarCursor.getMonth(), 1));
+			selectedTeamCalendarDay = '';
 			renderPage();
 		}
 
@@ -3482,7 +3585,7 @@ import Layout from '../layouts/Layout.astro';
 				},
 				{
 					id: 'validador_vacaciones',
-					name: 'Responsable de equipo',
+					name: 'Responsable de vacaciones',
 					email: 'vacaciones.demo@fichajesimple.es',
 					department: 'Administración',
 					role: 'validador_vacaciones',
@@ -3822,13 +3925,13 @@ import Layout from '../layouts/Layout.astro';
 
 		function roleLabel(role: Role) {
 			if (role === 'admin_global') return 'Administrador global';
-			if (role === 'validador_vacaciones') return 'Responsable de equipo';
+			if (role === 'validador_vacaciones') return 'Responsable de vacaciones';
 			return 'Usuario normal';
 		}
 
 		function roleHint(role: Role) {
 			if (role === 'admin_global') return 'Gestión diaria de empleados, fichajes, vacaciones y exportaciones';
-			if (role === 'validador_vacaciones') return 'Solicitudes y calendario del equipo';
+			if (role === 'validador_vacaciones') return 'Validación de vacaciones, calendario del equipo y festivos';
 			return 'Fichaje personal, vacaciones y calendario';
 		}
 

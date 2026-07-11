@@ -943,6 +943,16 @@ textarea:focus-visible {
 	color: var(--muted);
 }
 
+.status-holiday {
+	background: #fff1f1;
+	color: var(--danger);
+}
+
+.status-weekend {
+	background: #eef2f2;
+	color: var(--muted);
+}
+
 .quick-punch-card {
 	display: flex;
 	align-items: center;
@@ -1482,13 +1492,107 @@ textarea:focus-visible {
 	font-size: 0.78rem;
 }
 
+.responsible-filter-bar {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.request-filter-button.responsible-filter-pendiente.has-count {
+	border-color: #ead59b;
+	background: #fffaf0;
+	color: var(--pending);
+}
+
+.request-filter-button.responsible-filter-pendiente.no-count,
+.request-filter-button.responsible-filter-all {
+	background: #ffffff;
+	color: var(--muted-strong);
+}
+
+.request-filter-button.responsible-filter-aprobada {
+	border-color: #c6e5cf;
+	background: #f0fbf3;
+	color: var(--success);
+}
+
+.request-filter-button.responsible-filter-denegada.has-count {
+	border-color: #f0c1c1;
+	background: #fff7f7;
+	color: var(--danger);
+}
+
+.request-filter-button.responsible-filter-denegada.no-count {
+	border-color: var(--line);
+	background: #ffffff;
+	color: var(--muted-strong);
+}
+
+.request-filter-button.is-active {
+	box-shadow: 0 0 0 3px rgba(17, 122, 101, 0.1);
+}
+
 .responsible-request-list {
 	display: grid;
 	gap: 10px;
 }
 
-.responsible-request-list .vacation-select {
+.responsible-requests-layout {
+	display: grid;
+	grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.15fr);
+	gap: 16px;
+	align-items: start;
+}
+
+.responsible-request-shell {
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	box-shadow: 0 4px 14px rgba(23, 33, 31, 0.04);
+}
+
+.responsible-request-shell.is-active {
+	border-color: var(--primary);
+	background: var(--primary-soft);
+}
+
+.responsible-request-list .vacation-select,
+.responsible-request-card {
 	margin-bottom: 0;
+}
+
+.responsible-request-card {
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.responsible-request-card > span {
+	gap: 3px;
+}
+
+.responsible-request-card small {
+	color: var(--muted);
+	font-size: 0.78rem;
+	font-weight: 600;
+}
+
+.responsible-card-actions {
+	display: flex;
+	gap: 8px;
+	padding: 0 12px 12px;
+}
+
+.responsible-card-actions .button {
+	flex: 1 1 0;
+}
+
+.responsible-detail-panel {
+	min-width: 0;
+}
+
+.responsible-decision-form {
+	align-items: end;
+	grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .vacation-balance {
@@ -2076,6 +2180,14 @@ textarea:focus-visible {
 	background: #f6f8f8;
 }
 
+.team-legend-weekend {
+	background: #eef2f2;
+}
+
+.team-legend-holiday {
+	background: #fff1f1;
+}
+
 .team-calendar-controls {
 	grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
 	align-items: end;
@@ -2090,6 +2202,7 @@ textarea:focus-visible {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 12px;
+	margin-top: 2px;
 }
 
 .team-calendar-grid {
@@ -2141,6 +2254,17 @@ textarea:focus-visible {
 	background: #f0fbf7;
 }
 
+.team-day-weekend {
+	border-left-color: #c7d1cf;
+	background: #f7f9f8;
+	color: var(--muted);
+}
+
+.team-day-holiday {
+	border-left-color: var(--danger);
+	background: #fff3f5;
+}
+
 .team-day-names {
 	display: grid;
 	gap: 4px;
@@ -2175,6 +2299,10 @@ textarea:focus-visible {
 .team-day-detail h4 {
 	margin: 0 0 8px;
 	font-size: 0.95rem;
+}
+
+.team-day-flags {
+	margin: 10px 0 14px;
 }
 
 .team-vacation-list {
@@ -2243,8 +2371,24 @@ textarea:focus-visible {
 	color: var(--primary-dark);
 }
 
+.planning-weekend {
+	background: #f1f5f4;
+	color: var(--muted);
+}
+
+.planning-holiday {
+	background: #fff1f1;
+	color: var(--danger);
+}
+
 .planning-free {
 	color: var(--muted);
+}
+
+.holiday-row-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
 }
 
 .history-summary {
@@ -2743,7 +2887,8 @@ tr:last-child td {
 	}
 
 	.punch-layout,
-	.vacation-admin-summary {
+	.vacation-admin-summary,
+	.responsible-requests-layout {
 		grid-template-columns: 1fr;
 	}
 
@@ -2977,12 +3122,29 @@ tr:last-child td {
 		flex: 1 1 100%;
 	}
 
+	.holiday-row-actions {
+		width: 100%;
+		justify-content: space-between;
+	}
+
 	.vacation-filter-card {
 		padding: 12px;
 	}
 
 	.request-filter-bar {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.responsible-filter-bar {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.responsible-card-actions {
+		padding: 0 10px 10px;
+	}
+
+	.responsible-card-actions .button {
+		min-height: 40px;
 	}
 
 	.summary-row strong {
@@ -3032,6 +3194,21 @@ tr:last-child td {
 
 	.calendar-toolbar .button {
 		width: 100%;
+	}
+
+	.team-calendar-controls {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px;
+	}
+
+	.team-calendar-controls .button {
+		grid-column: 1 / -1;
+		min-height: 40px;
+	}
+
+	.responsible-detail-panel .vacation-matrix-wrap,
+	.responsible-detail-panel .comparison-legend + .helper-text {
+		display: none;
 	}
 
 	.day-detail-actions {
@@ -3267,6 +3444,10 @@ tr:last-child td {
 	}
 
 	.employee-request-filter-bar {
+		grid-template-columns: 1fr;
+	}
+
+	.responsible-filter-bar {
 		grid-template-columns: 1fr;
 	}
 
