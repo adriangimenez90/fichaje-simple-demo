@@ -1375,31 +1375,6 @@ textarea:focus-visible {
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.admin-create-user {
-	border: 1px dashed #cfdcda;
-	border-radius: 8px;
-	background: var(--surface-soft);
-	padding: 12px;
-}
-
-.admin-create-user summary {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	cursor: pointer;
-}
-
-.admin-create-user summary span {
-	display: grid;
-	gap: 2px;
-}
-
-.admin-create-user small {
-	color: var(--muted);
-	font-size: 0.84rem;
-}
-
 .row-actions .button {
 	width: auto;
 }
@@ -1578,7 +1553,7 @@ textarea:focus-visible {
 }
 
 .admin-vacation-controls {
-	grid-template-columns: repeat(3, minmax(170px, 1fr)) auto;
+	grid-template-columns: repeat(2, minmax(170px, 1fr)) auto;
 	align-items: end;
 }
 
@@ -1623,6 +1598,72 @@ textarea:focus-visible {
 
 .admin-vacation-secondary .panel-heading {
 	margin-bottom: 12px;
+}
+
+.admin-vacation-secondary summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	cursor: pointer;
+}
+
+.admin-vacation-secondary summary span {
+	display: grid;
+	gap: 2px;
+}
+
+.admin-vacation-secondary summary small {
+	color: var(--muted);
+	font-size: 0.84rem;
+}
+
+.department-availability {
+	display: grid;
+	gap: 8px;
+}
+
+.department-availability h4 {
+	margin: 0;
+	font-size: 0.95rem;
+}
+
+.department-availability-row {
+	display: grid;
+	grid-template-columns: minmax(120px, 1fr) auto auto auto;
+	align-items: center;
+	gap: 10px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 10px 12px;
+}
+
+.department-availability-row span,
+.department-availability-row b {
+	color: var(--muted-strong);
+	font-size: 0.86rem;
+}
+
+.department-availability-row b {
+	border-radius: 999px;
+	padding: 3px 8px;
+	font-weight: 700;
+}
+
+.availability-high b {
+	background: #e2f4e7;
+	color: var(--success);
+}
+
+.availability-medium b {
+	background: #fff6dc;
+	color: var(--pending);
+}
+
+.availability-low b {
+	background: #fff1f1;
+	color: var(--danger);
 }
 
 .record-detail {
@@ -2030,6 +2071,26 @@ textarea:focus-visible {
 	padding: 16px;
 }
 
+.vacation-carryover-note,
+.vacation-regularization-note {
+	border: 1px solid #d7e6e2;
+	border-radius: 8px;
+	background: var(--surface-soft);
+	padding: 10px 12px;
+}
+
+.vacation-carryover-note {
+	margin-top: 12px;
+}
+
+.vacation-regularization-note {
+	border-color: #ead59b;
+	background: #fffaf0;
+	color: var(--pending);
+	font-size: 0.9rem;
+	font-weight: 650;
+}
+
 .vacation-week-nav {
 	display: grid;
 	grid-template-columns: auto minmax(150px, 1fr) auto;
@@ -2191,6 +2252,27 @@ textarea:focus-visible {
 }
 
 .overlap-list span {
+	color: var(--muted);
+	font-size: 0.86rem;
+}
+
+.responsible-conflict-list {
+	display: grid;
+	gap: 8px;
+}
+
+.responsible-conflict-item {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	align-items: center;
+	gap: 10px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 10px 12px;
+}
+
+.responsible-conflict-item span {
 	color: var(--muted);
 	font-size: 0.86rem;
 }
@@ -3490,6 +3572,12 @@ tr:last-child td {
 	.admin-notice {
 		align-items: stretch;
 		flex-direction: column;
+	}
+
+	.department-availability-row,
+	.responsible-conflict-item {
+		grid-template-columns: 1fr;
+		gap: 6px;
 	}
 
 	.admin-status-strip {

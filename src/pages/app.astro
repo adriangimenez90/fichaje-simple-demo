@@ -45,7 +45,6 @@ import Layout from '../layouts/Layout.astro';
 		type EntryStatus = 'correcto' | 'incidencia' | 'pendiente' | 'sin fichaje';
 		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada' | 'cancelada';
 		type EmployeeVacationFilter = 'all' | 'aprobada-futura' | 'disfrutada' | VacationStatus;
-		type AdminVacationStatusFilter = 'all' | 'activa' | 'pendiente' | 'aprobada' | 'disfrutada' | 'denegada';
 		type IncidentStatus = 'pendiente' | 'revisada';
 		type TeamCalendarMode = 'month' | 'planning';
 		type AdminTodayFilter = 'all' | 'trabajando' | 'pausa' | 'sin-fichar';
@@ -226,11 +225,9 @@ import Layout from '../layouts/Layout.astro';
 		let adminVacationFilters: {
 			employeeId: string;
 			department: string;
-			status: AdminVacationStatusFilter;
 		} = {
 			employeeId: 'all',
 			department: 'all',
-			status: 'activa',
 		};
 		let vacationHistoryFilters = {
 			employeeId: 'all',
@@ -840,6 +837,7 @@ import Layout from '../layouts/Layout.astro';
 						${vacationSummaryCard('Pendientes', `${balance.pending} días`, 'pendiente')}
 						${vacationSummaryCard('Denegadas', `${balance.denied} días`, 'incidencia')}
 					</div>
+					<p class="helper-text vacation-carryover-note">Los días pendientes pueden acumularse al año siguiente si la empresa lo permite.</p>
 				</section>
 				<div class="grid grid-2 top-gap employee-vacation-layout">
 					<section class="panel vacation-request-panel">
@@ -980,9 +978,36 @@ import Layout from '../layouts/Layout.astro';
 				${sectionTitle('Empleados', 'Busca una persona y revisa su ficha. Todo es ficticio y local.')}
 				<div class="admin-users-layout admin-users-simple">
 					<section class="panel">
+						<h2>Crear empleado</h2>
+						<p class="helper-text">Alta simulada para probar la demo. No se envía ninguna invitación real.</p>
+						<form id="user-form" class="form-grid top-gap">
+							<label class="field">
+								<span>Nombre</span>
+								<input type="text" name="name" placeholder="Nombre y apellidos" required />
+							</label>
+							<label class="field">
+								<span>Email</span>
+								<input type="email" name="email" placeholder="persona@empresa-demo.es" required />
+							</label>
+							<label class="field">
+								<span>Departamento</span>
+								<input type="text" name="department" placeholder="Administración" required />
+							</label>
+							<label class="field">
+								<span>Rol</span>
+								<select name="role">
+									<option value="empleado">Usuario normal</option>
+									<option value="validador_vacaciones">Responsable de vacaciones</option>
+									<option value="admin_global">Administrador global</option>
+								</select>
+							</label>
+							<button class="button button-primary" type="submit">Crear usuario</button>
+						</form>
+					</section>
+					<section class="panel">
 						<div class="panel-heading">
 							<div>
-								<h2>Buscar</h2>
+								<h2>Editar empleado</h2>
 								<p class="helper-text">Nombre, email o departamento.</p>
 							</div>
 						</div>
@@ -1006,41 +1031,7 @@ import Layout from '../layouts/Layout.astro';
 								</button>
 							`).join('') : emptyState('No hay empleados con esa búsqueda.')}
 						</div>
-					</section>
-					<section class="panel">
-						<h2>Ficha</h2>
 						${selectedUser ? renderAdminUserCard(selectedUser) : emptyState('Selecciona un empleado.')}
-						<details class="admin-create-user top-gap">
-							<summary>
-								<span>
-									<strong>Crear empleado</strong>
-									<small>Alta simulada para probar la demo</small>
-								</span>
-							</summary>
-							<form id="user-form" class="form-grid top-gap">
-								<label class="field">
-									<span>Nombre</span>
-									<input type="text" name="name" placeholder="Nombre y apellidos" required />
-								</label>
-								<label class="field">
-									<span>Email</span>
-									<input type="email" name="email" placeholder="persona@empresa-demo.es" required />
-								</label>
-								<label class="field">
-									<span>Departamento</span>
-									<input type="text" name="department" placeholder="Administración" required />
-								</label>
-								<label class="field">
-									<span>Rol</span>
-									<select name="role">
-										<option value="empleado">Usuario normal</option>
-										<option value="validador_vacaciones">Responsable de vacaciones</option>
-										<option value="admin_global">Administrador global</option>
-									</select>
-								</label>
-								<button class="button button-primary" type="submit">Crear usuario</button>
-							</form>
-						</details>
 					</section>
 				</div>
 			`;
@@ -1085,11 +1076,11 @@ import Layout from '../layouts/Layout.astro';
 						</div>
 					</form>
 				</section>
+				${renderAdminIncidentsPanel('Incidencias pendientes')}
 				<section class="panel top-gap">
 					<h2>Registros encontrados</h2>
 					${renderTimesheetTable(rows)}
 				</section>
-				${renderAdminIncidentsPanel('Incidencias de fichaje')}
 			`;
 		}
 
@@ -1166,32 +1157,45 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderAdminVacations() {
 			const visibleEmployees = adminVacationEmployees();
-			const monthRequests = adminVacationMonthRequests(visibleEmployees)
-				.filter((request) => request.status === 'aprobada' || request.status === 'pendiente')
+			const monthRequests = adminVacationMonthRequests(visibleEmployees);
+			const approvedMonthRequests = monthRequests
+				.filter((request) => request.status === 'aprobada')
+				.sort((a, b) => a.from.localeCompare(b.from));
+			const pendingMonthRequests = monthRequests
+				.filter((request) => request.status === 'pendiente')
 				.sort((a, b) => a.from.localeCompare(b.from));
 			const deniedRequests = adminDeniedVacationRequests();
 
 			return `
-				${sectionTitle('Vacaciones', 'Consulta vacaciones y ausencias del equipo. La validación corresponde al responsable de vacaciones.')}
+				${sectionTitle('Vacaciones', 'Quién está de vacaciones y cómo queda el equipo.')}
 				${renderAdminVacationCalendar(visibleEmployees)}
-				<section class="panel top-gap admin-vacation-secondary">
-					<div class="panel-heading">
-						<div>
-							<h2>Solicitudes del mes</h2>
-							<p class="helper-text">Vista de consulta sin acciones de aprobación o denegación.</p>
-						</div>
-					</div>
-					${renderAdminVacationCards(monthRequests, 'No hay solicitudes aprobadas o pendientes con estos filtros.')}
-				</section>
-				<section class="panel top-gap admin-vacation-secondary">
-					<div class="panel-heading">
-						<div>
-							<h2>Solicitudes denegadas</h2>
-							<p class="helper-text">Listado secundario con motivo y fecha de decisión, si está disponible.</p>
-						</div>
-					</div>
+				<details class="panel top-gap admin-vacation-secondary">
+					<summary>
+						<span>
+							<strong>Vacaciones aprobadas del mes</strong>
+							<small>${approvedMonthRequests.length} registro${approvedMonthRequests.length === 1 ? '' : 's'}</small>
+						</span>
+					</summary>
+					${renderAdminVacationCards(approvedMonthRequests, 'No hay vacaciones aprobadas con estos filtros.')}
+				</details>
+				<details class="panel top-gap admin-vacation-secondary">
+					<summary>
+						<span>
+							<strong>Solicitudes pendientes</strong>
+							<small>${pendingMonthRequests.length} pendiente${pendingMonthRequests.length === 1 ? '' : 's'} en el mes</small>
+						</span>
+					</summary>
+					${renderAdminVacationCards(pendingMonthRequests, 'No hay solicitudes pendientes con estos filtros.')}
+				</details>
+				<details class="panel top-gap admin-vacation-secondary">
+					<summary>
+						<span>
+							<strong>Solicitudes denegadas</strong>
+							<small>Listado secundario con motivo</small>
+						</span>
+					</summary>
 					${renderAdminDeniedVacationCards(deniedRequests)}
-				</section>
+				</details>
 			`;
 		}
 
@@ -1203,14 +1207,14 @@ import Layout from '../layouts/Layout.astro';
 			const monthLabel = adminVacationCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 			const monthRequests = adminVacationMonthRequests(employees);
 			const approvedCount = monthRequests.filter((request) => request.status === 'aprobada').length;
-			const pendingCount = monthRequests.filter((request) => request.status === 'pendiente').length;
+			const holidayCount = adminVacationMonthDateRange().filter((date) => holidays.some((holiday) => holiday.date === date)).length;
 
 			return `
 				<section class="panel admin-vacation-calendar-panel">
 					<div class="panel-heading">
 						<div>
 							<h2>Calendario de vacaciones</h2>
-							<p class="helper-text">Consulta ocupación por días, festivos y fines de semana. Esta vista es solo lectura.</p>
+							<p class="helper-text">Solo muestra vacaciones aprobadas, festivos y fines de semana.</p>
 						</div>
 					</div>
 					<form id="admin-vacation-filter-form" class="form-grid admin-vacation-controls">
@@ -1228,17 +1232,6 @@ import Layout from '../layouts/Layout.astro';
 								${employeeOptions.map((employee) => `<option value="${employee.id}" ${adminVacationFilters.employeeId === employee.id ? 'selected' : ''}>${employee.name}</option>`).join('')}
 							</select>
 						</label>
-						<label class="field">
-							<span>Estado</span>
-							<select name="status">
-								<option value="activa" ${adminVacationFilters.status === 'activa' ? 'selected' : ''}>Aprobadas y pendientes</option>
-								<option value="all" ${adminVacationFilters.status === 'all' ? 'selected' : ''}>Todas</option>
-								<option value="aprobada" ${adminVacationFilters.status === 'aprobada' ? 'selected' : ''}>Aprobadas</option>
-								<option value="pendiente" ${adminVacationFilters.status === 'pendiente' ? 'selected' : ''}>Pendientes</option>
-								<option value="disfrutada" ${adminVacationFilters.status === 'disfrutada' ? 'selected' : ''}>Disfrutadas</option>
-								<option value="denegada" ${adminVacationFilters.status === 'denegada' ? 'selected' : ''}>Denegadas</option>
-							</select>
-						</label>
 						<button class="button button-secondary button-small" type="submit">Aplicar</button>
 					</form>
 					<div class="calendar-toolbar admin-vacation-toolbar">
@@ -1246,14 +1239,25 @@ import Layout from '../layouts/Layout.astro';
 						<h2>${monthLabel}</h2>
 						<button class="button button-secondary button-small" type="button" data-action="admin-vacation-next">Mes siguiente →</button>
 					</div>
-					${teamVacationLegend()}
+					${adminVacationLegend()}
 					${renderAdminVacationMonthCalendar(employees)}
 					<div class="team-calendar-meta admin-vacation-meta">
 						${metricCard('Personas visibles', String(employees.length), 'correcto')}
 						${metricCard('Aprobadas del mes', String(approvedCount), 'vacaciones')}
-						${metricCard('Pendientes del mes', String(pendingCount), pendingCount ? 'pendiente' : 'correcto')}
+						${metricCard('Festivos del mes', String(holidayCount), holidayCount ? 'festivo' : 'correcto')}
 					</div>
 				</section>
+			`;
+		}
+
+		function adminVacationLegend() {
+			return `
+				<div class="comparison-legend team-vacation-legend">
+					<span><i class="team-legend-approved"></i> Vacaciones aprobadas</span>
+					<span><i class="team-legend-free"></i> Libre</span>
+					<span><i class="team-legend-weekend"></i> Fin de semana</span>
+					<span><i class="team-legend-holiday"></i> Festivo</span>
+				</div>
 			`;
 		}
 
@@ -1320,19 +1324,44 @@ import Layout from '../layouts/Layout.astro';
 						${summaryRow('Festivo', holiday ? `${escapeHtml(holiday.name)} · ${escapeHtml(holiday.center)}` : 'No')}
 						${summaryRow('Fin de semana', isWeekend(date) ? 'Sí' : 'No')}
 					</div>
-					${dayData.approved.length || dayData.pending.length ? `
-						<div class="grid grid-2">
-							<div>
-								<h4>Aprobadas</h4>
-								${renderTeamVacationList(dayData.approved)}
-							</div>
-							<div>
-								<h4>Pendientes</h4>
-								${renderTeamVacationList(dayData.pending)}
-							</div>
+					${dayData.approved.length ? `
+						<div>
+							<h4>Personas de vacaciones</h4>
+							${renderTeamVacationList(dayData.approved)}
 						</div>
 					` : emptyState('Sin vacaciones registradas.')}
+					${renderAdminDepartmentAvailability(date, employees)}
 				</section>
+			`;
+		}
+
+		function renderAdminDepartmentAvailability(date: string, employees: Employee[]) {
+			const approvedIds = new Set(adminVacationDayData(date, employees).approved.map((request) => request.employeeId));
+			const rows = departmentList()
+				.map((department) => {
+					const departmentPeople = employees.filter((employee) => employee.department === department);
+					if (!departmentPeople.length) return '';
+					const total = departmentPeople.length;
+					const away = departmentPeople.filter((employee) => approvedIds.has(employee.id)).length;
+					const availability = total ? Math.round(((total - away) / total) * 100) : 100;
+					const status = availability >= 67 ? 'high' : availability >= 34 ? 'medium' : 'low';
+					return `
+						<div class="department-availability-row availability-${status}">
+							<strong>${escapeHtml(department)}</strong>
+							<span>${total} total</span>
+							<span>${away} de vacaciones</span>
+							<b>${availability}% disponible</b>
+						</div>
+					`;
+				})
+				.filter(Boolean)
+				.join('');
+
+			return `
+				<div class="department-availability top-gap">
+					<h4>Disponibilidad por departamento</h4>
+					${rows || emptyState('No hay empleados visibles para calcular disponibilidad.')}
+				</div>
 			`;
 		}
 
@@ -1410,7 +1439,6 @@ import Layout from '../layouts/Layout.astro';
 			const employeeIds = new Set(employees.map((employee) => employee.id));
 			return vacations
 				.filter((request) => employeeIds.has(request.employeeId))
-				.filter(adminVacationRequestMatchesStatus)
 				.filter((request) => businessRangesOverlap(from, to, request.from, request.to));
 		}
 
@@ -1420,8 +1448,7 @@ import Layout from '../layouts/Layout.astro';
 			const employeeIds = new Set(employees.map((employee) => employee.id));
 			return vacations
 				.filter((request) => employeeIds.has(request.employeeId))
-				.filter((request) => request.status === 'aprobada' || request.status === 'pendiente')
-				.filter(adminVacationRequestMatchesStatus)
+				.filter((request) => request.status === 'aprobada')
 				.filter((request) => isDateWithin(date, request.from, request.to));
 		}
 
@@ -1431,13 +1458,6 @@ import Layout from '../layouts/Layout.astro';
 				approved: dayRequests.filter((request) => request.status === 'aprobada'),
 				pending: dayRequests.filter((request) => request.status === 'pendiente'),
 			};
-		}
-
-		function adminVacationRequestMatchesStatus(request: VacationRequest) {
-			if (adminVacationFilters.status === 'all') return true;
-			if (adminVacationFilters.status === 'activa') return request.status === 'aprobada' || request.status === 'pendiente';
-			if (adminVacationFilters.status === 'disfrutada') return isEnjoyedVacation(request);
-			return request.status === adminVacationFilters.status;
 		}
 
 		function adminDeniedVacationRequests() {
@@ -1528,13 +1548,14 @@ import Layout from '../layouts/Layout.astro';
 								${summaryRow('Fechas', `${formatDate(selected.from)} - ${formatDate(selected.to)}`)}
 								${summaryRow('Días laborables', String(vacationRequestDays(selected)))}
 								${summaryRow('Coincidencias aprobadas', String(conflictCounts.approved))}
-								${summaryRow('Coincidencias pendientes', String(conflictCounts.pending))}
-								${summaryRow('Comentario', escapeHtml(selected.comment || 'Sin comentario'))}
-								${summaryRow('Saldo disponible', `${balance?.available ?? 0} días`)}
-							</div>
-							<div class="top-gap">
-								${renderVacationAdminDetail(selected, scopedEmployees)}
-							</div>
+										${summaryRow('Coincidencias pendientes', String(conflictCounts.pending))}
+										${summaryRow('Comentario', escapeHtml(selected.comment || 'Sin comentario'))}
+										${summaryRow('Saldo disponible', `${balance?.available ?? 0} días`)}
+									</div>
+									${renderResponsibleConflictDetails(selected, scopedEmployees)}
+									<div class="top-gap">
+										${renderVacationAdminDetail(selected, scopedEmployees)}
+									</div>
 						` : emptyState('Selecciona una solicitud.')}
 					</section>
 				</div>
@@ -2509,9 +2530,51 @@ import Layout from '../layouts/Layout.astro';
 		function responsibleConflictLine(request: VacationRequest) {
 			const employee = employeeById(request.employeeId);
 			const scope = employee ? departmentEmployees(employee.department) : EMPLOYEES;
-			const counts = vacationConflictCounts(request, scope);
-			if (!counts.approved && !counts.pending) return '<small>Sin solapes del departamento</small>';
-			return `<small>${counts.approved} aprobadas · ${counts.pending} pendientes en el departamento</small>`;
+			const details = vacationConflictDetails(request, scope);
+			if (!details.length) return '<small>Sin solapes del departamento</small>';
+			const preview = details.slice(0, 2).map((item) => (
+				`${employeeName(item.request.employeeId)} ${formatDayHeader(item.from)}-${formatDayHeader(item.to)} · ${item.request.status === 'aprobada' ? 'Aprobada' : 'Pendiente'}`
+			));
+			const extra = details.length > preview.length ? ` · +${details.length - preview.length} más` : '';
+			return `<small>${preview.map(escapeHtml).join('<br>')}${extra}</small>`;
+		}
+
+		function renderResponsibleConflictDetails(request: VacationRequest, scopeEmployees: Employee[]) {
+			const details = vacationConflictDetails(request, scopeEmployees);
+			if (!details.length) {
+				return `<p class="helper-text top-gap">No hay solapes en el departamento.</p>`;
+			}
+
+			return `
+				<div class="responsible-conflict-list top-gap">
+					${details.map((item) => `
+						<div class="responsible-conflict-item">
+							<strong>${employeeName(item.request.employeeId)}</strong>
+							<span>${formatDate(item.from)} - ${formatDate(item.to)}</span>
+							${pill(item.request.status === 'aprobada' ? 'Aprobada' : 'Pendiente', item.request.status)}
+						</div>
+					`).join('')}
+				</div>
+			`;
+		}
+
+		function vacationConflictDetails(request: VacationRequest, scopeEmployees = EMPLOYEES) {
+			const scopeIds = new Set(scopeEmployees.map((employee) => employee.id));
+			return vacations
+				.filter(
+					(item) =>
+						item.id !== request.id &&
+						item.employeeId !== request.employeeId &&
+						scopeIds.has(item.employeeId) &&
+						isActiveVacationRequest(item) &&
+						businessRangesOverlap(request.from, request.to, item.from, item.to),
+				)
+				.map((item) => ({
+					request: item,
+					from: maxDate(request.from, item.from),
+					to: minDate(request.to, item.to),
+				}))
+				.sort((a, b) => a.from.localeCompare(b.from));
 		}
 
 		function responsibleRequestEmptyState(filter: VacationStatus | 'all') {
@@ -2924,31 +2987,9 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function vacationConflictCounts(request: VacationRequest, scopeEmployees = EMPLOYEES) {
-			const scopeIds = new Set(scopeEmployees.map((employee) => employee.id));
-			const approved = new Set(
-				vacations
-					.filter(
-						(item) =>
-							item.id !== request.id &&
-							item.employeeId !== request.employeeId &&
-							scopeIds.has(item.employeeId) &&
-							item.status === 'aprobada' &&
-							businessRangesOverlap(request.from, request.to, item.from, item.to),
-					)
-					.map((item) => item.employeeId),
-			);
-			const pending = new Set(
-				vacations
-					.filter(
-						(item) =>
-							item.id !== request.id &&
-							item.employeeId !== request.employeeId &&
-							scopeIds.has(item.employeeId) &&
-							item.status === 'pendiente' &&
-							businessRangesOverlap(request.from, request.to, item.from, item.to),
-					)
-					.map((item) => item.employeeId),
-			);
+			const details = vacationConflictDetails(request, scopeEmployees);
+			const approved = new Set(details.filter((item) => item.request.status === 'aprobada').map((item) => item.request.employeeId));
+			const pending = new Set(details.filter((item) => item.request.status === 'pendiente').map((item) => item.request.employeeId));
 
 			return {
 				approved: approved.size,
@@ -3042,6 +3083,9 @@ import Layout from '../layouts/Layout.astro';
 						businessRangesOverlap(from, to, request.from, request.to),
 				)
 				.sort((a, b) => a.from.localeCompare(b.from));
+			const pastRequestNote = from < todayIso()
+				? `<p class="vacation-regularization-note">Estás solicitando vacaciones en fechas pasadas. Se registrará como regularización.</p>`
+				: '';
 
 			const comparisonRows = peers.map((peer) => `
 				<tr>
@@ -3061,6 +3105,7 @@ import Layout from '../layouts/Layout.astro';
 							<p class="helper-text">${formatDate(from)} - ${formatDate(to)} · ${previewRequest.days} días laborables solicitados.</p>
 						</div>
 					</div>
+					${pastRequestNote}
 					<div class="vacation-week-nav">
 						<button class="button button-tertiary button-small" type="button" data-action="employee-vacation-week-prev" ${weekStart <= minWeekStart ? 'disabled' : ''}>Semana anterior</button>
 						<strong>${formatDayHeader(weekStart)} - ${formatDayHeader(weekEnd)}</strong>
@@ -3410,7 +3455,7 @@ import Layout from '../layouts/Layout.astro';
 			const to = scope === 'week'
 				? endOfCurrentWorkWeekIso()
 				: isoFromDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
-			const holidayDays = dateRange(from, to).filter((date) => holidays.some((holiday) => holiday.date === date)).length;
+			const holidayDays = dateRange(from, to).filter((date) => !isWeekend(date) && holidays.some((holiday) => holiday.date === date)).length;
 
 			return EMPLOYEES.map((employee) => {
 				const entries = timeEntries.filter(
@@ -3418,7 +3463,7 @@ import Layout from '../layouts/Layout.astro';
 				);
 				const worked = entries.reduce((sum, entry) => sum + workedMinutes(entry), 0);
 				const laborDays = businessDaysBetween(from, to);
-				const vacationDays = scope === 'month' ? countVacationDaysInRange(employee.id, from, to) : 0;
+				const vacationDays = countVacationDaysInRange(employee.id, from, to);
 				const expectedDays = Math.max(laborDays - vacationDays, 0);
 				const expected = expectedDays * 8 * 60;
 				const employeeIncidents = incidents.filter(
@@ -3947,7 +3992,6 @@ import Layout from '../layouts/Layout.astro';
 
 		function applyAdminVacationFilters(form: HTMLFormElement) {
 			const formData = new FormData(form);
-			const statusValue = String(formData.get('status') || 'activa');
 			const department = String(formData.get('department') || 'all');
 			let employeeId = String(formData.get('employeeId') || 'all');
 			if (
@@ -3961,9 +4005,6 @@ import Layout from '../layouts/Layout.astro';
 			adminVacationFilters = {
 				department,
 				employeeId,
-				status: ['all', 'activa', 'pendiente', 'aprobada', 'disfrutada', 'denegada'].includes(statusValue)
-					? (statusValue as AdminVacationStatusFilter)
-					: 'activa',
 			};
 			selectedAdminVacationDay = '';
 			renderPage();
