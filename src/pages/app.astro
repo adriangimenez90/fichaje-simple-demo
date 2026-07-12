@@ -156,16 +156,27 @@ import Layout from '../layouts/Layout.astro';
 			audit: 'fs_audit',
 		} as const;
 
-		const DEMO_VERSION = 'fichaje-simple-roles-2026-07';
+		const DEMO_YEAR = 2026;
+		const DEMO_VERSION = '2026-empresa-17-v1';
 
 		const EMPLOYEES: Employee[] = [
 			{ id: 'ana', name: 'Ana Martínez', department: 'Administración', vacationDays: 22 },
+			{ id: 'laura', name: 'Laura Sánchez', department: 'Administración', vacationDays: 22 },
+			{ id: 'sergio', name: 'Sergio Navarro', department: 'Administración', vacationDays: 22 },
+			{ id: 'miguel', name: 'Miguel López', department: 'Operaciones', vacationDays: 22 },
 			{ id: 'carlos', name: 'Carlos Gómez', department: 'Operaciones', vacationDays: 22 },
-			{ id: 'laura', name: 'Laura Pérez', department: 'Administración', vacationDays: 22 },
-			{ id: 'miguel', name: 'Miguel Torres', department: 'Almacén', vacationDays: 22 },
-			{ id: 'sara', name: 'Sara Navarro', department: 'Administración', vacationDays: 22 },
-			{ id: 'javier', name: 'Javier Ruiz', department: 'Reparto', vacationDays: 22 },
-			{ id: 'marta', name: 'Marta Soler', department: 'Atención al cliente', vacationDays: 22 },
+			{ id: 'elena', name: 'Elena Torres', department: 'Operaciones', vacationDays: 22 },
+			{ id: 'javier', name: 'Javier Romero', department: 'Operaciones', vacationDays: 22 },
+			{ id: 'daniel', name: 'Daniel Ortega', department: 'Operaciones', vacationDays: 22 },
+			{ id: 'paula', name: 'Paula Molina', department: 'Comercial', vacationDays: 22 },
+			{ id: 'ruben', name: 'Rubén Castillo', department: 'Comercial', vacationDays: 22 },
+			{ id: 'alberto', name: 'Alberto Campos', department: 'Comercial', vacationDays: 22 },
+			{ id: 'marta', name: 'Marta Ruiz', department: 'Atención al cliente', vacationDays: 22 },
+			{ id: 'cristina', name: 'Cristina Vidal', department: 'Atención al cliente', vacationDays: 22 },
+			{ id: 'noelia', name: 'Noelia Ferrer', department: 'Atención al cliente', vacationDays: 22 },
+			{ id: 'irene', name: 'Irene Gil', department: 'RRHH', vacationDays: 22 },
+			{ id: 'beatriz', name: 'Beatriz León', department: 'RRHH', vacationDays: 22 },
+			{ id: 'raul', name: 'Raúl Moreno', department: 'Dirección', vacationDays: 22 },
 		];
 
 		const EMPLOYEE_VIEWS = [
@@ -377,6 +388,10 @@ import Layout from '../layouts/Layout.astro';
 				const teamCalendarForm = target.closest<HTMLFormElement>('#team-calendar-filter-form');
 				if (teamCalendarForm && target.matches('select')) {
 					applyTeamCalendarFilters(teamCalendarForm);
+				}
+
+				if (target.matches('#export-hours-report-form select[name="scope"]')) {
+					updateExportReportPeriodFields();
 				}
 			});
 
@@ -2233,7 +2248,7 @@ import Layout from '../layouts/Layout.astro';
 						</label>
 						<label class="field">
 							<span>Destinatario email</span>
-							<input type="email" name="recipient" value="responsable@sourcingdemo.es" required />
+							<input type="email" name="recipient" value="responsable.vacaciones@empresa-demo.es" required />
 						</label>
 						<label class="field">
 							<span>Formato</span>
@@ -2302,14 +2317,29 @@ import Layout from '../layouts/Layout.astro';
 					</div>
 					<form id="export-hours-report-form" class="form-grid export-timesheet-form export-report-form">
 						<label class="field">
+							<span>Empleado</span>
+							<select name="employeeId">
+								<option value="all">Todos los empleados</option>
+								${EMPLOYEES.map((employee) => `<option value="${employee.id}">${employee.name}</option>`).join('')}
+							</select>
+						</label>
+						<label class="field">
 							<span>Tipo de reporte</span>
 							<select name="scope">
 								<option value="week">Reporte semanal</option>
 								<option value="month">Reporte mensual</option>
 							</select>
 						</label>
+						<label class="field export-period-field" data-period-field="week">
+							<span>Semana</span>
+							<input type="week" name="week" value="${weekInputValue(todayIso())}" />
+						</label>
+						<label class="field export-period-field hidden" data-period-field="month">
+							<span>Mes</span>
+							<input type="month" name="month" value="${todayIso().slice(0, 7)}" />
+						</label>
 						<div class="table-actions">
-							<button class="button button-primary" type="button" data-action="export-hours-report-simple">Exportar reporte CSV</button>
+							<button class="button button-primary" type="button" data-action="export-hours-report-simple">Exportar reporte</button>
 						</div>
 					</form>
 				</section>
@@ -3530,8 +3560,10 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderExportHoursReports() {
-			const weeklyRows = buildExpectedHoursReport('week');
-			const monthlyRows = buildExpectedHoursReport('month');
+			const weeklyRange = weekRangeFromInput(weekInputValue(todayIso()));
+			const monthlyRange = monthRangeFromInput(todayIso().slice(0, 7));
+			const weeklyRows = buildExpectedHoursReport('week', weeklyRange.from, weeklyRange.to, 'all');
+			const monthlyRows = buildExpectedHoursReport('month', monthlyRange.from, monthlyRange.to, 'all');
 
 			return `
 				<section class="panel top-gap export-reports-panel">
@@ -3545,13 +3577,13 @@ import Layout from '../layouts/Layout.astro';
 						${exportReportPreview(
 							'Reporte semanal de horas',
 							'Semana laboral en curso. Esperado: días laborables x 8 horas.',
-							['Empleado', 'Horas fichadas', 'Horas esperadas', 'Diferencia', 'Incidencias'],
+							['Empleado', 'Departamento', 'Periodo', 'Horas fichadas', 'Horas esperadas', 'Diferencia', 'Incidencias'],
 							weeklyRows,
 						)}
 						${exportReportPreview(
 							'Reporte mensual de horas',
 							'Mes actual. Las vacaciones aprobadas reducen las horas esperadas.',
-							['Empleado', 'Horas fichadas', 'Horas esperadas', 'Diferencia', 'Incidencias', 'Vacaciones/festivos'],
+							['Empleado', 'Departamento', 'Periodo', 'Horas fichadas', 'Horas esperadas', 'Diferencia', 'Incidencias'],
 							monthlyRows,
 						)}
 					</div>
@@ -3579,14 +3611,13 @@ import Layout from '../layouts/Layout.astro';
 			`;
 		}
 
-		function buildExpectedHoursReport(scope: 'week' | 'month') {
-			const from = scope === 'week' ? startOfCurrentWorkWeekIso() : startOfMonthIso(new Date());
-			const to = scope === 'week'
-				? endOfCurrentWorkWeekIso()
-				: isoFromDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
-			const holidayDays = dateRange(from, to).filter((date) => !isWeekend(date) && holidays.some((holiday) => holiday.date === date)).length;
+		function buildExpectedHoursReport(scope: 'week' | 'month', from: string, to: string, employeeId = 'all') {
+			const employees = EMPLOYEES.filter((employee) => employeeId === 'all' || employee.id === employeeId);
+			const period = scope === 'week'
+				? `Semana ${formatDate(from)} - ${formatDate(to)}`
+				: monthLabel(from.slice(0, 7));
 
-			return EMPLOYEES.map((employee) => {
+			return employees.map((employee) => {
 				const entries = timeEntries.filter(
 					(entry) => entry.employeeId === employee.id && dateInRange(entry.date, from, to),
 				);
@@ -3598,22 +3629,16 @@ import Layout from '../layouts/Layout.astro';
 				const employeeIncidents = incidents.filter(
 					(incident) => incident.employeeId === employee.id && dateInRange(incident.date, from, to),
 				).length;
-				const baseRow = [
+				return [
 					employee.name,
+					employee.department,
+					period,
 					formatMinutes(worked),
 					formatMinutes(expected),
 					formatSignedMinutes(worked - expected),
 					String(employeeIncidents),
 				];
 
-				if (scope === 'month') {
-					return [
-						...baseRow,
-						`${vacationDays} días vacaciones · ${holidayDays} festivos`,
-					];
-				}
-
-				return baseRow;
 			});
 		}
 
@@ -3632,6 +3657,40 @@ import Layout from '../layouts/Layout.astro';
 				month: 'long',
 				year: 'numeric',
 			});
+		}
+
+		function monthRangeFromInput(month: string) {
+			const safeMonth = /^\d{4}-\d{2}$/.test(month) ? month : todayIso().slice(0, 7);
+			const [year, monthIndex] = safeMonth.split('-').map(Number);
+			return {
+				from: `${safeMonth}-01`,
+				to: isoFromDate(new Date(year, monthIndex, 0)),
+			};
+		}
+
+		function weekInputValue(date: string) {
+			const target = new Date(`${date}T12:00:00`);
+			const day = target.getDay() || 7;
+			target.setDate(target.getDate() + 4 - day);
+			const yearStart = new Date(target.getFullYear(), 0, 1);
+			const week = Math.ceil((((target.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+			return `${target.getFullYear()}-W${String(week).padStart(2, '0')}`;
+		}
+
+		function weekRangeFromInput(weekValue: string) {
+			const safeWeek = /^\d{4}-W\d{2}$/.test(weekValue) ? weekValue : weekInputValue(todayIso());
+			const [yearText, weekText] = safeWeek.split('-W');
+			const year = Number(yearText);
+			const week = Number(weekText);
+			const fourthJan = new Date(year, 0, 4);
+			const weekOneOffset = (fourthJan.getDay() + 6) % 7;
+			const monday = new Date(fourthJan);
+			monday.setDate(fourthJan.getDate() - weekOneOffset + (week - 1) * 7);
+			const from = isoFromDate(monday);
+			return {
+				from,
+				to: addDaysIso(from, 6),
+			};
 		}
 
 		function buildMissingPunchReport() {
@@ -3941,7 +4000,7 @@ import Layout from '../layouts/Layout.astro';
 				reportType: String(formData.get('reportType') || 'Resumen semanal'),
 				frequency: String(formData.get('frequency') || 'Semanal'),
 				sendDay: String(formData.get('sendDay') || 'Lunes'),
-				recipient: String(formData.get('recipient') || 'responsable@sourcingdemo.es').trim(),
+				recipient: String(formData.get('recipient') || 'responsable.vacaciones@empresa-demo.es').trim(),
 				format: String(formData.get('format') || 'CSV'),
 				active: true,
 				createdAt: new Date().toISOString(),
@@ -4323,29 +4382,35 @@ import Layout from '../layouts/Layout.astro';
 
 			const formData = new FormData(form);
 			const scope = String(formData.get('scope') || 'week') === 'month' ? 'month' : 'week';
-			const rows: Record<string, string | number>[] = buildExpectedHoursReport(scope).map((row) => {
-				const base = {
-					empleado: String(row[0]),
-					horas_fichadas: String(row[1]),
-					horas_esperadas: String(row[2]),
-					diferencia: String(row[3]),
-					incidencias: String(row[4]),
-				};
-
-				if (scope === 'month') {
-					return {
-						...base,
-						vacaciones_festivos: String(row[5] || ''),
-					};
-				}
-
-				return base;
-			});
+			const employeeId = String(formData.get('employeeId') || 'all');
+			const range = scope === 'week'
+				? weekRangeFromInput(String(formData.get('week') || weekInputValue(todayIso())))
+				: monthRangeFromInput(String(formData.get('month') || todayIso().slice(0, 7)));
+			const rows: Record<string, string | number>[] = buildExpectedHoursReport(scope, range.from, range.to, employeeId).map((row) => ({
+				empleado: String(row[0]),
+				departamento: String(row[1]),
+				periodo: String(row[2]),
+				horas_fichadas: String(row[3]),
+				horas_esperadas: String(row[4]),
+				diferencia: String(row[5]),
+				incidencias: String(row[6]),
+			}));
 
 			downloadCsv(scope === 'week' ? 'reporte-semanal-demo.csv' : 'reporte-mensual-demo.csv', rows);
-			addAudit('Exportación CSV', `Reporte ${scope === 'week' ? 'semanal' : 'mensual'} exportado.`);
+			addAudit('Exportación CSV', `Reporte ${scope === 'week' ? 'semanal' : 'mensual'} exportado (${formatDate(range.from)} - ${formatDate(range.to)}).`);
 			saveAll();
 			showToast('Reporte CSV descargado.');
+		}
+
+		function updateExportReportPeriodFields() {
+			const form = document.querySelector<HTMLFormElement>('#export-hours-report-form');
+			if (!form) return;
+
+			const scope = String(new FormData(form).get('scope') || 'week');
+			form.querySelectorAll<HTMLElement>('[data-period-field]').forEach((field) => {
+				const visible = field.dataset.periodField === scope;
+				field.classList.toggle('hidden', !visible);
+			});
 		}
 
 		function exportGeneric() {
@@ -4480,7 +4545,7 @@ import Layout from '../layouts/Layout.astro';
 							? 'ana.demo@fichajesimple.es'
 							: employee.id === 'miguel'
 								? 'miguel.demo@fichajesimple.es'
-								: `${employee.id}@sourcingdemo.es`,
+								: `${employee.id}@empresa-demo.es`,
 					department: employee.department,
 					role: 'empleado' as Role,
 					active: true,
@@ -4736,6 +4801,31 @@ import Layout from '../layouts/Layout.astro';
 				},
 			];
 
+			const yearlyHolidays = createYearlyDemoHolidays();
+			const yearlyVacations = createYearlyDemoVacations(yearlyHolidays);
+			const yearlyTimesheets = createYearlyDemoTimesheets(yearlyVacations, yearlyHolidays);
+			holidaysSeed.splice(0, holidaysSeed.length, ...yearlyHolidays);
+			vacationsSeed.splice(0, vacationsSeed.length, ...yearlyVacations);
+			timeEntriesSeed.splice(0, timeEntriesSeed.length, ...yearlyTimesheets.timeEntries);
+			incidentsSeed.splice(0, incidentsSeed.length, ...yearlyTimesheets.incidents);
+			auditSeed.splice(0, auditSeed.length, {
+				id: 'audit-init-2026-demo',
+				at: '2026-01-02T09:00:00.000Z',
+				user: 'Sistema demo',
+				action: 'Datos iniciales',
+				detail: 'Se cargaron datos ficticios anuales de Empresa Demo.',
+			});
+			scheduledReportsSeed.splice(0, scheduledReportsSeed.length, {
+				id: 'report-weekly-default',
+				reportType: 'Resumen semanal',
+				frequency: 'Semanal',
+				sendDay: 'Lunes',
+				recipient: 'responsable.vacaciones@empresa-demo.es',
+				format: 'CSV + PDF',
+				active: true,
+				createdAt: '2026-01-05T09:00:00.000Z',
+			});
+
 			return {
 				timeEntries: timeEntriesSeed,
 				vacations: vacationsSeed,
@@ -4745,6 +4835,235 @@ import Layout from '../layouts/Layout.astro';
 				users: usersSeed,
 				auditLog: auditSeed,
 			};
+		}
+
+		function createYearlyDemoHolidays(): Holiday[] {
+			return [
+				{ id: 'holiday-2026-01-01', date: '2026-01-01', name: 'Año Nuevo', center: 'Centro Principal' },
+				{ id: 'holiday-2026-01-06', date: '2026-01-06', name: 'Reyes', center: 'Centro Principal' },
+				{ id: 'holiday-2026-03-19', date: '2026-03-19', name: 'San José', center: 'Centro Principal' },
+				{ id: 'holiday-2026-05-01', date: '2026-05-01', name: 'Día del Trabajo', center: 'Centro Principal' },
+				{ id: 'holiday-2026-08-15', date: '2026-08-15', name: 'Asunción', center: 'Centro Principal' },
+				{ id: 'holiday-2026-10-09', date: '2026-10-09', name: 'Día de la Comunitat Valenciana', center: 'Centro Principal' },
+				{ id: 'holiday-2026-10-12', date: '2026-10-12', name: 'Fiesta Nacional', center: 'Centro Principal' },
+				{ id: 'holiday-2026-11-01', date: '2026-11-01', name: 'Todos los Santos', center: 'Centro Principal' },
+				{ id: 'holiday-2026-12-06', date: '2026-12-06', name: 'Constitución', center: 'Centro Principal' },
+				{ id: 'holiday-2026-12-08', date: '2026-12-08', name: 'Inmaculada', center: 'Centro Principal' },
+				{ id: 'holiday-2026-12-25', date: '2026-12-25', name: 'Navidad', center: 'Centro Principal' },
+			];
+		}
+
+		function demoSeedNumber(value: string) {
+			return Array.from(value).reduce((sum, char, index) => (sum + char.charCodeAt(0) * (index + 17)) % 100000, 0);
+		}
+
+		function demoClock(minutes: number) {
+			return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+		}
+
+		function demoTimestamp(date: string, time = '09:00') {
+			return `${date}T${time}:00.000Z`;
+		}
+
+		function demoBusinessDay(date: string, holidayDates: Set<string>) {
+			return !isWeekend(date) && !holidayDates.has(date);
+		}
+
+		function demoBusinessDaysBetween(from: string, to: string, holidayDates: Set<string>) {
+			return dateRange(from, to).filter((date) => demoBusinessDay(date, holidayDates)).length;
+		}
+
+		function createYearlyDemoVacations(holidaySeed: Holiday[]): VacationRequest[] {
+			const holidayDates = new Set(holidaySeed.map((holiday) => holiday.date));
+			const plans: Array<{
+				employeeId: string;
+				from: string;
+				to: string;
+				status: VacationStatus;
+				comment: string;
+				denialReason?: string;
+			}> = [
+				{ employeeId: 'ana', from: '2026-01-26', to: '2026-01-26', status: 'aprobada', comment: 'Asunto familiar' },
+				{ employeeId: 'ana', from: '2026-08-10', to: '2026-08-14', status: 'aprobada', comment: 'Vacaciones de verano' },
+				{ employeeId: 'laura', from: '2026-03-30', to: '2026-04-01', status: 'aprobada', comment: 'Descanso planificado' },
+				{ employeeId: 'laura', from: '2026-09-14', to: '2026-09-18', status: 'aprobada', comment: 'Vacaciones anuales' },
+				{ employeeId: 'sergio', from: '2026-05-04', to: '2026-05-05', status: 'aprobada', comment: 'Puente personal' },
+				{ employeeId: 'sergio', from: '2026-08-13', to: '2026-08-14', status: 'aprobada', comment: 'Descanso de verano' },
+				{ employeeId: 'miguel', from: '2026-02-16', to: '2026-02-20', status: 'aprobada', comment: 'Semana libre' },
+				{ employeeId: 'miguel', from: '2026-07-27', to: '2026-07-31', status: 'aprobada', comment: 'Vacaciones de verano' },
+				{ employeeId: 'carlos', from: '2026-03-16', to: '2026-03-16', status: 'aprobada', comment: 'Trámite personal' },
+				{ employeeId: 'carlos', from: '2026-09-07', to: '2026-09-11', status: 'aprobada', comment: 'Descanso anual' },
+				{ employeeId: 'elena', from: '2026-04-06', to: '2026-04-08', status: 'aprobada', comment: 'Vacaciones cortas' },
+				{ employeeId: 'elena', from: '2026-10-05', to: '2026-10-09', status: 'aprobada', comment: 'Semana de descanso' },
+				{ employeeId: 'javier', from: '2026-01-19', to: '2026-01-23', status: 'aprobada', comment: 'Vacaciones de invierno' },
+				{ employeeId: 'javier', from: '2026-08-24', to: '2026-08-28', status: 'aprobada', comment: 'Vacaciones familiares' },
+				{ employeeId: 'daniel', from: '2026-06-22', to: '2026-06-26', status: 'aprobada', comment: 'Semana de verano' },
+				{ employeeId: 'daniel', from: '2026-12-21', to: '2026-12-24', status: 'aprobada', comment: 'Navidad' },
+				{ employeeId: 'paula', from: '2026-02-09', to: '2026-02-10', status: 'aprobada', comment: 'Descanso corto' },
+				{ employeeId: 'paula', from: '2026-07-20', to: '2026-07-24', status: 'aprobada', comment: 'Vacaciones de verano' },
+				{ employeeId: 'ruben', from: '2026-04-20', to: '2026-04-24', status: 'aprobada', comment: 'Viaje familiar' },
+				{ employeeId: 'ruben', from: '2026-11-09', to: '2026-11-13', status: 'aprobada', comment: 'Descanso anual' },
+				{ employeeId: 'alberto', from: '2026-05-18', to: '2026-05-22', status: 'aprobada', comment: 'Semana libre' },
+				{ employeeId: 'alberto', from: '2026-12-28', to: '2026-12-31', status: 'aprobada', comment: 'Fin de año' },
+				{ employeeId: 'marta', from: '2026-03-02', to: '2026-03-06', status: 'aprobada', comment: 'Vacaciones aprobadas' },
+				{ employeeId: 'marta', from: '2026-08-03', to: '2026-08-07', status: 'aprobada', comment: 'Vacaciones de verano' },
+				{ employeeId: 'cristina', from: '2026-06-08', to: '2026-06-12', status: 'aprobada', comment: 'Semana libre' },
+				{ employeeId: 'cristina', from: '2026-09-21', to: '2026-09-23', status: 'aprobada', comment: 'Descanso pendiente' },
+				{ employeeId: 'noelia', from: '2026-01-12', to: '2026-01-16', status: 'aprobada', comment: 'Vacaciones de invierno' },
+				{ employeeId: 'noelia', from: '2026-10-19', to: '2026-10-23', status: 'aprobada', comment: 'Vacaciones anuales' },
+				{ employeeId: 'irene', from: '2026-02-23', to: '2026-02-27', status: 'aprobada', comment: 'Descanso anual' },
+				{ employeeId: 'irene', from: '2026-07-06', to: '2026-07-10', status: 'aprobada', comment: 'Vacaciones de verano' },
+				{ employeeId: 'beatriz', from: '2026-05-25', to: '2026-05-29', status: 'aprobada', comment: 'Semana libre' },
+				{ employeeId: 'beatriz', from: '2026-11-23', to: '2026-11-27', status: 'aprobada', comment: 'Descanso planificado' },
+				{ employeeId: 'raul', from: '2026-08-17', to: '2026-08-21', status: 'aprobada', comment: 'Vacaciones dirección' },
+				{ employeeId: 'raul', from: '2026-12-07', to: '2026-12-11', status: 'aprobada', comment: 'Puente de diciembre' },
+				{ employeeId: 'ana', from: '2026-08-31', to: '2026-09-02', status: 'pendiente', comment: 'Pendiente de confirmar calendario escolar' },
+				{ employeeId: 'laura', from: '2026-08-12', to: '2026-08-17', status: 'pendiente', comment: 'Revisar cobertura de Administración' },
+				{ employeeId: 'miguel', from: '2026-12-28', to: '2026-12-31', status: 'pendiente', comment: 'Vacaciones de fin de año' },
+				{ employeeId: 'carlos', from: '2026-10-06', to: '2026-10-09', status: 'pendiente', comment: 'Pendiente de cuadrar turnos' },
+				{ employeeId: 'paula', from: '2026-11-10', to: '2026-11-12', status: 'pendiente', comment: 'Viaje comercial familiar' },
+				{ employeeId: 'marta', from: '2026-09-21', to: '2026-09-25', status: 'pendiente', comment: 'Semana solicitada' },
+				{ employeeId: 'irene', from: '2026-12-07', to: '2026-12-11', status: 'pendiente', comment: 'Puente de diciembre' },
+				{ employeeId: 'noelia', from: '2026-07-20', to: '2026-07-21', status: 'pendiente', comment: 'Asunto personal' },
+				{ employeeId: 'sergio', from: '2026-09-30', to: '2026-10-02', status: 'denegada', comment: 'Solicitud en cierre mensual', denialReason: 'Periodo de cierre mensual' },
+				{ employeeId: 'elena', from: '2026-08-24', to: '2026-08-28', status: 'denegada', comment: 'Semana completa', denialReason: 'Solape con demasiadas ausencias en el departamento' },
+				{ employeeId: 'cristina', from: '2026-08-03', to: '2026-08-07', status: 'denegada', comment: 'Vacaciones de verano', denialReason: 'Cobertura insuficiente en Atención al cliente' },
+				{ employeeId: 'alberto', from: '2026-12-21', to: '2026-12-24', status: 'denegada', comment: 'Navidad', denialReason: 'Pendiente de reorganizar turnos' },
+				{ employeeId: 'beatriz', from: '2026-07-06', to: '2026-07-10', status: 'denegada', comment: 'Semana de julio', denialReason: 'Cobertura insuficiente en RRHH' },
+				{ employeeId: 'carlos', from: '2026-05-18', to: '2026-05-22', status: 'denegada', comment: 'Semana solicitada', denialReason: 'Solape con demasiadas ausencias en el departamento' },
+				{ employeeId: 'ana', from: '2026-04-13', to: '2026-04-14', status: 'cancelada', comment: 'Cancelada por cambio de planes' },
+				{ employeeId: 'miguel', from: '2026-10-13', to: '2026-10-16', status: 'cancelada', comment: 'Cancelada por necesidades del equipo' },
+				{ employeeId: 'paula', from: '2026-05-11', to: '2026-05-11', status: 'cancelada', comment: 'Cancelada por agenda comercial' },
+			];
+
+			return plans.map((request, index) => ({
+				id: `vac-${request.employeeId}-${request.from}-${request.status}`,
+				employeeId: request.employeeId,
+				from: request.from,
+				to: request.to,
+				days: demoBusinessDaysBetween(request.from, request.to, holidayDates),
+				status: request.status,
+				comment: request.comment,
+				denialReason: request.denialReason,
+				createdAt: demoTimestamp(addDaysIso(request.from, -28 - (index % 9))),
+				decidedAt: request.status === 'pendiente'
+					? undefined
+					: demoTimestamp(addDaysIso(request.from, -20 - (index % 6)), '11:30'),
+			}));
+		}
+
+		function createYearlyDemoTimesheets(vacationSeed: VacationRequest[], holidaySeed: Holiday[]) {
+			const holidayDates = new Set(holidaySeed.map((holiday) => holiday.date));
+			const approvedVacationDates = new Set<string>();
+			const timeEntriesSeed: TimeEntry[] = [];
+			const incidentsSeed: Incident[] = [];
+
+			vacationSeed
+				.filter((request) => request.status === 'aprobada')
+				.forEach((request) => {
+					dateRange(request.from, request.to)
+						.filter((date) => demoBusinessDay(date, holidayDates))
+						.forEach((date) => approvedVacationDates.add(`${request.employeeId}|${date}`));
+				});
+
+			EMPLOYEES.forEach((employee, employeeIndex) => {
+				dateRange(`${DEMO_YEAR}-01-01`, `${DEMO_YEAR}-12-31`).forEach((date, dayIndex) => {
+					if (!demoBusinessDay(date, holidayDates)) return;
+					if (approvedVacationDates.has(`${employee.id}|${date}`)) return;
+
+					const marker = demoSeedNumber(`${employee.id}-${date}-${employeeIndex}`);
+					const missedDay = marker % 211 === 0;
+					const missingEnd = !missedDay && marker % 239 === 0;
+					const openBreak = !missedDay && !missingEnd && marker % 293 === 0;
+					const earlyEnd = !missedDay && !missingEnd && !openBreak && marker % 317 === 0;
+					const pendingCorrection = !missedDay && !missingEnd && !openBreak && !earlyEnd && marker % 359 === 0;
+					const issue = missedDay || missingEnd || openBreak || earlyEnd || pendingCorrection;
+					const incidentReviewed = date < '2026-07-01' || marker % 5 === 0;
+					const incidentStatus: IncidentStatus = incidentReviewed ? 'revisada' : 'pendiente';
+
+					if (missedDay) {
+						incidentsSeed.push({
+							id: `incident-missed-${employee.id}-${date}`,
+							employeeId: employee.id,
+							date,
+							type: 'Sin fichaje',
+							detail: 'No consta entrada registrada en una jornada laborable.',
+							status: incidentStatus,
+							createdAt: demoTimestamp(date, '18:10'),
+							reviewedAt: incidentReviewed ? demoTimestamp(addDaysIso(date, 1), '10:15') : undefined,
+						});
+						return;
+					}
+
+					const startMinutes = 480 + ((marker + employeeIndex * 7) % 76);
+					const hasBreak = openBreak || marker % 6 !== 0;
+					const breakStartMinutes = 810 + ((marker + dayIndex) % 91);
+					const breakDuration = 20 + (marker % 56);
+					const breakEndMinutes = breakStartMinutes + breakDuration;
+					const breakKind: TimeBreak['kind'] = marker % 4 === 0 ? 'meal' : 'manual';
+					const breaks: TimeBreak[] = hasBreak
+						? [{
+							start: demoClock(breakStartMinutes),
+							end: openBreak ? undefined : demoClock(breakEndMinutes),
+							kind: breakKind,
+							label: breakKind === 'meal' ? 'Comida' : 'Descanso',
+						}]
+						: [];
+					const normalEndMinutes = 1005 + ((marker + employeeIndex * 13) % 106);
+					const earlyEndMinutes = startMinutes + 360 + (marker % 35);
+					const minimumEnd = hasBreak && !openBreak ? breakEndMinutes + 45 : startMinutes + 420;
+					const endMinutes = Math.max(earlyEnd ? earlyEndMinutes : normalEndMinutes, minimumEnd);
+					const end = missingEnd || openBreak ? undefined : demoClock(endMinutes);
+					const status: EntryStatus = issue ? 'incidencia' : 'correcto';
+
+					timeEntriesSeed.push({
+						id: `time-${employee.id}-${date}`,
+						employeeId: employee.id,
+						date,
+						start: demoClock(startMinutes),
+						breaks,
+						end,
+						status,
+						notes: missingEnd
+							? 'Salida pendiente de revisar'
+							: openBreak
+								? 'Pausa abierta pendiente de cierre'
+								: earlyEnd
+									? 'Jornada incompleta'
+									: pendingCorrection
+										? 'Corrección pendiente de validar'
+										: undefined,
+					});
+
+					if (!issue) return;
+
+					const incidentType = missingEnd
+						? 'Salida olvidada'
+						: openBreak
+							? 'Pausa abierta'
+							: earlyEnd
+								? 'Jornada incompleta'
+								: 'Corrección pendiente';
+					incidentsSeed.push({
+						id: `incident-${employee.id}-${date}`,
+						employeeId: employee.id,
+						date,
+						type: incidentType,
+						detail: missingEnd
+							? 'Jornada sin salida registrada.'
+							: openBreak
+								? `Pausa iniciada a las ${breaks[0]?.start || 'sin hora'} pendiente de cierre.`
+								: earlyEnd
+									? `Salida registrada antes de la jornada prevista: ${end}.`
+									: 'El empleado ha solicitado revisar este registro.',
+						status: incidentStatus,
+						createdAt: demoTimestamp(date, '18:20'),
+						reviewedAt: incidentReviewed ? demoTimestamp(addDaysIso(date, 1), '10:30') : undefined,
+					});
+				});
+			});
+
+			return { timeEntries: timeEntriesSeed, incidents: incidentsSeed };
 		}
 
 		function saveAll() {
