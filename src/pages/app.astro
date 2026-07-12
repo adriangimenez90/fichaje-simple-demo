@@ -47,7 +47,7 @@ import Layout from '../layouts/Layout.astro';
 		type EmployeeVacationFilter = 'all' | 'aprobada-futura' | 'disfrutada' | VacationStatus;
 		type IncidentStatus = 'pendiente' | 'revisada';
 		type TeamCalendarMode = 'month' | 'planning';
-		type AdminTodayFilter = 'all' | 'trabajando' | 'pausa' | 'sin-fichar';
+		type AdminTodayFilter = 'all' | 'trabajando' | 'pausa' | 'sin-fichar' | 'vacaciones';
 		type AdminIncidentFilter = IncidentStatus | 'all';
 
 		type Session = {
@@ -245,6 +245,7 @@ import Layout from '../layouts/Layout.astro';
 		let adminIncidentFilter: AdminIncidentFilter = 'pendiente';
 		let adminUserSearch = '';
 		let selectedAdminUserId = '';
+		let selectedTimesheetSummaryKey = '';
 
 		let timeEntries: TimeEntry[] = [];
 		let vacations: VacationRequest[] = [];
@@ -350,6 +351,7 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'delete-holiday') deleteHoliday(actionButton.dataset.id || '');
 				if (action === 'export-timesheets') exportTimesheets();
 				if (action === 'export-timesheets-simple') exportTimesheetsFromExportForm();
+				if (action === 'export-hours-report-simple') exportHoursReportFromForm();
 				if (action === 'simulate-pdf') showToast('PDF simulado listo. En producción se generaría un documento firmado.');
 				if (action === 'export-generic') exportGeneric();
 				if (action === 'toggle-user') toggleUser(actionButton.dataset.id || '');
@@ -358,6 +360,7 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'admin-today-filter') setAdminTodayFilter(actionButton.dataset.filter || 'all');
 				if (action === 'open-pending-incidents') openPendingIncidents();
 				if (action === 'select-admin-user') selectAdminUser(actionButton.dataset.id || '');
+				if (action === 'select-timesheet-summary') selectTimesheetSummary(actionButton.dataset.id || '');
 				if (action === 'admin-incident-filter') setAdminIncidentFilter(actionButton.dataset.filter || 'pendiente');
 				if (action === 'reset-demo') {
 					resetDemoData();
@@ -891,17 +894,13 @@ import Layout from '../layouts/Layout.astro';
 				employee,
 				entry: findEntry(employee.id, today),
 			}));
-			const workingNow = statuses.filter(({ entry }) => currentWorkStatus(entry).key === 'trabajando').length;
-			const inPause = statuses.filter(({ entry }) => currentWorkStatus(entry).key === 'pausa').length;
-			const missing = statuses.filter(({ entry }) => !entry?.start).length;
-			const pendingIncidentRows = incidents
-				.filter((incident) => incident.status === 'pendiente')
-				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-			const pendingIncidents = pendingIncidentRows.length;
-			const pendingVacations = vacations.filter((request) => request.status === 'pendiente').length;
+			const workingNow = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'trabajando').length;
+			const inPause = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'pausa').length;
+			const missing = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'sin-fichar').length;
+			const vacationToday = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'vacaciones').length;
 			const filteredStatuses = adminTodayFilter === 'all'
 				? statuses
-				: statuses.filter(({ entry }) => currentWorkStatus(entry).key === adminTodayFilter);
+				: statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === adminTodayFilter);
 			const filterLabel = adminTodayFilterLabel(adminTodayFilter);
 
 			return `
@@ -910,14 +909,8 @@ import Layout from '../layouts/Layout.astro';
 					${adminDashboardMetric('Trabajando', String(workingNow), 'trabajando', '', '', 'trabajando')}
 					${adminDashboardMetric('En descanso', String(inPause), 'pausa', '', '', 'pausa')}
 					${adminDashboardMetric('Sin fichar', String(missing), missing ? 'pendiente' : 'correcto', '', '', 'sin-fichar')}
-					${adminDashboardMetric('Incidencias', String(pendingIncidents), pendingIncidents ? 'incidencia' : 'correcto', '', '', '', 'open-pending-incidents')}
+					${adminDashboardMetric('De vacaciones hoy', String(vacationToday), 'vacaciones', '', '', 'vacaciones')}
 				</div>
-				${pendingVacations ? `
-					<section class="admin-notice top-gap">
-						<span>${pendingVacations} solicitud${pendingVacations === 1 ? '' : 'es'} de vacaciones pendiente${pendingVacations === 1 ? '' : 's'}.</span>
-						<button class="button button-tertiary button-small" type="button" data-view="vacaciones-admin">Ver vacaciones</button>
-					</section>
-				` : ''}
 				<section class="panel top-gap admin-primary-list">
 					<div class="panel-heading">
 						<div>
@@ -939,16 +932,19 @@ import Layout from '../layouts/Layout.astro';
 								</tr>
 							</thead>
 							<tbody>
-								${filteredStatuses.map(({ employee, entry }) => `
+								${filteredStatuses.map(({ employee, entry }) => {
+									const status = adminTodayStatus(employee, entry);
+									return `
 									<tr>
 										<td><strong>${employee.name}</strong></td>
-										<td>${pill(currentWorkStatus(entry).label, currentWorkStatus(entry).key)}</td>
+										<td>${pill(status.label, status.key)}</td>
 										<td>${entry?.start || 'Sin registrar'}</td>
 										<td>${entry?.end || 'Sin registrar'}</td>
 										<td>${formatBreaks(entry)}</td>
 										<td>${employee.department}</td>
 									</tr>
-								`).join('')}
+								`;
+								}).join('')}
 							</tbody>
 						</table>
 					</div>
@@ -963,15 +959,15 @@ import Layout from '../layouts/Layout.astro';
 		function renderUsers() {
 			const sortedUsers = users.slice().sort((a, b) => a.name.localeCompare(b.name));
 			const query = adminUserSearch.trim().toLowerCase();
-			const filteredUsers = sortedUsers.filter((user) => {
-				if (!query) return true;
-				return [user.name, user.email, user.department || '', roleLabel(user.role)]
-					.some((value) => value.toLowerCase().includes(query));
-			});
+			const filteredUsers = query
+				? sortedUsers.filter((user) =>
+					[user.name, user.email, user.department || '', roleLabel(user.role)]
+						.some((value) => value.toLowerCase().includes(query))
+				)
+				: [];
 			const selectedUser =
 				filteredUsers.find((user) => user.id === selectedAdminUserId) ||
-				filteredUsers[0] ||
-				sortedUsers[0];
+				filteredUsers[0];
 			if (selectedUser) selectedAdminUserId = selectedUser.id;
 
 			return `
@@ -1019,7 +1015,7 @@ import Layout from '../layouts/Layout.astro';
 							<button class="button button-secondary" type="submit">Buscar</button>
 						</form>
 						<div class="admin-user-picker top-gap">
-							${filteredUsers.length ? filteredUsers.map((user) => `
+							${query ? (filteredUsers.length ? filteredUsers.map((user) => `
 								<button
 									class="admin-user-option ${selectedUser?.id === user.id ? 'is-active' : ''}"
 									type="button"
@@ -1029,9 +1025,9 @@ import Layout from '../layouts/Layout.astro';
 									<strong>${escapeHtml(user.name)}</strong>
 									<span>${escapeHtml(user.department || 'General')} · ${roleLabel(user.role)}</span>
 								</button>
-							`).join('') : emptyState('No hay empleados con esa búsqueda.')}
+							`).join('') : emptyState('No hay empleados con esa búsqueda.')) : emptyState('Busca un empleado para editar su ficha.')}
 						</div>
-						${selectedUser ? renderAdminUserCard(selectedUser) : emptyState('Selecciona un empleado.')}
+						${selectedUser ? renderAdminUserCard(selectedUser) : ''}
 					</section>
 				</div>
 			`;
@@ -1076,12 +1072,168 @@ import Layout from '../layouts/Layout.astro';
 						</div>
 					</form>
 				</section>
-				${renderAdminIncidentsPanel('Incidencias pendientes')}
+				${renderAdminIncidentSummary()}
 				<section class="panel top-gap">
-					<h2>Registros encontrados</h2>
-					${renderTimesheetTable(rows)}
+					<div class="panel-heading">
+						<div>
+							<h2>Resumen por persona</h2>
+							<p class="helper-text">Selecciona una persona para revisar sus fichajes del periodo.</p>
+						</div>
+					</div>
+					${renderTimesheetSummary(rows)}
+				</section>
+				<section class="panel top-gap admin-timesheet-detail-panel">
+					${renderTimesheetDetail(rows)}
 				</section>
 			`;
+		}
+
+		function renderAdminIncidentSummary() {
+			const pendingRows = incidents
+				.filter((incident) => incident.status === 'pendiente')
+				.filter((incident) => timeFilters.employeeId === 'all' || incident.employeeId === timeFilters.employeeId)
+				.filter((incident) => dateInRange(incident.date, timeFilters.from, timeFilters.to));
+			const grouped = EMPLOYEES.map((employee) => {
+				const employeeRows = pendingRows.filter((incident) => incident.employeeId === employee.id);
+				return { employee, count: employeeRows.length, latest: employeeRows[0] };
+			}).filter((item) => item.count > 0);
+
+			return `
+				<section class="panel top-gap admin-incident-summary-panel">
+					<div class="panel-heading">
+						<div>
+							<h2>Incidencias pendientes</h2>
+							<p class="helper-text">Resumen por persona. El detalle aparece al abrir sus fichajes.</p>
+						</div>
+					</div>
+					${grouped.length ? `
+						<div class="admin-incident-summary-list">
+							${grouped.map(({ employee, count, latest }) => `
+								<article class="admin-incident-summary-card">
+									<div>
+										<strong>${employee.name}</strong>
+										<span>${employee.department}</span>
+									</div>
+									${pill(`${count} pendiente${count === 1 ? '' : 's'}`, 'incidencia')}
+									<small>${latest ? escapeHtml(latest.type) : 'Revisar fichajes'}</small>
+								</article>
+							`).join('')}
+						</div>
+					` : emptyState('No hay incidencias pendientes en este periodo.')}
+				</section>
+			`;
+		}
+
+		function renderTimesheetSummary(rows: TimeEntry[]) {
+			const grouped = timesheetSummaryRows(rows);
+			if (!grouped.length) return emptyState('No hay fichajes con esos filtros.');
+
+			return `
+				<div class="admin-timesheet-summary-list">
+					${grouped.map((item) => `
+						<button
+							class="admin-timesheet-summary-card ${selectedTimesheetSummaryKey === item.key ? 'is-active' : ''}"
+							type="button"
+							data-action="select-timesheet-summary"
+							data-id="${item.key}"
+						>
+							<div class="admin-timesheet-summary-head">
+								<span>${item.monthLabel}</span>
+								<strong>${item.employee.name}</strong>
+								<small>${item.employee.department}</small>
+							</div>
+							<div class="admin-card-grid">
+								${summaryRow('Días con fichaje', String(item.days))}
+								${summaryRow('Horas registradas', formatMinutes(item.worked))}
+								${summaryRow('Incidencias', String(item.incidents))}
+								${summaryRow('Estado', item.incidents ? 'Revisar' : 'Correcto')}
+							</div>
+						</button>
+					`).join('')}
+				</div>
+			`;
+		}
+
+		function renderTimesheetDetail(rows: TimeEntry[]) {
+			if (!selectedTimesheetSummaryKey) {
+				return emptyState('Selecciona una persona del resumen para ver sus registros.');
+			}
+
+			const selected = timesheetSummaryRows(rows).find((item) => item.key === selectedTimesheetSummaryKey);
+			if (!selected) return emptyState('Ese resumen ya no tiene registros con los filtros actuales.');
+
+			const detailRows = rows.filter(
+				(entry) => entry.employeeId === selected.employee.id && monthKey(entry.date) === selected.month,
+			);
+			const detailIncidents = incidents
+				.filter((incident) => incident.employeeId === selected.employee.id)
+				.filter((incident) => monthKey(incident.date) === selected.month)
+				.filter((incident) => dateInRange(incident.date, timeFilters.from, timeFilters.to))
+				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+			return `
+				<div class="panel-heading">
+					<div>
+						<h2>Detalle de ${selected.employee.name}</h2>
+						<p class="helper-text">${selected.monthLabel}. ${detailRows.length} registro${detailRows.length === 1 ? '' : 's'}.</p>
+					</div>
+				</div>
+				${renderTimesheetTable(detailRows)}
+				${detailIncidents.length ? `
+					<div class="top-gap">
+						<h3>Incidencias de este periodo</h3>
+						<div class="admin-incident-card-list is-visible">
+							${detailIncidents.map(renderAdminIncidentCard).join('')}
+						</div>
+					</div>
+				` : ''}
+			`;
+		}
+
+		function timesheetSummaryRows(rows: TimeEntry[]) {
+			const grouped = new Map<string, {
+				key: string;
+				employee: Employee;
+				month: string;
+				monthLabel: string;
+				days: number;
+				worked: number;
+				incidents: number;
+			}>();
+
+			rows.forEach((entry) => {
+				const employee = employeeById(entry.employeeId);
+				if (!employee) return;
+
+				const month = monthKey(entry.date);
+				const key = `${entry.employeeId}|${month}`;
+				const existing = grouped.get(key) || {
+					key,
+					employee,
+					month,
+					monthLabel: monthLabel(month),
+					days: 0,
+					worked: 0,
+					incidents: 0,
+				};
+				existing.days += 1;
+				existing.worked += workedMinutes(entry);
+				existing.incidents += entry.status === 'incidencia' ? 1 : 0;
+				grouped.set(key, existing);
+			});
+
+			grouped.forEach((item) => {
+				item.incidents += incidents.filter(
+					(incident) =>
+						incident.employeeId === item.employee.id &&
+						monthKey(incident.date) === item.month &&
+						dateInRange(incident.date, timeFilters.from, timeFilters.to),
+				).length;
+			});
+
+			return Array.from(grouped.values()).sort(
+				(a, b) => b.month.localeCompare(a.month) || a.employee.name.localeCompare(b.employee.name),
+			);
 		}
 
 		function renderAdminIncidents() {
@@ -1157,45 +1309,9 @@ import Layout from '../layouts/Layout.astro';
 
 		function renderAdminVacations() {
 			const visibleEmployees = adminVacationEmployees();
-			const monthRequests = adminVacationMonthRequests(visibleEmployees);
-			const approvedMonthRequests = monthRequests
-				.filter((request) => request.status === 'aprobada')
-				.sort((a, b) => a.from.localeCompare(b.from));
-			const pendingMonthRequests = monthRequests
-				.filter((request) => request.status === 'pendiente')
-				.sort((a, b) => a.from.localeCompare(b.from));
-			const deniedRequests = adminDeniedVacationRequests();
-
 			return `
 				${sectionTitle('Vacaciones', 'Quién está de vacaciones y cómo queda el equipo.')}
 				${renderAdminVacationCalendar(visibleEmployees)}
-				<details class="panel top-gap admin-vacation-secondary">
-					<summary>
-						<span>
-							<strong>Vacaciones aprobadas del mes</strong>
-							<small>${approvedMonthRequests.length} registro${approvedMonthRequests.length === 1 ? '' : 's'}</small>
-						</span>
-					</summary>
-					${renderAdminVacationCards(approvedMonthRequests, 'No hay vacaciones aprobadas con estos filtros.')}
-				</details>
-				<details class="panel top-gap admin-vacation-secondary">
-					<summary>
-						<span>
-							<strong>Solicitudes pendientes</strong>
-							<small>${pendingMonthRequests.length} pendiente${pendingMonthRequests.length === 1 ? '' : 's'} en el mes</small>
-						</span>
-					</summary>
-					${renderAdminVacationCards(pendingMonthRequests, 'No hay solicitudes pendientes con estos filtros.')}
-				</details>
-				<details class="panel top-gap admin-vacation-secondary">
-					<summary>
-						<span>
-							<strong>Solicitudes denegadas</strong>
-							<small>Listado secundario con motivo</small>
-						</span>
-					</summary>
-					${renderAdminDeniedVacationCards(deniedRequests)}
-				</details>
 			`;
 		}
 
@@ -1205,9 +1321,6 @@ import Layout from '../layouts/Layout.astro';
 				? EMPLOYEES
 				: departmentEmployees(adminVacationFilters.department);
 			const monthLabel = adminVacationCursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-			const monthRequests = adminVacationMonthRequests(employees);
-			const approvedCount = monthRequests.filter((request) => request.status === 'aprobada').length;
-			const holidayCount = adminVacationMonthDateRange().filter((date) => holidays.some((holiday) => holiday.date === date)).length;
 
 			return `
 				<section class="panel admin-vacation-calendar-panel">
@@ -1241,11 +1354,6 @@ import Layout from '../layouts/Layout.astro';
 					</div>
 					${adminVacationLegend()}
 					${renderAdminVacationMonthCalendar(employees)}
-					<div class="team-calendar-meta admin-vacation-meta">
-						${metricCard('Personas visibles', String(employees.length), 'correcto')}
-						${metricCard('Aprobadas del mes', String(approvedCount), 'vacaciones')}
-						${metricCard('Festivos del mes', String(holidayCount), holidayCount ? 'festivo' : 'correcto')}
-					</div>
 				</section>
 			`;
 		}
@@ -2185,6 +2293,26 @@ import Layout from '../layouts/Layout.astro';
 						</div>
 					</form>
 				</section>
+				<section class="panel top-gap export-primary-panel">
+					<div class="panel-heading">
+						<div>
+							<h2>Exportar reporte CSV</h2>
+							<p class="helper-text">Descarga un resumen semanal o mensual de horas por empleado.</p>
+						</div>
+					</div>
+					<form id="export-hours-report-form" class="form-grid export-timesheet-form export-report-form">
+						<label class="field">
+							<span>Tipo de reporte</span>
+							<select name="scope">
+								<option value="week">Reporte semanal</option>
+								<option value="month">Reporte mensual</option>
+							</select>
+						</label>
+						<div class="table-actions">
+							<button class="button button-primary" type="button" data-action="export-hours-report-simple">Exportar reporte CSV</button>
+						</div>
+					</form>
+				</section>
 				${renderExportHoursReports()}
 			`;
 		}
@@ -2379,7 +2507,7 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderAdminTodayCard(employee: Employee, entry?: TimeEntry) {
-			const status = currentWorkStatus(entry);
+			const status = adminTodayStatus(employee, entry);
 			return `
 				<article class="admin-today-card">
 					<div class="admin-card-head">
@@ -2460,6 +2588,7 @@ import Layout from '../layouts/Layout.astro';
 			if (filter === 'trabajando') return 'trabajando ahora';
 			if (filter === 'pausa') return 'en descanso';
 			if (filter === 'sin-fichar') return 'sin fichar hoy';
+			if (filter === 'vacaciones') return 'de vacaciones hoy';
 			return 'todos';
 		}
 
@@ -3493,6 +3622,18 @@ import Layout from '../layouts/Layout.astro';
 			return `${sign}${formatMinutes(Math.abs(minutes))}`;
 		}
 
+		function monthKey(date: string) {
+			return date.slice(0, 7);
+		}
+
+		function monthLabel(month: string) {
+			const [year, monthIndex] = month.split('-').map(Number);
+			return new Date(year, monthIndex - 1, 1).toLocaleDateString('es-ES', {
+				month: 'long',
+				year: 'numeric',
+			});
+		}
+
 		function buildMissingPunchReport() {
 			const today = todayIso();
 			return EMPLOYEES.filter((employee) => !findEntry(employee.id, today)?.start).map((employee) => [
@@ -3896,12 +4037,13 @@ import Layout from '../layouts/Layout.astro';
 				to: String(formData.get('to') || todayIso()),
 				status: String(formData.get('status') || 'all'),
 			};
+			selectedTimesheetSummaryKey = '';
 			showToast('Filtros aplicados.');
 			renderPage();
 		}
 
 		function setAdminTodayFilter(filter: string) {
-			adminTodayFilter = ['all', 'trabajando', 'pausa', 'sin-fichar'].includes(filter)
+			adminTodayFilter = ['all', 'trabajando', 'pausa', 'sin-fichar', 'vacaciones'].includes(filter)
 				? (filter as AdminTodayFilter)
 				: 'all';
 			renderPage();
@@ -3914,12 +4056,18 @@ import Layout from '../layouts/Layout.astro';
 				status: 'incidencia',
 			};
 			adminIncidentFilter = 'pendiente';
+			selectedTimesheetSummaryKey = '';
 			renderNav();
 			renderPage();
 		}
 
 		function selectAdminUser(id: string) {
 			selectedAdminUserId = id;
+			renderPage();
+		}
+
+		function selectTimesheetSummary(id: string) {
+			selectedTimesheetSummaryKey = id;
 			renderPage();
 		}
 
@@ -4167,6 +4315,37 @@ import Layout from '../layouts/Layout.astro';
 			addAudit('Exportación CSV', `Fichajes exportados (${rows.length} registros).`);
 			saveAll();
 			showToast('CSV de fichajes descargado.');
+		}
+
+		function exportHoursReportFromForm() {
+			const form = document.querySelector<HTMLFormElement>('#export-hours-report-form');
+			if (!form) return;
+
+			const formData = new FormData(form);
+			const scope = String(formData.get('scope') || 'week') === 'month' ? 'month' : 'week';
+			const rows: Record<string, string | number>[] = buildExpectedHoursReport(scope).map((row) => {
+				const base = {
+					empleado: String(row[0]),
+					horas_fichadas: String(row[1]),
+					horas_esperadas: String(row[2]),
+					diferencia: String(row[3]),
+					incidencias: String(row[4]),
+				};
+
+				if (scope === 'month') {
+					return {
+						...base,
+						vacaciones_festivos: String(row[5] || ''),
+					};
+				}
+
+				return base;
+			});
+
+			downloadCsv(scope === 'week' ? 'reporte-semanal-demo.csv' : 'reporte-mensual-demo.csv', rows);
+			addAudit('Exportación CSV', `Reporte ${scope === 'week' ? 'semanal' : 'mensual'} exportado.`);
+			saveAll();
+			showToast('Reporte CSV descargado.');
 		}
 
 		function exportGeneric() {
@@ -4675,6 +4854,28 @@ import Layout from '../layouts/Layout.astro';
 			if (entry.end) return { label: 'Jornada finalizada', key: 'correcto' };
 			if (activeBreak(entry)) return { label: 'En descanso', key: 'pausa' };
 			return { label: 'Trabajando', key: 'trabajando' };
+		}
+
+		function adminTodayStatus(employee: Employee, entry?: TimeEntry) {
+			if (approvedVacationForDate(employee.id, todayIso())) {
+				return { label: 'De vacaciones', key: 'vacaciones' };
+			}
+
+			const status = currentWorkStatus(entry);
+			if (status.key === 'sin-fichaje') return { label: 'Sin fichar', key: 'sin-fichar' };
+			return status;
+		}
+
+		function approvedVacationForDate(employeeId: string, date: string) {
+			return (
+				isBusinessDay(date) &&
+				vacations.some(
+					(request) =>
+						request.employeeId === employeeId &&
+						request.status === 'aprobada' &&
+						isDateWithin(date, request.from, request.to),
+				)
+			);
 		}
 
 		function punchActionLabel(entry?: TimeEntry) {

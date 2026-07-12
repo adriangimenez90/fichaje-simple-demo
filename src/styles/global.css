@@ -949,6 +949,7 @@ textarea:focus-visible {
 }
 
 .status-sin-fichaje,
+.status-sin-fichar,
 .status-fin-de-semana,
 .status-inactivo {
 	background: #eef2f2;
@@ -1279,7 +1280,9 @@ textarea:focus-visible {
 .admin-users-layout,
 .admin-today-card-list,
 .admin-timesheet-card-list,
-.admin-incident-card-list {
+.admin-incident-card-list,
+.admin-timesheet-summary-list,
+.admin-incident-summary-list {
 	display: grid;
 	gap: 12px;
 }
@@ -1326,6 +1329,7 @@ textarea:focus-visible {
 
 .admin-user-option span,
 .admin-card-head span,
+.admin-incident-summary-card span,
 .admin-incident-card p {
 	color: var(--muted);
 	font-size: 0.86rem;
@@ -1334,7 +1338,9 @@ textarea:focus-visible {
 .admin-user-card,
 .admin-today-card,
 .admin-timesheet-card,
-.admin-incident-card {
+.admin-incident-card,
+.admin-timesheet-summary-card,
+.admin-incident-summary-card {
 	display: grid;
 	gap: 12px;
 	border: 1px solid var(--line);
@@ -1342,6 +1348,46 @@ textarea:focus-visible {
 	background: #ffffff;
 	padding: 14px;
 	box-shadow: 0 4px 14px rgba(23, 33, 31, 0.04);
+}
+
+.admin-timesheet-summary-list,
+.admin-incident-summary-list {
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.admin-timesheet-summary-card {
+	width: 100%;
+	color: var(--text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.admin-timesheet-summary-card:hover,
+.admin-timesheet-summary-card.is-active {
+	border-color: var(--primary);
+	background: var(--primary-soft);
+	box-shadow: 0 8px 22px rgba(15, 118, 110, 0.1);
+}
+
+.admin-timesheet-summary-head {
+	display: grid;
+	gap: 2px;
+}
+
+.admin-timesheet-summary-head span,
+.admin-timesheet-summary-head small,
+.admin-incident-summary-card small {
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+
+.admin-incident-summary-card {
+	align-content: start;
+}
+
+.admin-incident-card-list.is-visible {
+	display: grid;
 }
 
 .admin-card-head {
@@ -3566,6 +3612,11 @@ tr:last-child td {
 	}
 
 	.admin-user-search {
+		grid-template-columns: 1fr;
+	}
+
+	.admin-timesheet-summary-list,
+	.admin-incident-summary-list {
 		grid-template-columns: 1fr;
 	}
 
