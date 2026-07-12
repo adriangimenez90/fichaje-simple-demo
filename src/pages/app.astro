@@ -18,8 +18,8 @@ import Layout from '../layouts/Layout.astro';
 
 			<div class="header-actions">
 				<div id="user-chip" class="user-chip"></div>
-				<button id="reset-demo" class="button button-tertiary button-small reset-demo-button" type="button">
-					Reset
+				<button id="reset-demo" class="button button-tertiary button-small reset-demo-button" type="button" title="Restablece los datos demo 2026 y borra cambios locales del navegador">
+					Demo 2026
 				</button>
 				<button id="logout" class="button button-secondary button-small" type="button">
 					Cerrar sesión
@@ -315,7 +315,7 @@ import Layout from '../layouts/Layout.astro';
 
 			document.querySelector('#reset-demo')?.addEventListener('click', () => {
 				resetDemoData();
-				showToast('Demo restablecida con datos ficticios iniciales.');
+				showToast('Datos demo 2026 restablecidos. Se han borrado los cambios locales del navegador.');
 			});
 
 			document.addEventListener('click', (event) => {
@@ -375,7 +375,7 @@ import Layout from '../layouts/Layout.astro';
 				if (action === 'admin-incident-filter') setAdminIncidentFilter(actionButton.dataset.filter || 'pendiente');
 				if (action === 'reset-demo') {
 					resetDemoData();
-					showToast('Demo restablecida con datos ficticios iniciales.');
+					showToast('Datos demo 2026 restablecidos. Se han borrado los cambios locales del navegador.');
 				}
 			});
 
@@ -1009,7 +1009,7 @@ import Layout from '../layouts/Layout.astro';
 								<select name="role">
 									<option value="empleado">Usuario normal</option>
 									<option value="validador_vacaciones">Responsable de vacaciones</option>
-									<option value="admin_global">Administrador global</option>
+									<option value="admin_global">Administrador</option>
 								</select>
 							</label>
 							<button class="button button-primary" type="submit">Crear usuario</button>
@@ -2410,16 +2410,17 @@ import Layout from '../layouts/Layout.astro';
 						</div>
 					</section>
 					<section class="panel">
-						<h2>Restablecer demo</h2>
+						<h2>Restablecer datos demo 2026</h2>
 						<p class="helper-text">
 							La sesión, fichajes, vacaciones, incidencias y auditoría se guardan únicamente en este navegador.
+							Al restablecer se borran los cambios locales y vuelve el dataset anual 2026.
 						</p>
 						<div class="settings-reset-card">
 							<div>
 								<strong>Volver a datos iniciales</strong>
-								<span>Útil para enseñar la demo desde cero después de probar acciones.</span>
+								<span>Borra los cambios locales del navegador y deja la demo lista para enseñarla desde cero.</span>
 							</div>
-							<button class="button button-tertiary" type="button" data-action="reset-demo">Restablecer demo</button>
+							<button class="button button-tertiary" type="button" data-action="reset-demo">Restablecer datos demo 2026</button>
 						</div>
 					</section>
 				</div>
@@ -2474,7 +2475,7 @@ import Layout from '../layouts/Layout.astro';
 					</div>
 					<div class="demo-try-grid">
 						<div><strong>1. Fichaje</strong><span>Entrada, descansos, salida y ajustes manuales.</span></div>
-						<div><strong>2. Vacaciones</strong><span>Solicitud, validación y tabla de coincidencias por día.</span></div>
+						<div><strong>2. Vacaciones</strong><span>Solicitud, revisión y tabla de coincidencias por día.</span></div>
 						<div><strong>3. Informes</strong><span>Resumen semanal/mensual, incidencias y programación simulada.</span></div>
 					</div>
 				</section>
@@ -4323,13 +4324,13 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			const rows = filteredTimeEntries().map((entry) => ({
-				fecha: entry.date,
-				empleado: employeeName(entry.employeeId),
-				entrada: entry.start || '',
-				descansos: formatBreaks(entry),
-				salida: entry.end || '',
-				tiempo: formatMinutes(workedMinutes(entry)),
-				estado: entry.status,
+				Fecha: formatDate(entry.date),
+				Empleado: employeeName(entry.employeeId),
+				Entrada: entry.start || '',
+				Descansos: formatBreaks(entry),
+				Salida: entry.end || '',
+				'Tiempo trabajado': formatMinutes(workedMinutes(entry)),
+				Estado: entry.status,
 			}));
 
 			downloadCsv('fichajes-demo.csv', rows);
@@ -4361,13 +4362,13 @@ import Layout from '../layouts/Layout.astro';
 				.filter((entry) => employeeId === 'all' || entry.employeeId === employeeId)
 				.filter((entry) => dateInRange(entry.date, from, to))
 				.map((entry) => ({
-					fecha: entry.date,
-					empleado: employeeName(entry.employeeId),
-					entrada: entry.start || '',
-					descansos: formatBreaks(entry),
-					salida: entry.end || '',
-					tiempo: formatMinutes(workedMinutes(entry)),
-					estado: entry.status,
+					Fecha: formatDate(entry.date),
+					Empleado: employeeName(entry.employeeId),
+					Entrada: entry.start || '',
+					Descansos: formatBreaks(entry),
+					Salida: entry.end || '',
+					'Tiempo trabajado': formatMinutes(workedMinutes(entry)),
+					Estado: entry.status,
 				}));
 
 			downloadCsv('fichajes-demo.csv', rows);
@@ -4387,13 +4388,13 @@ import Layout from '../layouts/Layout.astro';
 				? weekRangeFromInput(String(formData.get('week') || weekInputValue(todayIso())))
 				: monthRangeFromInput(String(formData.get('month') || todayIso().slice(0, 7)));
 			const rows: Record<string, string | number>[] = buildExpectedHoursReport(scope, range.from, range.to, employeeId).map((row) => ({
-				empleado: String(row[0]),
-				departamento: String(row[1]),
-				periodo: String(row[2]),
-				horas_fichadas: String(row[3]),
-				horas_esperadas: String(row[4]),
-				diferencia: String(row[5]),
-				incidencias: String(row[6]),
+				Empleado: String(row[0]),
+				Departamento: String(row[1]),
+				Periodo: String(row[2]),
+				'Horas fichadas': String(row[3]),
+				'Horas esperadas': String(row[4]),
+				Diferencia: String(row[5]),
+				Incidencias: String(row[6]),
 			}));
 
 			downloadCsv(scope === 'week' ? 'reporte-semanal-demo.csv' : 'reporte-mensual-demo.csv', rows);
@@ -4429,11 +4430,11 @@ import Layout from '../layouts/Layout.astro';
 					.filter((entry) => dateInRange(entry.date, from, to))
 					.filter((entry) => employeeId === 'all' || entry.employeeId === employeeId)
 					.map((entry) => ({
-						fecha: entry.date,
-						empleado: employeeName(entry.employeeId),
-						entrada: entry.start || '',
-						salida: entry.end || '',
-						estado: entry.status,
+						Fecha: formatDate(entry.date),
+						Empleado: employeeName(entry.employeeId),
+						Entrada: entry.start || '',
+						Salida: entry.end || '',
+						Estado: entry.status,
 					}));
 			}
 
@@ -4442,11 +4443,11 @@ import Layout from '../layouts/Layout.astro';
 					.filter((request) => dateInRange(request.from, from, to))
 					.filter((request) => employeeId === 'all' || request.employeeId === employeeId)
 					.map((request) => ({
-						desde: request.from,
-						hasta: request.to,
-						empleado: employeeName(request.employeeId),
-						dias: request.days,
-						estado: request.status,
+						Desde: formatDate(request.from),
+						Hasta: formatDate(request.to),
+						Empleado: employeeName(request.employeeId),
+						'Días laborables': request.days,
+						Estado: request.status,
 					}));
 			}
 
@@ -4455,11 +4456,11 @@ import Layout from '../layouts/Layout.astro';
 					.filter((incident) => dateInRange(incident.date, from, to))
 					.filter((incident) => employeeId === 'all' || incident.employeeId === employeeId)
 					.map((incident) => ({
-						fecha: incident.date,
-						empleado: employeeName(incident.employeeId),
-						tipo: incident.type,
-						estado: incident.status,
-						detalle: incident.detail,
+						Fecha: formatDate(incident.date),
+						Empleado: employeeName(incident.employeeId),
+						Tipo: incident.type,
+						Estado: incident.status,
+						Detalle: incident.detail,
 					}));
 			}
 
@@ -4467,10 +4468,10 @@ import Layout from '../layouts/Layout.astro';
 				rows = auditLog
 					.filter((entry) => dateInRange(entry.at.slice(0, 10), from, to))
 					.map((entry) => ({
-						fecha: formatDateTime(entry.at),
-						usuario: entry.user,
-						accion: entry.action,
-						detalle: entry.detail,
+						Fecha: formatDateTime(entry.at),
+						Usuario: entry.user,
+						Acción: entry.action,
+						Detalle: entry.detail,
 					}));
 			}
 
@@ -4513,7 +4514,7 @@ import Layout from '../layouts/Layout.astro';
 			scheduledReports = defaults.scheduledReports;
 			users = defaults.users;
 			auditLog = defaults.auditLog;
-			addAudit('Demo restablecida', 'Se restauraron los datos ficticios iniciales.');
+			addAudit('Datos demo 2026 restablecidos', 'Se borraron los cambios locales y se restauró el dataset anual ficticio.');
 			saveAll();
 			renderPage();
 		}
@@ -4794,7 +4795,7 @@ import Layout from '../layouts/Layout.astro';
 					reportType: 'Resumen semanal',
 					frequency: 'Semanal',
 					sendDay: 'Lunes',
-					recipient: 'responsable@sourcingdemo.es',
+					recipient: 'responsable.vacaciones@empresa-demo.es',
 					format: 'CSV + PDF',
 					active: true,
 					createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
@@ -5124,14 +5125,14 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function roleLabel(role: Role) {
-			if (role === 'admin_global') return 'Administrador global';
+			if (role === 'admin_global') return 'Administrador';
 			if (role === 'validador_vacaciones') return 'Responsable de vacaciones';
 			return 'Usuario normal';
 		}
 
 		function roleHint(role: Role) {
 			if (role === 'admin_global') return 'Gestión diaria de empleados, fichajes, vacaciones y exportaciones';
-			if (role === 'validador_vacaciones') return 'Validación de vacaciones, calendario del equipo y festivos';
+			if (role === 'validador_vacaciones') return 'Revisión de vacaciones, calendario del equipo y festivos';
 			return 'Fichaje personal, vacaciones y calendario';
 		}
 
@@ -5478,8 +5479,8 @@ import Layout from '../layouts/Layout.astro';
 			const csv = [
 				headers.join(';'),
 				...body.map((row) => headers.map((header) => csvValue(row[header])).join(';')),
-			].join('\n');
-			const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+			].join('\r\n');
+			const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
 			const link = document.createElement('a');
 			link.href = URL.createObjectURL(blob);
 			link.download = filename;
