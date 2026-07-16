@@ -101,6 +101,16 @@ export type ScheduledReport = {
 	createdAt: string;
 };
 
+export type DemoData = {
+	timeEntries: TimeEntry[];
+	vacations: VacationRequest[];
+	incidents: Incident[];
+	holidays: Holiday[];
+	scheduledReports: ScheduledReport[];
+	users: AppUser[];
+	auditLog: AuditEntry[];
+};
+
 export type NavigationView = {
 	id: string;
 	label: string;
