@@ -41,182 +41,36 @@ import Layout from '../layouts/Layout.astro';
 	<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 	<script>
-		type Role = 'admin_global' | 'validador_vacaciones' | 'empleado';
-		type EntryStatus = 'correcto' | 'incidencia' | 'pendiente' | 'sin fichaje';
-		type VacationStatus = 'pendiente' | 'aprobada' | 'denegada' | 'cancelada';
-		type EmployeeVacationFilter = 'all' | 'aprobada-futura' | 'disfrutada' | VacationStatus;
-		type IncidentStatus = 'pendiente' | 'revisada';
-		type TeamCalendarMode = 'month' | 'planning';
-		type AdminTodayFilter = 'all' | 'trabajando' | 'pausa' | 'sin-fichar' | 'vacaciones';
-		type AdminIncidentFilter = IncidentStatus | 'all';
-
-		type Session = {
-			id: string;
-			email: string;
-			name: string;
-			role: Role;
-			department?: string;
-			employeeId?: string;
-		};
-
-		type AppUser = {
-			id: string;
-			name: string;
-			email: string;
-			department: string;
-			role: Role;
-			active: boolean;
-			employeeId?: string;
-		};
-
-		type Employee = {
-			id: string;
-			name: string;
-			department: string;
-			vacationDays: number;
-		};
-
-		type TimeBreak = {
-			start: string;
-			end?: string;
-			kind?: 'manual' | 'quick' | 'meal';
-			label?: string;
-		};
-
-		type TimeEntry = {
-			id: string;
-			employeeId: string;
-			date: string;
-			start?: string;
-			breaks: TimeBreak[];
-			end?: string;
-			status: EntryStatus;
-			notes?: string;
-		};
-
-		type VacationRequest = {
-			id: string;
-			employeeId: string;
-			from: string;
-			to: string;
-			days: number;
-			status: VacationStatus;
-			comment?: string;
-			denialReason?: string;
-			createdAt: string;
-			decidedAt?: string;
-		};
-
-		type Incident = {
-			id: string;
-			employeeId: string;
-			date: string;
-			type: string;
-			detail: string;
-			status: IncidentStatus;
-			createdAt: string;
-			reviewedAt?: string;
-		};
-
-		type Holiday = {
-			id: string;
-			date: string;
-			name: string;
-			center: string;
-		};
-
-		type AuditEntry = {
-			id: string;
-			at: string;
-			user: string;
-			action: string;
-			detail: string;
-		};
-
-		type ScheduledReport = {
-			id: string;
-			reportType: string;
-			frequency: string;
-			sendDay: string;
-			recipient: string;
-			format: string;
-			active: boolean;
-			createdAt: string;
-		};
-
-		const KEYS = {
-			demoVersion: 'fs_demoVersion',
-			session: 'fs_session',
-			timeEntries: 'fs_timeEntries',
-			vacations: 'fs_vacations',
-			incidents: 'fs_incidents',
-			holidays: 'fs_holidays',
-			scheduledReports: 'fs_scheduledReports',
-			users: 'fs_users',
-			audit: 'fs_audit',
-		} as const;
-
-		const DEMO_YEAR = 2026;
-		const DEMO_VERSION = '2026-empresa-17-v1';
-
-		const EMPLOYEES: Employee[] = [
-			{ id: 'ana', name: 'Ana Martínez', department: 'Administración', vacationDays: 22 },
-			{ id: 'laura', name: 'Laura Sánchez', department: 'Administración', vacationDays: 22 },
-			{ id: 'sergio', name: 'Sergio Navarro', department: 'Administración', vacationDays: 22 },
-			{ id: 'miguel', name: 'Miguel López', department: 'Operaciones', vacationDays: 22 },
-			{ id: 'carlos', name: 'Carlos Gómez', department: 'Operaciones', vacationDays: 22 },
-			{ id: 'elena', name: 'Elena Torres', department: 'Operaciones', vacationDays: 22 },
-			{ id: 'javier', name: 'Javier Romero', department: 'Operaciones', vacationDays: 22 },
-			{ id: 'daniel', name: 'Daniel Ortega', department: 'Operaciones', vacationDays: 22 },
-			{ id: 'paula', name: 'Paula Molina', department: 'Comercial', vacationDays: 22 },
-			{ id: 'ruben', name: 'Rubén Castillo', department: 'Comercial', vacationDays: 22 },
-			{ id: 'alberto', name: 'Alberto Campos', department: 'Comercial', vacationDays: 22 },
-			{ id: 'marta', name: 'Marta Ruiz', department: 'Atención al cliente', vacationDays: 22 },
-			{ id: 'cristina', name: 'Cristina Vidal', department: 'Atención al cliente', vacationDays: 22 },
-			{ id: 'noelia', name: 'Noelia Ferrer', department: 'Atención al cliente', vacationDays: 22 },
-			{ id: 'irene', name: 'Irene Gil', department: 'RRHH', vacationDays: 22 },
-			{ id: 'beatriz', name: 'Beatriz León', department: 'RRHH', vacationDays: 22 },
-			{ id: 'raul', name: 'Raúl Moreno', department: 'Dirección', vacationDays: 22 },
-		];
-
-		const EMPLOYEE_VIEWS = [
-			{ id: 'fichar', label: 'Fichar', hint: 'Entrada, descanso y salida' },
-			{ id: 'vacaciones', label: 'Vacaciones', hint: 'Saldo y solicitudes' },
-			{ id: 'calendario', label: 'Calendario', hint: 'Registros del mes' },
-		];
-
-		const VALIDATOR_VIEWS = [
-			{ id: 'solicitudes', label: 'Solicitudes', hint: 'Aprobar o denegar' },
-			{ id: 'calendario-equipo', label: 'Calendario equipo', hint: 'Vacaciones del equipo' },
-			{ id: 'festivos', label: 'Festivos', hint: 'Calendario local' },
-		];
-
-		const ADMIN_VIEWS = [
-			{ id: 'dashboard', label: 'Inicio', hint: 'Resumen de hoy' },
-			{ id: 'usuarios', label: 'Empleados', hint: 'Personas y roles' },
-			{ id: 'fichajes', label: 'Fichajes', hint: 'Registros e incidencias' },
-			{ id: 'vacaciones-admin', label: 'Vacaciones', hint: 'Solicitudes y planning' },
-			{ id: 'exportaciones', label: 'Exportar', hint: 'Informes y descargas' },
-			{ id: 'configuracion', label: 'Ajustes', hint: 'Festivos y demo' },
-		];
-
-		const STATUS_LABELS: Record<string, string> = {
-			correcto: 'Correcto',
-			incidencia: 'Incidencia',
-			pendiente: 'Pendiente',
-			'sin fichaje': 'Sin fichaje',
-			festivo: 'Festivo',
-			vacaciones: 'Vacaciones',
-			'fin de semana': 'Fin de semana',
-			aprobada: 'Aprobada',
-			denegada: 'Denegada',
-			cancelada: 'Cancelada',
-			revisada: 'Revisada',
-			trabajando: 'Trabajando',
-			pausa: 'En descanso',
-			activo: 'Activo',
-			inactivo: 'Inactivo',
-		};
+		import type {
+			AdminIncidentFilter,
+			AdminTodayFilter,
+			AppUser,
+			AuditEntry,
+			Employee,
+			EmployeeVacationFilter,
+			EntryStatus,
+			Holiday,
+			Incident,
+			IncidentStatus,
+			Role,
+			ScheduledReport,
+			Session,
+			TeamCalendarMode,
+			TimeBreak,
+			TimeEntry,
+			VacationRequest,
+			VacationStatus,
+		} from '../lib/types';
+		import {
+			ADMIN_VIEWS,
+			DEMO_VERSION,
+			DEMO_YEAR,
+			EMPLOYEE_VIEWS,
+			EMPLOYEES,
+			KEYS,
+			STATUS_LABELS,
+			VALIDATOR_VIEWS,
+		} from '../config/app';
 
 		let session: Session;
 		let activeView = 'inicio';
