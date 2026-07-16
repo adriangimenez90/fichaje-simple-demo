@@ -111,6 +111,22 @@ export type DemoData = {
 	auditLog: AuditEntry[];
 };
 
+export type VacationBalance = {
+	available: number;
+	used: number;
+	enjoyed: number;
+	futureApproved: number;
+	pending: number;
+	denied: number;
+	canceled: number;
+};
+
+export type VacationConflict = {
+	request: VacationRequest;
+	from: string;
+	to: string;
+};
+
 export type NavigationView = {
 	id: string;
 	label: string;

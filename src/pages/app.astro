@@ -83,12 +83,9 @@ import Layout from '../layouts/Layout.astro';
 			isDateWithin,
 			isWeekend,
 			isoFromDate,
-			maxDate,
-			minDate,
 			monthKey,
 			monthLabel,
 			monthRangeFromInput,
-			rangesOverlap,
 			startOfMonthIso,
 			startOfWeekIso,
 			todayIso,
@@ -122,6 +119,20 @@ import Layout from '../layouts/Layout.astro';
 			validateManualTimeAdjustment,
 			workedMinutes,
 		} from '../domain/time-entry';
+		import {
+			businessDaysBetween as calculateBusinessDaysBetween,
+			businessRangesOverlap as checkBusinessRangesOverlap,
+			calculateVacationBalance,
+			countVacationDaysInRange as calculateVacationDaysInRange,
+			filterEmployeeVacationRequests as filterVacationRequests,
+			isActiveVacationRequest as checkActiveVacationRequest,
+			isBusinessDay as checkBusinessDay,
+			isEnjoyedVacation as checkEnjoyedVacation,
+			isFutureApprovedVacation as checkFutureApprovedVacation,
+			vacationConflictCounts as calculateVacationConflictCounts,
+			vacationConflictDetails as calculateVacationConflictDetails,
+			vacationRequestDays as calculateVacationRequestDays,
+		} from '../domain/absence';
 
 		let session: Session;
 		let activeView = 'inicio';
@@ -2624,22 +2635,12 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function vacationConflictDetails(request: VacationRequest, scopeEmployees = EMPLOYEES) {
-			const scopeIds = new Set(scopeEmployees.map((employee) => employee.id));
-			return vacations
-				.filter(
-					(item) =>
-						item.id !== request.id &&
-						item.employeeId !== request.employeeId &&
-						scopeIds.has(item.employeeId) &&
-						isActiveVacationRequest(item) &&
-						businessRangesOverlap(request.from, request.to, item.from, item.to),
-				)
-				.map((item) => ({
-					request: item,
-					from: maxDate(request.from, item.from),
-					to: minDate(request.to, item.to),
-				}))
-				.sort((a, b) => a.from.localeCompare(b.from));
+			return calculateVacationConflictDetails(
+				request,
+				scopeEmployees,
+				vacations,
+				holidays,
+			);
 		}
 
 		function responsibleRequestEmptyState(filter: VacationStatus | 'all') {
@@ -2688,22 +2689,23 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function filterEmployeeVacationRequests(requests: VacationRequest[], filter: EmployeeVacationFilter) {
-			if (filter === 'all') return requests;
-			if (filter === 'aprobada-futura') return requests.filter(isFutureApprovedVacation);
-			if (filter === 'disfrutada') return requests.filter(isEnjoyedVacation);
-			return requests.filter((request) => request.status === filter);
+			return filterVacationRequests(
+				requests,
+				filter,
+				todayIso(),
+			);
 		}
 
 		function isFutureApprovedVacation(request: VacationRequest) {
-			return request.status === 'aprobada' && request.from > todayIso();
+			return checkFutureApprovedVacation(request, todayIso());
 		}
 
 		function isEnjoyedVacation(request: VacationRequest) {
-			return request.status === 'aprobada' && request.from <= todayIso();
+			return checkEnjoyedVacation(request, todayIso());
 		}
 
 		function vacationRequestDays(request: VacationRequest) {
-			return businessDaysBetween(request.from, request.to);
+			return calculateVacationRequestDays(request, holidays);
 		}
 
 		function statusLegend(statuses: string[]) {
@@ -3052,14 +3054,12 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function vacationConflictCounts(request: VacationRequest, scopeEmployees = EMPLOYEES) {
-			const details = vacationConflictDetails(request, scopeEmployees);
-			const approved = new Set(details.filter((item) => item.request.status === 'aprobada').map((item) => item.request.employeeId));
-			const pending = new Set(details.filter((item) => item.request.status === 'pendiente').map((item) => item.request.employeeId));
-
-			return {
-				approved: approved.size,
-				pending: pending.size,
-			};
+			return calculateVacationConflictCounts(
+				request,
+				scopeEmployees,
+				vacations,
+				holidays,
+			);
 		}
 
 		function renderVacationComparisonCell(employeeId: string, date: string, request: VacationRequest) {
@@ -4622,22 +4622,13 @@ import Layout from '../layouts/Layout.astro';
 
 		function vacationBalance(employeeId: string) {
 			const employee = EMPLOYEES.find((item) => item.id === employeeId) || EMPLOYEES[0];
-			const own = vacations.filter((request) => request.employeeId === employeeId);
-			const enjoyed = own.filter(isEnjoyedVacation).reduce((sum, item) => sum + vacationRequestDays(item), 0);
-			const futureApproved = own.filter(isFutureApprovedVacation).reduce((sum, item) => sum + vacationRequestDays(item), 0);
-			const pending = own.filter((request) => request.status === 'pendiente').reduce((sum, item) => sum + vacationRequestDays(item), 0);
-			const denied = own.filter((request) => request.status === 'denegada').reduce((sum, item) => sum + vacationRequestDays(item), 0);
-			const canceled = own.filter((request) => request.status === 'cancelada').reduce((sum, item) => sum + vacationRequestDays(item), 0);
-			const committed = enjoyed + futureApproved + pending;
-			return {
-				available: Math.max(employee.vacationDays - committed, 0),
-				used: enjoyed,
-				enjoyed,
-				futureApproved,
-				pending,
-				denied,
-				canceled,
-			};
+
+			return calculateVacationBalance(
+				employee,
+				vacations,
+				holidays,
+				todayIso(),
+			);
 		}
 
 		function filteredTimeEntries() {
@@ -4663,38 +4654,35 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function businessDaysBetween(from: string, to: string) {
-			return dateRange(from, to).filter(isBusinessDay).length;
+			return calculateBusinessDaysBetween(from, to, holidays);
 		}
 
 		function isBusinessDay(date: string) {
-			return !isWeekend(date) && !holidays.some((holiday) => holiday.date === date);
+			return checkBusinessDay(date, holidays);
 		}
 
 		function businessRangesOverlap(fromA: string, toA: string, fromB: string, toB: string) {
-			if (!rangesOverlap(fromA, toA, fromB, toB)) return false;
-			return dateRange(maxDate(fromA, fromB), minDate(toA, toB)).some(isBusinessDay);
+			return checkBusinessRangesOverlap(
+				fromA,
+				toA,
+				fromB,
+				toB,
+				holidays,
+			);
 		}
 
 		function isActiveVacationRequest(request: VacationRequest) {
-			return request.status === 'aprobada' || request.status === 'pendiente';
+			return checkActiveVacationRequest(request);
 		}
 
 		function countVacationDaysInRange(employeeId: string, from: string, to: string) {
-			return vacations
-				.filter(
-					(request) =>
-						request.employeeId === employeeId &&
-						request.status === 'aprobada' &&
-						rangesOverlap(from, to, request.from, request.to),
-				)
-				.reduce((sum, request) => {
-					return (
-						sum +
-						dateRange(maxDate(from, request.from), minDate(to, request.to)).filter(
-							isBusinessDay,
-						).length
-					);
-				}, 0);
+			return calculateVacationDaysInRange(
+				employeeId,
+				from,
+				to,
+				vacations,
+				holidays,
+			);
 		}
 
 		function uniqueId(prefix: string) {
