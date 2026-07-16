@@ -1,0 +1,322 @@
+.app-shell[data-role="validador_vacaciones"] {
+	background: #f4f7f6;
+	color: #13211e;
+	overflow-x: hidden;
+}
+
+.app-shell[data-role="validador_vacaciones"] .app-header {
+	min-height: 62px;
+	padding: 10px 20px;
+	box-shadow: 0 1px 0 rgba(18, 33, 29, 0.05);
+}
+
+.app-shell[data-role="validador_vacaciones"] .sidebar {
+	width: 244px;
+	padding: 14px 12px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="validador_vacaciones"] .app-main {
+	width: min(100%, 1440px);
+	margin: 0 auto;
+	padding: 24px;
+	overflow-x: hidden;
+}
+
+.app-shell[data-role="validador_vacaciones"] .nav-context {
+	border-radius: 10px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .nav-button {
+	min-height: 48px;
+	border-radius: 10px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-page {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 4px 0 2px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-header h1 {
+	margin: 0;
+	font-size: 2rem;
+	font-weight: 760;
+	letter-spacing: 0;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-header p {
+	margin: 4px 0 0;
+	color: #65736f;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-header > strong {
+	flex: 0 0 auto;
+	padding: 9px 12px;
+	border-radius: 999px;
+	background: #fff2da;
+	color: #7a4a00;
+	font-size: 0.9rem;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-filters .request-filter-button {
+	min-height: 48px;
+	border-radius: 12px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-inbox {
+	display: grid;
+	grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
+	gap: 16px;
+	align-items: start;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-list,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail {
+	min-width: 0;
+	border: 1px solid rgba(18, 33, 29, 0.09);
+	border-radius: 18px;
+	background: #ffffff;
+	box-shadow: 0 12px 30px rgba(18, 33, 29, 0.06);
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-list {
+	padding: 14px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-list-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-list-head h2,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail h2,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail h3 {
+	margin: 0;
+	font-weight: 720;
+	letter-spacing: 0;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-list-head span {
+	color: #65736f;
+	font-size: 0.88rem;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-list {
+	display: grid;
+	gap: 10px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-card {
+	display: grid;
+	width: 100%;
+	gap: 8px;
+	padding: 13px;
+	border: 1px solid #e2ebe8;
+	border-radius: 15px;
+	background: #fbfdfc;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-card:hover,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-card.is-active {
+	border-color: #9ad4c5;
+	background: #f0fbf7;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-main {
+	display: grid;
+	gap: 2px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-main strong,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-type {
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-main small,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-meta,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-footer small {
+	color: #65736f;
+	font-size: 0.83rem;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-request-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 7px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail {
+	padding: 18px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-inner {
+	display: grid;
+	gap: 16px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-head span,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-head p {
+	margin: 0;
+	color: #65736f;
+	font-size: 0.9rem;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-grid section,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-section,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-decision {
+	display: grid;
+	gap: 10px;
+	min-width: 0;
+	padding: 14px;
+	border-radius: 15px;
+	background: #f8fbfa;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-balance strong {
+	display: block;
+	font-size: 1.15rem;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-balance span,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-availability p {
+	color: #65736f;
+	font-size: 0.92rem;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-conflict-list {
+	display: grid;
+	gap: 9px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-conflict-item {
+	display: grid;
+	gap: 4px;
+	padding: 10px;
+	border: 1px solid #e2ebe8;
+	border-radius: 12px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-conflict-item span,
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-conflict-item small {
+	color: #65736f;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-availability-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-decision-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .responsible-v2-decision-actions .button {
+	min-height: 48px;
+}
+
+.app-shell[data-role="validador_vacaciones"] .table-wrap,
+.app-shell[data-role="validador_vacaciones"] .planning-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.app-shell[data-role="validador_vacaciones"] .team-calendar-controls,
+.app-shell[data-role="validador_vacaciones"] .calendar-toolbar {
+	align-items: end;
+}
+
+@media (max-width: 980px) {
+	.app-shell[data-role="validador_vacaciones"] {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .sidebar {
+		display: none;
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .app-main {
+		padding: 16px 14px calc(96px + env(safe-area-inset-bottom));
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .mobile-nav {
+		display: grid;
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-inbox,
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-header {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .team-calendar-controls,
+	.app-shell[data-role="validador_vacaciones"] .calendar-toolbar {
+		display: grid;
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 430px) {
+	.app-shell[data-role="validador_vacaciones"] .app-header {
+		padding: 8px 14px;
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-filters {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-availability-grid,
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-decision-actions {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-detail,
+	.app-shell[data-role="validador_vacaciones"] .responsible-v2-list {
+		padding: 12px;
+	}
+}

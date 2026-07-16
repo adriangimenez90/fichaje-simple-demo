@@ -85,6 +85,67 @@ export function businessRangesOverlap(
 	return dateRange(maxDate(fromA, fromB), minDate(toA, toB)).some((date) => isBusinessDay(date, holidays));
 }
 
+function absenceTimeToMinutes(value: string) {
+	const [hours, minutes] = value.split(':').map(Number);
+	return hours * 60 + minutes;
+}
+
+export function absenceRequestsOverlap(
+	first: VacationRequest,
+	second: VacationRequest,
+	holidays: Holiday[],
+	absenceTypes: readonly AbsenceType[],
+): boolean {
+	if (!businessRangesOverlap(first.from, first.to, second.from, second.to, holidays)) return false;
+
+	const firstUsesHours = absenceUsesHours(first, absenceTypes);
+	const secondUsesHours = absenceUsesHours(second, absenceTypes);
+
+	if (!firstUsesHours && !secondUsesHours) return true;
+
+	if (firstUsesHours && secondUsesHours) {
+		if (first.from !== second.from) return false;
+		if (!first.startTime || !first.endTime || !second.startTime || !second.endTime) return false;
+		const firstStart = absenceTimeToMinutes(first.startTime);
+		const firstEnd = absenceTimeToMinutes(first.endTime);
+		const secondStart = absenceTimeToMinutes(second.startTime);
+		const secondEnd = absenceTimeToMinutes(second.endTime);
+		return firstStart < secondEnd && secondStart < firstEnd;
+	}
+
+	const hourlyRequest = firstUsesHours ? first : second;
+	const dayRequest = firstUsesHours ? second : first;
+	return (
+		isDateWithin(hourlyRequest.from, dayRequest.from, dayRequest.to) &&
+		isBusinessDay(hourlyRequest.from, holidays)
+	);
+}
+
+export function absenceConflictRequests(
+	request: VacationRequest,
+	scopeEmployees: Employee[],
+	requests: VacationRequest[],
+	holidays: Holiday[],
+	absenceTypes: readonly AbsenceType[],
+): VacationRequest[] {
+	const scopeIds = new Set(scopeEmployees.map((employee) => employee.id));
+	return requests
+		.filter(
+			(item) =>
+				item.id !== request.id &&
+				item.employeeId !== request.employeeId &&
+				scopeIds.has(item.employeeId) &&
+				isActiveVacationRequest(item) &&
+				absenceRequestsOverlap(request, item, holidays, absenceTypes),
+		)
+		.slice()
+		.sort((first, second) => {
+			const dateOrder = first.from.localeCompare(second.from);
+			if (dateOrder) return dateOrder;
+			return (first.startTime || '').localeCompare(second.startTime || '');
+		});
+}
+
 export function isActiveVacationRequest(
 	request: VacationRequest,
 ): boolean {

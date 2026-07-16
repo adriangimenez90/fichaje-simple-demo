@@ -1,6 +1,7 @@
 ﻿---
 import Layout from '../layouts/Layout.astro';
 import '../styles/employee-v2.css';
+import '../styles/responsible-v2.css';
 ---
 
 <Layout title="FichajeSimple">
@@ -135,6 +136,7 @@ import '../styles/employee-v2.css';
 			countVacationDaysInRange as calculateVacationDaysInRange,
 			filterEmployeeVacationRequests as filterVacationRequests,
 			absenceDeductsVacationBalance,
+			absenceConflictRequests,
 			absenceUsesHours,
 			findAbsenceType,
 			isActiveVacationRequest as checkActiveVacationRequest,
@@ -408,8 +410,8 @@ import '../styles/employee-v2.css';
 				shell.dataset.role = session.role;
 			}
 			if (userChip) {
-				const displayName = session.role === 'validador_vacaciones' && session.name.toLowerCase().includes('validador')
-					? 'Responsable de vacaciones'
+				const displayName = session.role === 'validador_vacaciones'
+					? 'Responsable de ausencias'
 					: session.name;
 				userChip.innerHTML = `
 					<span>${roleLabel(session.role)}</span>
@@ -770,7 +772,7 @@ import '../styles/employee-v2.css';
 							${summaryRow('Centro', 'Centro Principal')}
 							${summaryRow('Departamento', escapeHtml(employee.department))}
 							${summaryRow('Vacaciones anuales', `${employee.vacationDays} días`)}
-							${summaryRow('Responsable', 'Responsable de vacaciones')}
+							${summaryRow('Responsable', 'Responsable de ausencias')}
 						</div>
 					</section>
 
@@ -1113,7 +1115,7 @@ import '../styles/employee-v2.css';
 								<span>Rol</span>
 								<select name="role">
 									<option value="empleado">Usuario normal</option>
-									<option value="validador_vacaciones">Responsable de vacaciones</option>
+									<option value="validador_vacaciones">Responsable de ausencias</option>
 									<option value="admin_global">Administrador</option>
 								</select>
 							</label>
@@ -1698,9 +1700,248 @@ import '../styles/employee-v2.css';
 				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 		}
 
+		function responsibleRequestDateLabel(
+			request: VacationRequest,
+		): string {
+			return absenceRequestDateLabel(request);
+		}
+
+		function responsibleRequestDurationLabel(
+			request: VacationRequest,
+		): string {
+			return absenceRequestDurationLabel(request);
+		}
+
+		function responsibleRequestSort(
+			first: VacationRequest,
+			second: VacationRequest,
+		): number {
+			const rank = (request: VacationRequest) => {
+				if (request.status === 'pendiente') return 0;
+				if (request.status === 'aprobada' && request.to >= todayIso()) return 1;
+				return 2;
+			};
+			const rankDiff = rank(first) - rank(second);
+			if (rankDiff) return rankDiff;
+			if (rank(first) === 1) {
+				const dateDiff = first.from.localeCompare(second.from);
+				if (dateDiff) return dateDiff;
+				return (first.startTime || '').localeCompare(second.startTime || '');
+			}
+			return second.createdAt.localeCompare(first.createdAt);
+		}
+
+		function renderResponsibleRequestCard(
+			request: VacationRequest,
+			selected: boolean,
+		): string {
+			const employee = employeeById(request.employeeId);
+			const scope = employee ? departmentEmployees(employee.department) : EMPLOYEES;
+			const conflicts = absenceConflictRequests(request, scope, vacations, holidays, ABSENCE_TYPES);
+			const hasDocument = Boolean(request.attachmentName);
+
+			return `
+				<button
+					class="responsible-v2-request-card ${selected ? 'is-active' : ''}"
+					type="button"
+					data-action="select-vacation"
+					data-id="${request.id}"
+					aria-current="${selected ? 'page' : 'false'}"
+				>
+					<span class="responsible-v2-request-main">
+						<strong>${employeeName(request.employeeId)}</strong>
+						<small>${escapeHtml(employee?.department || 'Sin departamento')}</small>
+					</span>
+					<span class="responsible-v2-request-type">${escapeHtml(absenceTypeName(request))}</span>
+					<span class="responsible-v2-request-meta">${responsibleRequestDateLabel(request)} · ${responsibleRequestDurationLabel(request)}</span>
+					<span class="responsible-v2-request-footer">
+						${pill(request.status)}
+						<small>${hasDocument ? 'Justificante indicado' : 'Sin justificante'}</small>
+						<small>${conflicts.length} coincidencias</small>
+						<small>${formatDate(request.createdAt.slice(0, 10))}</small>
+					</span>
+				</button>
+			`;
+		}
+
+		function renderResponsibleRequestDetail(
+			request: VacationRequest,
+		): string {
+			const employee = employeeById(request.employeeId);
+			const type = findAbsenceType(request, ABSENCE_TYPES);
+			const deductsVacation = absenceDeductsVacationBalance(request, ABSENCE_TYPES);
+			const balance = deductsVacation ? vacationBalance(request.employeeId) : undefined;
+
+			return `
+				<div class="responsible-v2-detail-inner">
+					<div class="responsible-v2-detail-head">
+						<div>
+							<span>Solicitud seleccionada</span>
+							<h2>${escapeHtml(employee?.name || request.employeeId)}</h2>
+							<p>${escapeHtml(employee?.department || 'Sin departamento')}</p>
+						</div>
+						${pill(request.status)}
+					</div>
+
+					<div class="responsible-v2-detail-grid">
+						<section>
+							<h3>Tipo</h3>
+							${summaryRow('Nombre', escapeHtml(absenceTypeName(request)))}
+							${summaryRow('Categoría', type ? absenceCategoryLabel(type.category) : 'Vacaciones')}
+							${summaryRow('Modalidad', absenceUsesHours(request, ABSENCE_TYPES) ? 'Solicitud por horas' : 'Solicitud por días')}
+							${summaryRow('Saldo', deductsVacation ? 'Descuenta vacaciones' : 'No descuenta vacaciones')}
+						</section>
+						<section>
+							<h3>Periodo</h3>
+							${summaryRow('Fechas', responsibleRequestDateLabel(request))}
+							${summaryRow('Duración', responsibleRequestDurationLabel(request))}
+							${summaryRow('Solicitada', formatDate(request.createdAt.slice(0, 10)))}
+						</section>
+					</div>
+
+					<section class="responsible-v2-detail-section">
+						<h3>Información</h3>
+						${summaryRow('Comentario', escapeHtml(request.comment || 'Sin comentario'))}
+						${renderResponsibleDocumentStatus(request)}
+					</section>
+
+					${balance ? `
+						<section class="responsible-v2-detail-section responsible-v2-balance">
+							<h3>Saldo de vacaciones</h3>
+							<div>
+								<strong>${balance.available} días disponibles</strong>
+								<span>${balance.enjoyed} disfrutados · ${balance.futureApproved} aprobados futuros · ${balance.pending} pendientes</span>
+							</div>
+						</section>
+					` : ''}
+
+					${renderResponsibleConflicts(request)}
+					${renderResponsibleAvailability(request)}
+
+					<section class="responsible-v2-decision">
+						${request.status === 'pendiente' ? `
+							<label class="field">
+								<span>Motivo de denegación</span>
+								<textarea id="denial-reason" placeholder="Obligatorio solo si se deniega">${escapeHtml(request.denialReason || '')}</textarea>
+							</label>
+							<div class="responsible-v2-decision-actions">
+								<button class="button button-primary" type="button" data-action="approve-vacation" data-id="${request.id}">Aprobar</button>
+								<button class="button button-danger" type="button" data-action="deny-vacation" data-id="${request.id}">Denegar</button>
+							</div>
+						` : `
+							<h3>Decisión</h3>
+							${summaryRow('Estado', pill(request.status))}
+							${summaryRow('Fecha de decisión', request.decidedAt ? formatDate(request.decidedAt.slice(0, 10)) : 'Sin fecha')}
+							${request.denialReason ? summaryRow('Motivo', escapeHtml(request.denialReason)) : ''}
+						`}
+					</section>
+				</div>
+			`;
+		}
+
+		function renderResponsibleDocumentStatus(
+			request: VacationRequest,
+		): string {
+			const type = findAbsenceType(request, ABSENCE_TYPES);
+			const requirement = type?.documentRequirement || 'none';
+			if (request.attachmentName) {
+				return summaryRow('Justificante', `Justificante indicado: ${escapeHtml(request.attachmentName)}`);
+			}
+			if (requirement === 'required') return summaryRow('Justificante', 'Falta el justificante obligatorio');
+			if (requirement === 'optional') return summaryRow('Justificante', 'Sin justificante adjunto');
+			return summaryRow('Justificante', 'No requiere justificante');
+		}
+
+		function renderResponsibleConflicts(
+			request: VacationRequest,
+		): string {
+			const employee = employeeById(request.employeeId);
+			const scope = employee ? departmentEmployees(employee.department) : EMPLOYEES;
+			const conflicts = absenceConflictRequests(request, scope, vacations, holidays, ABSENCE_TYPES);
+
+			return `
+				<section class="responsible-v2-detail-section">
+					<h3>Coincidencias</h3>
+					${conflicts.length ? `
+						<div class="responsible-v2-conflict-list">
+							${conflicts.map((item) => `
+								<div class="responsible-v2-conflict-item status-border-${statusClass(item.status)}">
+									<strong>${employeeName(item.employeeId)}</strong>
+									<span>${escapeHtml(absenceTypeName(item))}</span>
+									<small>${responsibleRequestDateLabel(item)}</small>
+									${pill(item.status)}
+								</div>
+							`).join('')}
+						</div>
+					` : '<p class="helper-text">Sin ausencias coincidentes en el equipo.</p>'}
+				</section>
+			`;
+		}
+
+		function renderResponsibleAvailability(
+			request: VacationRequest,
+		): string {
+			const employee = employeeById(request.employeeId);
+			const scope = employee ? departmentEmployees(employee.department) : EMPLOYEES;
+			const total = scope.length;
+
+			if (absenceUsesHours(request, ABSENCE_TYPES)) {
+				const conflicts = absenceConflictRequests(request, scope, vacations, holidays, ABSENCE_TYPES);
+				return `
+					<section class="responsible-v2-detail-section responsible-v2-availability">
+						<h3>Disponibilidad</h3>
+						<p>${conflicts.length} ausencia${conflicts.length === 1 ? '' : 's'} coincidente${conflicts.length === 1 ? '' : 's'} en esta franja horaria.</p>
+					</section>
+				`;
+			}
+
+			const days = dateRange(request.from, request.to).filter(isBusinessDay);
+			if (!days.length || !total) {
+				return `
+					<section class="responsible-v2-detail-section responsible-v2-availability">
+						<h3>Disponibilidad</h3>
+						<p>No hay días laborables para calcular disponibilidad.</p>
+					</section>
+				`;
+			}
+
+			const scopeIds = new Set(scope.map((item) => item.id));
+			const dayStats = days.map((date) => {
+				const absent = new Set<string>([request.employeeId]);
+				vacations
+					.filter((item) => item.id !== request.id)
+					.filter((item) => item.status === 'aprobada')
+					.filter((item) => scopeIds.has(item.employeeId))
+					.filter((item) => !absenceUsesHours(item, ABSENCE_TYPES))
+					.filter((item) => isDateWithin(date, item.from, item.to))
+					.forEach((item) => absent.add(item.employeeId));
+				const absentCount = absent.size;
+				const available = Math.max(total - absentCount, 0);
+				return {
+					date,
+					absent: absentCount,
+					available,
+					percentage: total ? Math.round((available / total) * 100) : 0,
+				};
+			});
+			const worst = dayStats.slice().sort((first, second) => first.available - second.available)[0];
+
+			return `
+				<section class="responsible-v2-detail-section responsible-v2-availability">
+					<h3>Disponibilidad</h3>
+					<p>Peor disponibilidad: ${worst.available} de ${total} personas disponibles el ${formatDate(worst.date)}.</p>
+					<div class="responsible-v2-availability-grid">
+						${summaryRow('Total departamento', String(total))}
+						${summaryRow('Personas ausentes', String(worst.absent))}
+						${summaryRow('Personas disponibles', String(worst.available))}
+						${summaryRow('Disponibilidad', `${worst.percentage}%`)}
+					</div>
+				</section>
+			`;
+		}
+
 		function renderValidatorRequests() {
-			const requests = vacations
-				.sort((a, b) => a.from.localeCompare(b.from));
+			const requests = vacations.slice().sort(responsibleRequestSort);
 			const filteredRequests = validatorRequestFilter === 'all'
 				? requests
 				: requests.filter((request) => request.status === validatorRequestFilter);
@@ -1709,9 +1950,7 @@ import '../styles/employee-v2.css';
 				filteredRequests[0] ||
 				requests.find((request) => request.id === selectedVacationId);
 			selectedVacationId = selected?.id || '';
-			const scopedEmployees = selected ? departmentEmployees(employeeById(selected.employeeId)?.department || '') : [];
-			const balance = selected ? vacationBalance(selected.employeeId) : undefined;
-			const conflictCounts = selected ? vacationConflictCounts(selected, scopedEmployees) : { approved: 0, pending: 0 };
+			const pendingCount = requests.filter((request) => request.status === 'pendiente').length;
 			const filterButtons: Array<{ filter: VacationStatus | 'all'; label: string }> = [
 				{ filter: 'pendiente', label: 'Pendientes' },
 				{ filter: 'aprobada', label: 'Aprobadas' },
@@ -1727,69 +1966,37 @@ import '../styles/employee-v2.css';
 				.join('');
 
 			return `
-				${sectionTitle('Solicitudes', 'Valida vacaciones pendientes y revisa solapes del departamento antes de decidir.')}
-				<div class="responsible-requests-layout">
-					<section class="panel responsible-list-panel">
-						<div class="panel-heading">
-							<div>
-								<h2>Solicitudes de vacaciones</h2>
-								<p class="helper-text">Filtra por estado y selecciona una solicitud para ver detalle y coincidencias.</p>
+				<div class="responsible-v2-page responsible-v2-requests-page">
+					<header class="responsible-v2-header">
+						<div>
+							<h1>Solicitudes</h1>
+							<p>Revisa vacaciones, permisos y otras ausencias del equipo.</p>
+						</div>
+						<strong>${pendingCount} pendientes</strong>
+					</header>
+
+					<div class="responsible-v2-filters" aria-label="Filtrar solicitudes">
+						${filterButtons}
+					</div>
+
+					<div class="responsible-v2-inbox">
+						<section class="responsible-v2-list" aria-label="Bandeja de solicitudes">
+							<div class="responsible-v2-list-head">
+								<h2>Bandeja</h2>
+								<span>${filteredRequests.length} solicitudes</span>
 							</div>
-						</div>
-						<div class="request-filter-bar responsible-filter-bar" aria-label="Filtrar solicitudes">
-							${filterButtons}
-						</div>
-						<div class="responsible-request-list top-gap">
-							${filteredRequests.length ? filteredRequests.map((request) => `
-								<article class="responsible-request-shell ${selected?.id === request.id ? 'is-active' : ''}">
-								<button
-									class="vacation-select responsible-request-card ${selected?.id === request.id ? 'is-active' : ''}"
-									type="button"
-									data-action="select-vacation"
-									data-id="${request.id}"
-								>
-									<span>
-										<strong>${employeeName(request.employeeId)}</strong>
-										<small>${escapeHtml(employeeById(request.employeeId)?.department || 'Sin departamento')}</small>
-										${formatDate(request.from)} - ${formatDate(request.to)} · ${vacationRequestDays(request)} días laborables
-										${request.comment ? `<small>${escapeHtml(request.comment)}</small>` : ''}
-										${responsibleConflictLine(request)}
-									</span>
-									${pill(request.status)}
-								</button>
-								${request.status === 'pendiente' ? `
-									<div class="responsible-card-actions">
-										<button class="button button-primary button-small" type="button" data-action="approve-vacation" data-id="${request.id}">Aprobar</button>
-										<button class="button button-danger button-small" type="button" data-action="deny-vacation" data-id="${request.id}">Denegar</button>
-									</div>
-								` : ''}
-								</article>
-							`).join('') : emptyState(`No hay solicitudes ${validatorRequestFilter === 'all' ? 'registradas' : STATUS_LABELS[validatorRequestFilter]?.toLowerCase() || 'con este estado'}.`)}
-						</div>
-					</section>
-					<section class="panel responsible-detail-panel" ${selected ? `data-selected-vacation-id="${selected.id}"` : ''}>
-						<h2>Detalle y solapes</h2>
-						${selected ? `
-							<div class="summary-list">
-								${summaryRow('Solicitante', employeeName(selected.employeeId))}
-								${summaryRow('Departamento', escapeHtml(employeeById(selected.employeeId)?.department || 'Sin departamento'))}
-								${summaryRow('Fechas', `${formatDate(selected.from)} - ${formatDate(selected.to)}`)}
-								${summaryRow('Días laborables', String(vacationRequestDays(selected)))}
-								${summaryRow('Coincidencias aprobadas', String(conflictCounts.approved))}
-										${summaryRow('Coincidencias pendientes', String(conflictCounts.pending))}
-										${summaryRow('Comentario', escapeHtml(selected.comment || 'Sin comentario'))}
-										${summaryRow('Saldo disponible', `${balance?.available ?? 0} días`)}
-									</div>
-									${renderResponsibleConflictDetails(selected, scopedEmployees)}
-									<div class="top-gap">
-										${renderVacationAdminDetail(selected, scopedEmployees)}
-									</div>
-						` : emptyState('Selecciona una solicitud.')}
-					</section>
+							<div class="responsible-v2-request-list">
+								${filteredRequests.length ? filteredRequests.map((request) => renderResponsibleRequestCard(request, selected?.id === request.id)).join('') : emptyState(`No hay solicitudes ${validatorRequestFilter === 'all' ? 'registradas' : STATUS_LABELS[validatorRequestFilter]?.toLowerCase() || 'con este estado'}.`)}
+							</div>
+						</section>
+
+						<section class="responsible-v2-detail" ${selected ? `data-selected-vacation-id="${selected.id}"` : ''}>
+							${selected ? renderResponsibleRequestDetail(selected) : emptyState('Selecciona una solicitud.')}
+						</section>
+					</div>
 				</div>
 			`;
 		}
-
 		function renderTeamCalendar() {
 			return `
 				${sectionTitle('Calendario del equipo', 'Consulta vacaciones y posibles solapes de forma visual.')}
@@ -4615,12 +4822,16 @@ import '../styles/employee-v2.css';
 
 			request.status = status;
 			request.decidedAt = new Date().toISOString();
+			const isVacation = resolveAbsenceTypeId(request) === DEFAULT_ABSENCE_TYPE_ID;
+			const typeName = absenceTypeName(request);
 			addAudit(
-				status === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones denegadas',
-				`${employeeName(request.employeeId)} · ${formatDate(request.from)} - ${formatDate(request.to)}`,
+				status === 'aprobada'
+					? (isVacation ? 'Vacaciones aprobadas' : 'Ausencia aprobada')
+					: (isVacation ? 'Vacaciones denegadas' : 'Ausencia denegada'),
+				`${employeeName(request.employeeId)} · ${typeName} · ${responsibleRequestDateLabel(request)}`,
 			);
 			saveAll();
-			showToast('Solicitud actualizada. Email simulado enviado al empleado.');
+			showToast(`${status === 'aprobada' ? 'Solicitud aprobada.' : 'Solicitud denegada.'} La solicitud se ha actualizado en la demo.`);
 			renderPage();
 		}
 
@@ -4908,7 +5119,7 @@ import '../styles/employee-v2.css';
 			}
 
 			if (session.role === 'validador_vacaciones') {
-				return [{ label: 'Vacaciones', items: views }];
+				return [{ label: 'Ausencias', items: views }];
 			}
 
 			return [{ label: '', items: views }];
@@ -4922,13 +5133,13 @@ import '../styles/employee-v2.css';
 
 		function roleLabel(role: Role) {
 			if (role === 'admin_global') return 'Administrador';
-			if (role === 'validador_vacaciones') return 'Responsable de vacaciones';
+			if (role === 'validador_vacaciones') return 'Responsable de ausencias';
 			return 'Usuario normal';
 		}
 
 		function roleHint(role: Role) {
 			if (role === 'admin_global') return 'Gestión diaria de empleados, fichajes, vacaciones y exportaciones';
-			if (role === 'validador_vacaciones') return 'Revisión de vacaciones, calendario del equipo y festivos';
+			if (role === 'validador_vacaciones') return 'Revisión de vacaciones, permisos, calendario del equipo y festivos';
 			return 'Fichaje personal, vacaciones y calendario';
 		}
 

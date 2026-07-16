@@ -43,9 +43,9 @@ export const EMPLOYEE_VIEWS: NavigationView[] = [
 ];
 
 export const VALIDATOR_VIEWS: NavigationView[] = [
-	{ id: 'solicitudes', label: 'Solicitudes', hint: 'Aprobar o denegar' },
-	{ id: 'calendario-equipo', label: 'Calendario equipo', hint: 'Vacaciones del equipo' },
-	{ id: 'festivos', label: 'Festivos', hint: 'Calendario local' },
+	{ id: 'solicitudes', label: 'Solicitudes', hint: 'Vacaciones y permisos' },
+	{ id: 'calendario-equipo', label: 'Calendario', hint: 'Disponibilidad del equipo' },
+	{ id: 'festivos', label: 'Festivos', hint: 'Calendario laboral' },
 ];
 
 export const ADMIN_VIEWS: NavigationView[] = [
