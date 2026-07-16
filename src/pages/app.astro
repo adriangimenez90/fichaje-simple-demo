@@ -71,6 +71,44 @@ import Layout from '../layouts/Layout.astro';
 			STATUS_LABELS,
 			VALIDATOR_VIEWS,
 		} from '../config/app';
+		import {
+			addDaysIso,
+			clampDateIso,
+			dateInRange,
+			dateRange,
+			diffDays,
+			isDateWithin,
+			isWeekend,
+			isoFromDate,
+			maxDate,
+			minDate,
+			monthKey,
+			monthLabel,
+			monthRangeFromInput,
+			rangesOverlap,
+			startOfMonthIso,
+			startOfWeekIso,
+			todayIso,
+			weekInputValue,
+			weekRangeFromInput,
+		} from '../lib/date';
+		import {
+			escapeHtml,
+			formatDate,
+			formatDateTime,
+			formatDayHeader,
+			statusClass,
+			weekdayShort,
+		} from '../lib/format';
+		import {
+			addMinutesToTime,
+			currentTime,
+			currentTimeWithSeconds,
+			formatMinutes,
+			formatSignedMinutes,
+			timeToMinutes,
+		} from '../lib/time';
+		import { downloadCsv } from '../lib/csv';
 
 		let session: Session;
 		let activeView = 'inicio';
@@ -3497,57 +3535,6 @@ import Layout from '../layouts/Layout.astro';
 			});
 		}
 
-		function formatSignedMinutes(minutes: number) {
-			const sign = minutes > 0 ? '+' : minutes < 0 ? '-' : '';
-			return `${sign}${formatMinutes(Math.abs(minutes))}`;
-		}
-
-		function monthKey(date: string) {
-			return date.slice(0, 7);
-		}
-
-		function monthLabel(month: string) {
-			const [year, monthIndex] = month.split('-').map(Number);
-			return new Date(year, monthIndex - 1, 1).toLocaleDateString('es-ES', {
-				month: 'long',
-				year: 'numeric',
-			});
-		}
-
-		function monthRangeFromInput(month: string) {
-			const safeMonth = /^\d{4}-\d{2}$/.test(month) ? month : todayIso().slice(0, 7);
-			const [year, monthIndex] = safeMonth.split('-').map(Number);
-			return {
-				from: `${safeMonth}-01`,
-				to: isoFromDate(new Date(year, monthIndex, 0)),
-			};
-		}
-
-		function weekInputValue(date: string) {
-			const target = new Date(`${date}T12:00:00`);
-			const day = target.getDay() || 7;
-			target.setDate(target.getDate() + 4 - day);
-			const yearStart = new Date(target.getFullYear(), 0, 1);
-			const week = Math.ceil((((target.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-			return `${target.getFullYear()}-W${String(week).padStart(2, '0')}`;
-		}
-
-		function weekRangeFromInput(weekValue: string) {
-			const safeWeek = /^\d{4}-W\d{2}$/.test(weekValue) ? weekValue : weekInputValue(todayIso());
-			const [yearText, weekText] = safeWeek.split('-W');
-			const year = Number(yearText);
-			const week = Number(weekText);
-			const fourthJan = new Date(year, 0, 4);
-			const weekOneOffset = (fourthJan.getDay() + 6) % 7;
-			const monday = new Date(fourthJan);
-			monday.setDate(fourthJan.getDate() - weekOneOffset + (week - 1) * 7);
-			const from = isoFromDate(monday);
-			return {
-				from,
-				to: addDaysIso(from, 6),
-			};
-		}
-
 		function buildMissingPunchReport() {
 			const today = todayIso();
 			return EMPLOYEES.filter((employee) => !findEntry(employee.id, today)?.start).map((employee) => [
@@ -5327,26 +5314,6 @@ import Layout from '../layouts/Layout.astro';
 				.sort((a, b) => b.date.localeCompare(a.date));
 		}
 
-		function downloadCsv(filename: string, rows: Record<string, string | number>[]) {
-			const headers = Object.keys(rows[0] || { demo: 'Sin datos' });
-			const body = rows.length ? rows : [{ demo: 'Sin datos' }];
-			const csv = [
-				headers.join(';'),
-				...body.map((row) => headers.map((header) => csvValue(row[header])).join(';')),
-			].join('\r\n');
-			const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-			const link = document.createElement('a');
-			link.href = URL.createObjectURL(blob);
-			link.download = filename;
-			link.click();
-			URL.revokeObjectURL(link.href);
-		}
-
-		function csvValue(value: string | number | undefined) {
-			const text = String(value ?? '');
-			return `"${text.replaceAll('"', '""')}"`;
-		}
-
 		function showToast(message: string) {
 			if (!toast) return;
 			if (toastTimer) window.clearTimeout(toastTimer);
@@ -5355,135 +5322,10 @@ import Layout from '../layouts/Layout.astro';
 			toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 4200);
 		}
 
-		function statusClass(status: string) {
-			return status
-				.toLowerCase()
-				.normalize('NFD')
-				.replace(/[\u0300-\u036f]/g, '')
-				.replace(/\s+/g, '-');
-		}
-
-		function escapeHtml(value: string) {
-			return value.replace(/[&<>"']/g, (character) => {
-				const entities: Record<string, string> = {
-					'&': '&amp;',
-					'<': '&lt;',
-					'>': '&gt;',
-					'"': '&quot;',
-					"'": '&#39;',
-				};
-				return entities[character] || character;
-			});
-		}
-
-		function todayIso() {
-			return isoFromDate(new Date());
-		}
-
-		function isoFromDate(date: Date) {
-			const year = date.getFullYear();
-			const month = String(date.getMonth() + 1).padStart(2, '0');
-			const day = String(date.getDate()).padStart(2, '0');
-			return `${year}-${month}-${day}`;
-		}
-
-		function startOfWeekIso(date: string) {
-			const weekStart = new Date(`${date}T12:00:00`);
-			const offset = (weekStart.getDay() + 6) % 7;
-			weekStart.setDate(weekStart.getDate() - offset);
-			return isoFromDate(weekStart);
-		}
-
-		function startOfMonthIso(date: Date) {
-			return isoFromDate(new Date(date.getFullYear(), date.getMonth(), 1));
-		}
-
-		function currentTime() {
-			const now = new Date();
-			return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-		}
-
-		function currentTimeWithSeconds() {
-			const now = new Date();
-			return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-		}
-
 		function updateLiveClock() {
 			document.querySelectorAll<HTMLElement>('.live-clock').forEach((element) => {
 				element.textContent = currentTimeWithSeconds();
 			});
-		}
-
-		function formatDate(date: string) {
-			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
-				day: '2-digit',
-				month: '2-digit',
-				year: 'numeric',
-			});
-		}
-
-		function formatDayHeader(date: string) {
-			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
-				day: '2-digit',
-				month: '2-digit',
-			});
-		}
-
-		function weekdayShort(date: string) {
-			return new Date(`${date}T12:00:00`).toLocaleDateString('es-ES', {
-				weekday: 'short',
-			});
-		}
-
-		function formatDateTime(value: string) {
-			return new Date(value).toLocaleString('es-ES', {
-				day: '2-digit',
-				month: '2-digit',
-				year: 'numeric',
-				hour: '2-digit',
-				minute: '2-digit',
-			});
-		}
-
-		function formatMinutes(minutes: number) {
-			const hours = Math.floor(minutes / 60);
-			const remainder = minutes % 60;
-			return `${hours} h ${String(remainder).padStart(2, '0')} min`;
-		}
-
-		function timeToMinutes(value: string) {
-			const [hours, minutes] = value.split(':').map(Number);
-			return hours * 60 + minutes;
-		}
-
-		function addMinutesToTime(value: string, minutesToAdd: number) {
-			const total = timeToMinutes(value) + minutesToAdd;
-			const hours = Math.floor(total / 60) % 24;
-			const minutes = total % 60;
-			return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-		}
-
-		function addDaysIso(date: string, amount: number) {
-			const next = new Date(`${date}T12:00:00`);
-			next.setDate(next.getDate() + amount);
-			return isoFromDate(next);
-		}
-
-		function clampDateIso(date: string, min: string, max: string) {
-			if (date < min) return min;
-			if (date > max) return max;
-			return date;
-		}
-
-		function diffDays(from: string, to: string) {
-			const start = new Date(`${from}T12:00:00`).getTime();
-			const end = new Date(`${to}T12:00:00`).getTime();
-			return Math.round((end - start) / 86400000);
-		}
-
-		function dateRange(from: string, to: string) {
-			const total = Math.max(diffDays(from, to), 0);
-			return Array.from({ length: total + 1 }, (_, index) => addDaysIso(from, index));
 		}
 
 		function businessDaysBetween(from: string, to: string) {
@@ -5494,19 +5336,6 @@ import Layout from '../layouts/Layout.astro';
 			return !isWeekend(date) && !holidays.some((holiday) => holiday.date === date);
 		}
 
-		function isWeekend(date: string) {
-			const day = new Date(`${date}T12:00:00`).getDay();
-			return day === 0 || day === 6;
-		}
-
-		function isDateWithin(date: string, from: string, to: string) {
-			return date >= from && date <= to;
-		}
-
-		function rangesOverlap(fromA: string, toA: string, fromB: string, toB: string) {
-			return fromA <= toB && fromB <= toA;
-		}
-
 		function businessRangesOverlap(fromA: string, toA: string, fromB: string, toB: string) {
 			if (!rangesOverlap(fromA, toA, fromB, toB)) return false;
 			return dateRange(maxDate(fromA, fromB), minDate(toA, toB)).some(isBusinessDay);
@@ -5514,10 +5343,6 @@ import Layout from '../layouts/Layout.astro';
 
 		function isActiveVacationRequest(request: VacationRequest) {
 			return request.status === 'aprobada' || request.status === 'pendiente';
-		}
-
-		function dateInRange(date: string, from: string, to: string) {
-			return (!from || date >= from) && (!to || date <= to);
 		}
 
 		function countVacationDaysInRange(employeeId: string, from: string, to: string) {
@@ -5536,14 +5361,6 @@ import Layout from '../layouts/Layout.astro';
 						).length
 					);
 				}, 0);
-		}
-
-		function minDate(a: string, b: string) {
-			return a < b ? a : b;
-		}
-
-		function maxDate(a: string, b: string) {
-			return a > b ? a : b;
 		}
 
 		function uniqueId(prefix: string) {
