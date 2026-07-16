@@ -421,6 +421,231 @@
 	margin: 0;
 }
 
+.app-shell[data-role="empleado"] .employee-v2-absence-page {
+	gap: 14px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-balance,
+.app-shell[data-role="empleado"] .employee-v2-absence-form,
+.app-shell[data-role="empleado"] .employee-v2-absence-card {
+	border: 1px solid rgba(18, 33, 29, 0.09);
+	border-radius: 22px;
+	background: #ffffff;
+	box-shadow: 0 12px 30px rgba(18, 33, 29, 0.07);
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-balance {
+	display: grid;
+	gap: 14px;
+	padding: 18px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-balance span,
+.app-shell[data-role="empleado"] .employee-v2-absence-card-meta,
+.app-shell[data-role="empleado"] .employee-v2-absence-type-info span {
+	color: #66756f;
+	font-size: 0.84rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-balance strong {
+	display: block;
+	margin-top: 4px;
+	color: #12211d;
+	font-size: 1.65rem;
+	font-weight: 760;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-balance p {
+	margin: 6px 0 0;
+	color: #66756f;
+	font-size: 0.9rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-progress {
+	height: 8px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: #e8efec;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-progress span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: #42a984;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-launcher {
+	width: 100%;
+	min-height: 58px;
+	border-radius: 18px;
+	font-size: 1rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-form {
+	padding: 18px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-form form {
+	display: grid;
+	gap: 14px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-fields[data-absence-unit="hours"] {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-form input,
+.app-shell[data-role="empleado"] .employee-v2-absence-form select,
+.app-shell[data-role="empleado"] .employee-v2-absence-form textarea {
+	width: 100%;
+	max-width: 100%;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-type-info,
+.app-shell[data-role="empleado"] .employee-v2-absence-summary {
+	display: grid;
+	gap: 6px;
+	padding: 13px;
+	border-radius: 16px;
+	background: #f5faf8;
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-type-info strong,
+.app-shell[data-role="empleado"] .employee-v2-absence-summary strong {
+	color: #12211d;
+	font-size: 0.96rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-summary {
+	color: #66756f;
+	font-size: 0.9rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-form-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-form-actions .button {
+	min-height: 48px;
+	border-radius: 14px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-filters {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 8px;
+	margin-top: 14px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-filter {
+	min-height: 48px;
+	padding: 9px 6px;
+	border: 1px solid rgba(18, 33, 29, 0.08);
+	border-radius: 14px;
+	background: #f8fbfa;
+	color: #66756f;
+	text-align: center;
+	cursor: pointer;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-filter.is-active {
+	border-color: #b6dfd3;
+	background: #e3f5ef;
+	color: #08735f;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-filter span,
+.app-shell[data-role="empleado"] .employee-v2-absence-filter strong {
+	display: block;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-filter span {
+	font-size: 0.72rem;
+	font-weight: 650;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-filter strong {
+	margin-top: 2px;
+	font-size: 1rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-list {
+	display: grid;
+	gap: 12px;
+	margin-top: 14px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card {
+	display: grid;
+	gap: 12px;
+	padding: 15px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card-header strong,
+.app-shell[data-role="empleado"] .employee-v2-absence-card-header span {
+	display: block;
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card-header strong {
+	color: #12211d;
+	font-size: 1rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card-header span {
+	margin-top: 2px;
+	color: #66756f;
+	font-size: 0.83rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card-meta span,
+.app-shell[data-role="empleado"] .employee-v2-absence-document {
+	padding: 6px 8px;
+	border-radius: 999px;
+	background: #f2f7f5;
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card p {
+	margin: 0;
+	color: #43514d;
+	font-size: 0.9rem;
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-document {
+	color: #43514d;
+	font-size: 0.84rem;
+}
+
+.app-shell[data-role="empleado"] .employee-v2-absence-card .button {
+	min-height: 48px;
+	border-radius: 14px;
+}
+
 @media (min-width: 768px) {
 	.app-shell[data-role="empleado"] .app-header {
 		width: min(100%, 600px);
@@ -465,6 +690,16 @@
 
 	.app-shell[data-role="empleado"] .employee-v2-secondary-actions {
 		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="empleado"] .employee-v2-absence-fields,
+	.app-shell[data-role="empleado"] .employee-v2-absence-fields[data-absence-unit="hours"],
+	.app-shell[data-role="empleado"] .employee-v2-absence-form-actions {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="empleado"] .employee-v2-absence-filters {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	.app-shell[data-role="empleado"] .mobile-nav .nav-button {

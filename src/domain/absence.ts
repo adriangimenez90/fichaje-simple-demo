@@ -152,8 +152,13 @@ export function calculateVacationBalance(
 	vacations: VacationRequest[],
 	holidays: Holiday[],
 	today: string,
+	absenceTypes: readonly AbsenceType[],
 ): VacationBalance {
-	const own = vacations.filter((request) => request.employeeId === employee.id);
+	const own = vacations.filter(
+		(request) =>
+			request.employeeId === employee.id &&
+			absenceDeductsVacationBalance(request, absenceTypes),
+	);
 	const enjoyed = own
 		.filter((request) => isEnjoyedVacation(request, today))
 		.reduce((sum, item) => sum + vacationRequestDays(item, holidays), 0);

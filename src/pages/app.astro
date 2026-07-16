@@ -42,12 +42,16 @@ import '../styles/employee-v2.css';
 	<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 	<script>
+		type EmployeeAbsenceFilter = 'all' | 'pending' | 'approved' | 'history';
+
 		import type {
+			AbsenceCategory,
 			AdminIncidentFilter,
 			AdminTodayFilter,
 			AppUser,
 			AuditEntry,
 			DemoData,
+			DocumentRequirement,
 			Employee,
 			EmployeeVacationFilter,
 			Holiday,
@@ -62,6 +66,10 @@ import '../styles/employee-v2.css';
 			VacationStatus,
 		} from '../lib/types';
 		import { createDemoData } from '../data/demo';
+		import {
+			ABSENCE_TYPES,
+			DEFAULT_ABSENCE_TYPE_ID,
+		} from '../config/absence-types';
 		import {
 			loadDemoDataFromStorage,
 			saveDemoDataToStorage,
@@ -126,10 +134,14 @@ import '../styles/employee-v2.css';
 			calculateVacationBalance,
 			countVacationDaysInRange as calculateVacationDaysInRange,
 			filterEmployeeVacationRequests as filterVacationRequests,
+			absenceDeductsVacationBalance,
+			absenceUsesHours,
+			findAbsenceType,
 			isActiveVacationRequest as checkActiveVacationRequest,
 			isBusinessDay as checkBusinessDay,
 			isEnjoyedVacation as checkEnjoyedVacation,
 			isFutureApprovedVacation as checkFutureApprovedVacation,
+			resolveAbsenceTypeId,
 			vacationConflictCounts as calculateVacationConflictCounts,
 			vacationConflictDetails as calculateVacationConflictDetails,
 			vacationRequestDays as calculateVacationRequestDays,
@@ -142,6 +154,8 @@ import '../styles/employee-v2.css';
 		let calendarAdjustmentDate = '';
 		let selectedVacationId = '';
 		let employeeVacationFilter: EmployeeVacationFilter = 'all';
+		let employeeAbsenceFilter: EmployeeAbsenceFilter = 'all';
+		let employeeAbsenceFormOpen = false;
 		let employeeVacationPreviewWeekStart = '';
 		let historyMonth = todayIso().slice(0, 7);
 		let teamCalendarDepartment = 'all';
@@ -262,6 +276,8 @@ import '../styles/employee-v2.css';
 				if (action === 'open-calendar-adjustment') openCalendarAdjustment(actionButton.dataset.date || selectedCalendarDay);
 				if (action === 'close-calendar-adjustment') closeCalendarAdjustment();
 				if (action === 'employee-vacation-filter') setEmployeeVacationFilter(actionButton.dataset.filter || 'all');
+				if (action === 'toggle-absence-form') toggleEmployeeAbsenceForm();
+				if (action === 'employee-absence-filter') setEmployeeAbsenceFilter(actionButton.dataset.filter || 'all');
 				if (action === 'employee-vacation-week-prev') shiftEmployeeVacationPreviewWeek(-7);
 				if (action === 'employee-vacation-week-next') shiftEmployeeVacationPreviewWeek(7);
 				if (action === 'cancel-employee-vacation') cancelEmployeeVacation(actionButton.dataset.id || '');
@@ -298,8 +314,8 @@ import '../styles/employee-v2.css';
 
 			document.addEventListener('change', (event) => {
 				const target = event.target as HTMLElement;
-				if (target.matches('#vacation-request-form input[name="from"], #vacation-request-form input[name="to"]')) {
-					updateEmployeeVacationPreview();
+				if (target.closest('#absence-request-form')) {
+					updateEmployeeAbsenceForm();
 				}
 
 				const teamCalendarForm = target.closest<HTMLFormElement>('#team-calendar-filter-form');
@@ -312,6 +328,13 @@ import '../styles/employee-v2.css';
 				}
 			});
 
+			document.addEventListener('input', (event) => {
+				const target = event.target as HTMLElement;
+				if (target.closest('#absence-request-form')) {
+					updateEmployeeAbsenceForm();
+				}
+			});
+
 			document.addEventListener('submit', (event) => {
 				const form = event.target as HTMLFormElement;
 
@@ -320,9 +343,9 @@ import '../styles/employee-v2.css';
 					saveManualAdjustment(form);
 				}
 
-				if (form.matches('#vacation-request-form')) {
+				if (form.matches('#absence-request-form')) {
 					event.preventDefault();
-					saveVacationRequest(form);
+					saveAbsenceRequest(form);
 				}
 
 				if (form.matches('#holiday-form')) {
@@ -515,6 +538,9 @@ import '../styles/employee-v2.css';
 
 			content.innerHTML = viewMap[activeView]?.() || viewMap[defaultViewForRole(session.role)]?.() || renderPunchClock();
 			updateLiveClock();
+			if (session.role === 'empleado' && activeView === 'vacaciones') {
+				queueMicrotask(updateEmployeeAbsenceForm);
+			}
 		}
 
 		function renderEmployeeHome() {
@@ -862,73 +888,122 @@ import '../styles/employee-v2.css';
 			const requests = vacations
 				.filter((request) => request.employeeId === employee.id)
 				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-			const filteredRequests = filterEmployeeVacationRequests(requests, employeeVacationFilter);
-			const filterLabel = employeeVacationFilterLabel(employeeVacationFilter);
+			const filteredRequests = filterEmployeeAbsenceRequests(requests, employeeAbsenceFilter);
+			const usedVacationDays = balance.enjoyed + balance.futureApproved + balance.pending;
+			const progress = employee.vacationDays
+				? Math.min((usedVacationDays / employee.vacationDays) * 100, 100)
+				: 0;
 
 			return `
-				${sectionTitle('Vacaciones', 'Solicita días y revisa tu saldo. Antes de guardar puedes ver coincidencias de tu departamento.')}
-				<section class="panel vacation-balance">
-					<div>
-						<span class="meta-label">Saldo anual</span>
-						<strong>${balance.available} días disponibles</strong>
-						<p class="helper-text">${balance.enjoyed} disfrutadas · ${balance.futureApproved} aprobadas futuras · ${balance.pending} pendientes · ${balance.denied} denegadas de ${employee.vacationDays} días anuales.</p>
-					</div>
-					<div class="vacation-bar" aria-label="Distribución de vacaciones">
-						<span class="bar-used" style="width: ${Math.min((balance.enjoyed / employee.vacationDays) * 100, 100)}%"></span>
-						<span class="bar-approved" style="width: ${Math.min((balance.futureApproved / employee.vacationDays) * 100, 100)}%"></span>
-						<span class="bar-pending" style="width: ${Math.min((balance.pending / employee.vacationDays) * 100, 100)}%"></span>
-					</div>
-					<div class="vacation-balance-grid">
-						${vacationSummaryCard('Disponibles', `${balance.available} días`, 'correcto')}
-						${vacationSummaryCard('Disfrutadas', `${balance.enjoyed} días`, 'vacaciones')}
-						${vacationSummaryCard('Aprobadas futuras', `${balance.futureApproved} días`, 'aprobada')}
-						${vacationSummaryCard('Pendientes', `${balance.pending} días`, 'pendiente')}
-						${vacationSummaryCard('Denegadas', `${balance.denied} días`, 'incidencia')}
-					</div>
-					<p class="helper-text vacation-carryover-note">Los días pendientes pueden acumularse al año siguiente si la empresa lo permite.</p>
-				</section>
-				<div class="grid grid-2 top-gap employee-vacation-layout">
-					<section class="panel vacation-request-panel">
-						<h2>Nueva solicitud</h2>
-						<p class="helper-text">Selecciona un rango para comprobar si alguien de tu departamento ya tiene vacaciones aprobadas o pendientes.</p>
-						<form id="vacation-request-form" class="form-grid employee-vacation-form">
-							<label class="field">
-								<span>Fecha desde</span>
-								<input type="date" name="from" required />
-							</label>
-							<label class="field">
-								<span>Fecha hasta</span>
-								<input type="date" name="to" required />
-							</label>
-							<label class="field">
-								<span>Comentario opcional</span>
-								<textarea name="comment" placeholder="Ej. Viaje familiar"></textarea>
-							</label>
-							<button class="button button-primary" type="submit">Solicitar vacaciones</button>
-						</form>
-					</section>
-					<section class="panel vacation-requests-panel">
-						<div class="section-head-inline">
-							<div>
-								<h2>Solicitudes</h2>
-								<p class="helper-text">Filtro activo: ${filterLabel}</p>
+				<div class="employee-v2-page employee-v2-absence-page">
+					<header class="employee-v2-header">
+						<h1>Ausencias</h1>
+						<span>Solicita vacaciones, permisos y otras ausencias.</span>
+					</header>
+
+					<section class="employee-v2-absence-balance">
+						<div>
+							<span>Saldo de vacaciones</span>
+							<strong>${balance.available} días disponibles</strong>
+							<p>Este saldo solo corresponde al tipo Vacaciones.</p>
+						</div>
+						<div class="employee-v2-absence-progress" aria-label="Vacaciones comprometidas">
+							<span style="width: ${progress}%"></span>
+						</div>
+						<div class="employee-v2-summary-grid">
+							<div class="employee-v2-summary-item">
+								<span>Disponibles</span>
+								<strong>${balance.available} días</strong>
+							</div>
+							<div class="employee-v2-summary-item">
+								<span>Disfrutados</span>
+								<strong>${balance.enjoyed} días</strong>
+							</div>
+							<div class="employee-v2-summary-item">
+								<span>Aprobadas futuras</span>
+								<strong>${balance.futureApproved} días</strong>
+							</div>
+							<div class="employee-v2-summary-item">
+								<span>Pendientes</span>
+								<strong>${balance.pending} días</strong>
 							</div>
 						</div>
-						<div class="request-filter-bar employee-request-filter-bar" aria-label="Filtrar solicitudes de vacaciones">
-							${employeeVacationFilterButton('Todas', 'all', employeeVacationFilter, requests.length)}
-							${employeeVacationFilterButton('Aprobadas futuras', 'aprobada-futura', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'aprobada-futura').length)}
-							${employeeVacationFilterButton('Disfrutadas', 'disfrutada', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'disfrutada').length)}
-							${employeeVacationFilterButton('Pendientes', 'pendiente', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'pendiente').length)}
-							${employeeVacationFilterButton('Denegadas', 'denegada', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'denegada').length)}
-							${employeeVacationFilterButton('Canceladas', 'cancelada', employeeVacationFilter, filterEmployeeVacationRequests(requests, 'cancelada').length)}
+					</section>
+
+					<button class="button button-primary employee-v2-absence-launcher" type="button" data-action="toggle-absence-form">
+						Nueva solicitud
+					</button>
+
+					<section class="employee-v2-absence-form ${employeeAbsenceFormOpen ? '' : 'hidden'}">
+						<form id="absence-request-form">
+							<label class="field">
+								<span>Tipo de ausencia</span>
+								<select name="absenceTypeId">
+									${ABSENCE_TYPES.filter((type) => type.active).map((type) => `
+										<option value="${type.id}" ${type.id === DEFAULT_ABSENCE_TYPE_ID ? 'selected' : ''}>${escapeHtml(type.name)}</option>
+									`).join('')}
+								</select>
+							</label>
+
+							<div class="employee-v2-absence-fields" data-absence-unit="days">
+								<label class="field">
+									<span>Fecha desde</span>
+									<input type="date" name="from" required />
+								</label>
+								<label class="field">
+									<span>Fecha hasta</span>
+									<input type="date" name="to" required />
+								</label>
+							</div>
+
+							<div class="employee-v2-absence-fields hidden" data-absence-unit="hours">
+								<label class="field">
+									<span>Fecha</span>
+									<input type="date" name="date" />
+								</label>
+								<label class="field">
+									<span>Hora de inicio</span>
+									<input type="time" name="startTime" />
+								</label>
+								<label class="field">
+									<span>Hora de fin</span>
+									<input type="time" name="endTime" />
+								</label>
+							</div>
+
+							<label class="field">
+								<span>Motivo o comentario</span>
+								<textarea name="comment" placeholder="Añade la información que necesite la persona responsable."></textarea>
+							</label>
+
+							<label class="field">
+								<span>Justificante</span>
+								<input type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png" />
+								<small>En esta demo solo se guarda el nombre del archivo. El documento no se sube.</small>
+							</label>
+
+							<div class="employee-v2-absence-type-info" data-absence-type-info></div>
+							<div class="employee-v2-absence-summary" data-absence-summary>Completa los datos para ver el resumen.</div>
+
+							<div class="employee-v2-absence-form-actions">
+								<button class="button button-primary" type="submit">Enviar solicitud</button>
+								<button class="button button-secondary" type="button" data-action="toggle-absence-form">Cancelar</button>
+							</div>
+						</form>
+					</section>
+
+					<section class="employee-v2-section">
+						<h2>Mis solicitudes</h2>
+						<div class="employee-v2-absence-filters" aria-label="Filtrar ausencias">
+							${employeeAbsenceFilterButton('Todas', 'all', requests)}
+							${employeeAbsenceFilterButton('Pendientes', 'pending', requests)}
+							${employeeAbsenceFilterButton('Aprobadas', 'approved', requests)}
+							${employeeAbsenceFilterButton('Historial', 'history', requests)}
 						</div>
-						<div class="vacation-list">
-							${filteredRequests.length ? filteredRequests.map(renderVacationRow).join('') : employeeVacationEmptyState(employeeVacationFilter)}
+						<div class="employee-v2-absence-list">
+							${filteredRequests.length ? filteredRequests.map(renderEmployeeAbsenceCard).join('') : emptyState('No hay solicitudes para este filtro.')}
 						</div>
 					</section>
-				</div>
-				<div id="employee-vacation-preview" class="employee-vacation-preview-wrap top-gap">
-					${employeeVacationPreview('', '')}
 				</div>
 			`;
 		}
@@ -2802,6 +2877,111 @@ import '../styles/employee-v2.css';
 			return emptyState('Aún no has solicitado vacaciones.');
 		}
 
+		function employeeAbsenceFilterButton(label: string, filter: EmployeeAbsenceFilter, requests: VacationRequest[]) {
+			return `
+				<button
+					class="employee-v2-absence-filter ${employeeAbsenceFilter === filter ? 'is-active' : ''}"
+					type="button"
+					data-action="employee-absence-filter"
+					data-filter="${filter}"
+				>
+					<span>${label}</span>
+					<strong>${filterEmployeeAbsenceRequests(requests, filter).length}</strong>
+				</button>
+			`;
+		}
+
+		function absenceTypeName(request: VacationRequest): string {
+			return findAbsenceType(request, ABSENCE_TYPES)?.name || 'Vacaciones';
+		}
+
+		function absenceCategoryLabel(category: AbsenceCategory): string {
+			if (category === 'vacation') return 'Vacaciones';
+			if (category === 'paid_leave') return 'Permiso retribuido';
+			if (category === 'unpaid_leave') return 'Ausencia no retribuida';
+			if (category === 'medical_leave') return 'Baja médica';
+			return 'Otra ausencia';
+		}
+
+		function absenceDocumentLabel(requirement: DocumentRequirement): string {
+			if (requirement === 'required') return 'Justificante obligatorio';
+			if (requirement === 'optional') return 'Justificante opcional';
+			return 'Justificante no requerido';
+		}
+
+		function absenceRequestDurationLabel(request: VacationRequest): string {
+			if (absenceUsesHours(request, ABSENCE_TYPES)) {
+				return `${(request.requestedHours || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h`;
+			}
+
+			return `${vacationRequestDays(request)} días`;
+		}
+
+		function absenceRequestDateLabel(request: VacationRequest): string {
+			if (absenceUsesHours(request, ABSENCE_TYPES)) {
+				return `${formatDate(request.from)} · ${request.startTime || '--:--'} - ${request.endTime || '--:--'}`;
+			}
+
+			return `${formatDate(request.from)} - ${formatDate(request.to)}`;
+		}
+
+		function renderEmployeeAbsenceCard(request: VacationRequest): string {
+			const type = findAbsenceType(request, ABSENCE_TYPES);
+			const category = type ? absenceCategoryLabel(type.category) : 'Vacaciones';
+			const canCancel = canCancelEmployeeVacation(request);
+			const cancelText = resolveAbsenceTypeId(request) === DEFAULT_ABSENCE_TYPE_ID ? 'Cancelar vacaciones' : 'Cancelar ausencia';
+
+			return `
+				<article class="employee-v2-absence-card">
+					<div class="employee-v2-absence-card-header">
+						<div>
+							<strong>${escapeHtml(absenceTypeName(request))}</strong>
+							<span>${category}</span>
+						</div>
+						${pill(request.status)}
+					</div>
+					<div class="employee-v2-absence-card-meta">
+						<span>${absenceRequestDateLabel(request)}</span>
+						<span>${absenceRequestDurationLabel(request)}</span>
+						<span>Solicitada: ${formatDate(request.createdAt.slice(0, 10))}</span>
+					</div>
+					${request.comment ? `<p>${escapeHtml(request.comment)}</p>` : ''}
+					${request.attachmentName ? `<div class="employee-v2-absence-document">Justificante: ${escapeHtml(request.attachmentName)}</div>` : ''}
+					${request.denialReason ? `<p class="helper-text">Motivo de denegación: ${escapeHtml(request.denialReason)}</p>` : ''}
+					${canCancel ? `<button class="button button-secondary" type="button" data-action="cancel-employee-vacation" data-id="${request.id}">${cancelText}</button>` : ''}
+				</article>
+			`;
+		}
+
+		function filterEmployeeAbsenceRequests(
+			requests: VacationRequest[],
+			filter: EmployeeAbsenceFilter,
+		): VacationRequest[] {
+			return requests
+				.filter((request) => {
+					if (filter === 'pending') return request.status === 'pendiente';
+					if (filter === 'approved') return request.status === 'aprobada' && request.to >= todayIso();
+					if (filter === 'history') {
+						return (
+							request.to < todayIso() ||
+							request.status === 'denegada' ||
+							request.status === 'cancelada'
+						);
+					}
+					return true;
+				})
+				.sort((a, b) => {
+					const rank = (request: VacationRequest) => {
+						if (request.status === 'pendiente') return 0;
+						if (request.status === 'aprobada' && request.to >= todayIso()) return 1;
+						return 2;
+					};
+					const rankDiff = rank(a) - rank(b);
+					if (rankDiff) return rankDiff;
+					return b.createdAt.localeCompare(a.createdAt);
+				});
+		}
+
 		function filterEmployeeVacationRequests(requests: VacationRequest[], filter: EmployeeVacationFilter) {
 			return filterVacationRequests(
 				requests,
@@ -3723,6 +3903,96 @@ import '../styles/employee-v2.css';
 			renderPage();
 		}
 
+		function updateEmployeeAbsenceForm() {
+			const form = document.querySelector<HTMLFormElement>('#absence-request-form');
+			if (!form) return;
+
+			const formData = new FormData(form);
+			const absenceTypeId = String(formData.get('absenceTypeId') || DEFAULT_ABSENCE_TYPE_ID);
+			const draftRequest = {
+				id: 'draft-absence',
+				employeeId: currentEmployee().id,
+				from: todayIso(),
+				to: todayIso(),
+				days: 0,
+				status: 'pendiente',
+				createdAt: '',
+				absenceTypeId,
+			} as VacationRequest;
+			const type = findAbsenceType(draftRequest, ABSENCE_TYPES) || ABSENCE_TYPES[0];
+			const usesHours = type.unit === 'hours';
+			const daysBlock = form.querySelector<HTMLElement>('[data-absence-unit="days"]');
+			const hoursBlock = form.querySelector<HTMLElement>('[data-absence-unit="hours"]');
+			const typeInfo = form.querySelector<HTMLElement>('[data-absence-type-info]');
+			const summary = form.querySelector<HTMLElement>('[data-absence-summary]');
+			const attachment = form.querySelector<HTMLInputElement>('input[name="attachment"]');
+
+			daysBlock?.classList.toggle('hidden', usesHours);
+			hoursBlock?.classList.toggle('hidden', !usesHours);
+
+			form.querySelectorAll<HTMLInputElement>('[data-absence-unit="days"] input').forEach((input) => {
+				input.required = !usesHours;
+			});
+			form.querySelectorAll<HTMLInputElement>('[data-absence-unit="hours"] input').forEach((input) => {
+				input.required = usesHours;
+			});
+			if (attachment) attachment.required = type.documentRequirement === 'required';
+
+			if (typeInfo) {
+				const deductsBalance = absenceDeductsVacationBalance(draftRequest, ABSENCE_TYPES);
+				typeInfo.innerHTML = `
+					<strong>${escapeHtml(type.name)}</strong>
+					<span>${absenceCategoryLabel(type.category)}</span>
+					<span>Solicitud por ${usesHours ? 'horas' : 'días'}</span>
+					<span>${type.requiresApproval ? 'Requiere aprobación' : 'Registro directo'}</span>
+					<span>${absenceDocumentLabel(type.documentRequirement)}</span>
+					<span>${deductsBalance ? 'Descuenta vacaciones' : 'No descuenta vacaciones'}</span>
+				`;
+			}
+
+			if (!summary) return;
+
+			if (usesHours) {
+				const date = String(formData.get('date') || '');
+				const startTime = String(formData.get('startTime') || '');
+				const endTime = String(formData.get('endTime') || '');
+				if (!date || !startTime || !endTime || timeToMinutes(endTime) <= timeToMinutes(startTime)) {
+					summary.textContent = 'Completa los datos para ver el resumen.';
+					return;
+				}
+				const hours = (timeToMinutes(endTime) - timeToMinutes(startTime)) / 60;
+				summary.innerHTML = `
+					<strong>${escapeHtml(type.name)}</strong>
+					<span>${formatDate(date)} · ${startTime} - ${endTime}</span>
+					<span>${hours.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h</span>
+					<span>${type.requiresApproval ? 'Pendiente de aprobación' : 'Se registrará automáticamente'}</span>
+					<span>${absenceDocumentLabel(type.documentRequirement)}</span>
+				`;
+				return;
+			}
+
+			const from = String(formData.get('from') || '');
+			const to = String(formData.get('to') || '');
+			if (!from || !to || from > to) {
+				summary.textContent = 'Completa los datos para ver el resumen.';
+				return;
+			}
+
+			const days = businessDaysBetween(from, to);
+			if (days <= 0) {
+				summary.textContent = 'Completa los datos para ver el resumen.';
+				return;
+			}
+
+			summary.innerHTML = `
+				<strong>${escapeHtml(type.name)}</strong>
+				<span>${formatDate(from)} - ${formatDate(to)}</span>
+				<span>${days} días</span>
+				<span>${type.requiresApproval ? 'Pendiente de aprobación' : 'Se registrará automáticamente'}</span>
+				<span>${absenceDocumentLabel(type.documentRequirement)}</span>
+			`;
+		}
+
 		function checkoutDay() {
 			const employee = currentEmployee();
 			const entry = todayEntry(employee.id);
@@ -3894,6 +4164,120 @@ import '../styles/employee-v2.css';
 			}
 			saveAll();
 			showToast(isNewEntry ? 'Registro creado. Los tiempos se han calculado.' : 'Registro actualizado. Los tiempos se han recalculado.');
+			renderPage();
+		}
+
+		function saveAbsenceRequest(form: HTMLFormElement) {
+			const employee = currentEmployee();
+			const formData = new FormData(form);
+			const absenceTypeId = String(formData.get('absenceTypeId') || DEFAULT_ABSENCE_TYPE_ID);
+			const draftRequest = {
+				id: 'draft-absence',
+				employeeId: employee.id,
+				from: todayIso(),
+				to: todayIso(),
+				days: 0,
+				status: 'pendiente',
+				createdAt: '',
+				absenceTypeId,
+			} as VacationRequest;
+			const type = findAbsenceType(draftRequest, ABSENCE_TYPES);
+
+			if (!type || !type.active || type.id !== absenceTypeId) {
+				showToast('Selecciona un tipo de ausencia válido.');
+				return;
+			}
+
+			const comment = String(formData.get('comment') || '').trim();
+			const attachmentInput = form.querySelector<HTMLInputElement>('input[name="attachment"]');
+			const selectedAttachmentName = attachmentInput?.files?.[0]?.name || '';
+			const attachmentName = type.documentRequirement === 'none' ? '' : selectedAttachmentName;
+
+			if (type.documentRequirement === 'required' && !attachmentName) {
+				showToast('Añade un justificante para este tipo de ausencia.');
+				return;
+			}
+
+			const createdAt = new Date().toISOString();
+			const request: VacationRequest = {
+				id: uniqueId('absence'),
+				employeeId: employee.id,
+				from: '',
+				to: '',
+				days: 0,
+				status: type.requiresApproval ? 'pendiente' : 'aprobada',
+				comment,
+				createdAt,
+				absenceTypeId: type.id,
+				attachmentName: attachmentName || undefined,
+				decidedAt: type.requiresApproval ? undefined : createdAt,
+			};
+
+			if (type.unit === 'hours') {
+				const date = String(formData.get('date') || '');
+				const startTime = String(formData.get('startTime') || '');
+				const endTime = String(formData.get('endTime') || '');
+
+				if (!date) {
+					showToast('Indica la fecha de la ausencia.');
+					return;
+				}
+
+				if (!type.allowsPastRequests && date < todayIso()) {
+					showToast('Este tipo de ausencia no permite solicitudes en fechas pasadas.');
+					return;
+				}
+
+				if (!startTime || !endTime) {
+					showToast('Indica hora de inicio y hora de fin.');
+					return;
+				}
+
+				const startMinutes = timeToMinutes(startTime);
+				const endMinutes = timeToMinutes(endTime);
+				if (endMinutes <= startMinutes) {
+					showToast('La hora de fin debe ser posterior a la hora de inicio.');
+					return;
+				}
+
+				request.from = date;
+				request.to = date;
+				request.requestedHours = Number(((endMinutes - startMinutes) / 60).toFixed(2));
+				request.startTime = startTime;
+				request.endTime = endTime;
+			} else {
+				const from = String(formData.get('from') || '');
+				const to = String(formData.get('to') || '');
+
+				if (!from || !to || from > to) {
+					showToast('Revisa las fechas de la solicitud.');
+					return;
+				}
+
+				if (!type.allowsPastRequests && from < todayIso()) {
+					showToast('Este tipo de ausencia no permite solicitudes en fechas pasadas.');
+					return;
+				}
+
+				const days = businessDaysBetween(from, to);
+				if (days <= 0) {
+					showToast('El rango seleccionado no incluye días laborables.');
+					return;
+				}
+
+				request.from = from;
+				request.to = to;
+				request.days = days;
+			}
+
+			vacations.push(request);
+			addAudit(
+				type.requiresApproval ? 'Solicitud de ausencia' : 'Ausencia registrada',
+				`${employee.name}: ${type.name} ${absenceRequestDateLabel(request)}.`,
+			);
+			saveAll();
+			employeeAbsenceFormOpen = false;
+			showToast(type.requiresApproval ? 'Solicitud enviada. En producción se avisaría a la persona responsable.' : 'Ausencia registrada en la demo.');
 			renderPage();
 		}
 
@@ -4137,6 +4521,18 @@ import '../styles/employee-v2.css';
 			renderPage();
 		}
 
+		function setEmployeeAbsenceFilter(filter: string) {
+			employeeAbsenceFilter = ['all', 'pending', 'approved', 'history'].includes(filter)
+				? (filter as EmployeeAbsenceFilter)
+				: 'all';
+			renderPage();
+		}
+
+		function toggleEmployeeAbsenceForm() {
+			employeeAbsenceFormOpen = !employeeAbsenceFormOpen;
+			renderPage();
+		}
+
 		function cancelEmployeeVacation(id: string) {
 			const employee = currentEmployee();
 			const request = vacations.find((item) => item.id === id && item.employeeId === employee.id);
@@ -4147,14 +4543,16 @@ import '../styles/employee-v2.css';
 			}
 
 			const wasApproved = request.status === 'aprobada';
+			const isVacation = resolveAbsenceTypeId(request) === DEFAULT_ABSENCE_TYPE_ID;
+			const typeName = absenceTypeName(request);
 			request.status = 'cancelada';
 			request.decidedAt = new Date().toISOString();
 			addAudit(
-				wasApproved ? 'Vacaciones canceladas' : 'Solicitud cancelada',
-				`${employee.name}: ${formatDate(request.from)} - ${formatDate(request.to)} (${vacationRequestDays(request)} días laborables).`,
+				wasApproved && isVacation ? 'Vacaciones canceladas' : 'Solicitud cancelada',
+				`${employee.name}: ${typeName} ${absenceRequestDateLabel(request)} (${absenceRequestDurationLabel(request)}).`,
 			);
 			saveAll();
-			showToast(wasApproved ? 'Vacaciones futuras canceladas.' : 'Solicitud cancelada.');
+			showToast(wasApproved && isVacation ? 'Vacaciones futuras canceladas.' : 'Solicitud de ausencia cancelada.');
 			renderPage();
 		}
 
@@ -4742,6 +5140,7 @@ import '../styles/employee-v2.css';
 				vacations,
 				holidays,
 				todayIso(),
+				ABSENCE_TYPES,
 			);
 		}
 
