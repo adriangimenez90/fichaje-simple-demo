@@ -1,5 +1,6 @@
 ﻿---
 import Layout from '../layouts/Layout.astro';
+import '../styles/employee-v2.css';
 ---
 
 <Layout title="FichajeSimple">
@@ -380,6 +381,9 @@ import Layout from '../layouts/Layout.astro';
 		}
 
 		function renderShell() {
+			if (shell) {
+				shell.dataset.role = session.role;
+			}
 			if (userChip) {
 				const displayName = session.role === 'validador_vacaciones' && session.name.toLowerCase().includes('validador')
 					? 'Responsable de vacaciones'
@@ -420,7 +424,8 @@ import Layout from '../layouts/Layout.astro';
 							data-view="${view.id}"
 							aria-current="${activeView === view.id ? 'page' : 'false'}"
 						>
-							${view.label}
+							${session.role === 'empleado' ? employeeNavIcon(view.id) : ''}
+							<span>${view.label}</span>
 						</button>
 					`,
 				)
@@ -447,6 +452,42 @@ import Layout from '../layouts/Layout.astro';
 			`;
 		}
 
+		function employeeNavIcon(viewId: string) {
+			if (viewId === 'fichar') {
+				return `
+					<svg class="employee-v2-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<circle cx="12" cy="12" r="8"></circle>
+						<path d="M12 7v5l3 2"></path>
+					</svg>
+				`;
+			}
+
+			if (viewId === 'vacaciones') {
+				return `
+					<svg class="employee-v2-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<rect x="4" y="5" width="16" height="15" rx="2"></rect>
+						<path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-5"></path>
+					</svg>
+				`;
+			}
+
+			if (viewId === 'calendario') {
+				return `
+					<svg class="employee-v2-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<rect x="4" y="5" width="16" height="15" rx="2"></rect>
+						<path d="M8 3v4M16 3v4M4 10h16"></path>
+					</svg>
+				`;
+			}
+
+			return `
+				<svg class="employee-v2-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+					<circle cx="12" cy="8" r="4"></circle>
+					<path d="M5 20a7 7 0 0 1 14 0"></path>
+				</svg>
+			`;
+		}
+
 		function renderPage() {
 			if (!content) return;
 
@@ -456,6 +497,7 @@ import Layout from '../layouts/Layout.astro';
 				calendario: renderCalendar,
 				historial: renderHistory,
 				vacaciones: renderEmployeeVacations,
+				perfil: renderEmployeeProfile,
 				dashboard: renderAdminDashboard,
 				usuarios: renderUsers,
 				fichajes: renderAdminTimesheets,
@@ -551,68 +593,94 @@ import Layout from '../layouts/Layout.astro';
 			const canCheckout = Boolean(entry?.start && !entry.end && !activeBreak(entry));
 			const checkoutHelp = checkoutHelpText(entry);
 			const weeklyWorked = workedMinutesThisWeek(employee.id);
-			const weeklyOverLimit = weeklyWorked > 40 * 60;
+			const firstName = employee.name.split(' ')[0];
+			const todayLabel = new Date(`${todayIso()}T12:00:00`).toLocaleDateString('es-ES', {
+				weekday: 'long',
+				day: 'numeric',
+				month: 'long',
+			});
+			const timelineItems = [
+				entry?.start
+					? `<li class="employee-v2-timeline-item is-done"><span>Entrada</span><strong>${entry.start}</strong></li>`
+					: `<li class="employee-v2-timeline-item"><span>Entrada</span><strong>Sin registrar</strong></li>`,
+				...(entry?.breaks || []).map(
+					(item) => `
+						<li class="employee-v2-timeline-item ${item.end ? 'is-done' : 'is-current'}">
+							<span>${breakLabel(item)}</span>
+							<strong>${item.start} - ${item.end || 'abierta'}</strong>
+						</li>
+					`,
+				),
+				entry?.end
+					? `<li class="employee-v2-timeline-item is-done"><span>Salida</span><strong>${entry.end}</strong></li>`
+					: `<li class="employee-v2-timeline-item"><span>Salida</span><strong>Sin registrar</strong></li>`,
+			].join('');
 
 			return `
-				${sectionTitle('Fichar', 'Entrada, descansos y salida de hoy.')}
-				<div class="grid punch-layout">
-					<section class="panel punch-panel">
-						<div class="punch-status-row">
-							<div class="punch-state-card">
-								<span class="meta-label">Estado actual</span>
-								<strong>${status.label}</strong>
-								<div class="top-gap-small">${pill(status.label, status.key)}</div>
+				<div class="employee-v2-page">
+					<header class="employee-v2-header">
+						<p>${todayLabel}</p>
+						<h1>Hola, ${escapeHtml(firstName)}</h1>
+						<span>Gestiona tu jornada de hoy.</span>
+					</header>
+
+					<section class="employee-v2-status-card">
+						<div class="employee-v2-status-top">
+							<div>
+								<span class="employee-v2-eyebrow">Estado actual</span>
+								${pill(status.label, status.key)}
 							</div>
-							<div class="clock-card">
-								<span>Hora actual</span>
-								<strong class="live-clock">${currentTimeWithSeconds()}</strong>
-							</div>
+							<strong class="live-clock">${currentTimeWithSeconds()}</strong>
 						</div>
-						<div class="punch-actions">
-							<button class="button button-primary punch-button" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
-								<span>${actionLabel}</span>
-								<small>${actionHelp}</small>
+
+						<div class="employee-v2-worked">
+							<span>Trabajado hoy</span>
+							<strong>${formatMinutes(workedMinutes(entry))}</strong>
+						</div>
+
+						<button class="button button-primary employee-v2-main-action" type="button" data-action="punch" ${entry?.end ? 'disabled' : ''}>
+							<span>${actionLabel}</span>
+							<small>${actionHelp}</small>
+						</button>
+
+						<div class="employee-v2-checkout">
+							<button class="button button-secondary" type="button" data-action="checkout" ${canCheckout ? '' : 'disabled'}>
+								Fichar salida
 							</button>
-							<div class="checkout-action">
-								<button class="button button-secondary punch-button punch-button-secondary" type="button" data-action="checkout" ${canCheckout ? '' : 'disabled'}>
-									<span>Fichar salida</span>
-									<small>${checkoutHelp}</small>
-								</button>
-								${isOnBreak ? '<p class="checkout-help">Finaliza el descanso antes de fichar salida.</p>' : ''}
-							</div>
-						</div>
-						<div class="punch-kpis">
-							<div>
-								<span>Entrada</span>
-								<strong>${entry?.start || 'Sin registrar'}</strong>
-							</div>
-							<div>
-								<span>Descansos</span>
-								<strong>${entry?.breaks.length || 0}</strong>
-							</div>
-							<div>
-								<span>Salida</span>
-								<strong>${entry?.end || 'Sin registrar'}</strong>
-							</div>
-							<div>
-								<span>Trabajado hoy</span>
-								<strong>${formatMinutes(workedMinutes(entry))}</strong>
-							</div>
-							<div>
-								<span>En descanso</span>
-								<strong>${formatMinutes(breakMinutes(entry))}</strong>
-							</div>
-							<div class="${weeklyOverLimit ? 'punch-kpi-alert' : ''}">
-								<span>Trabajado semanal</span>
-								<strong>${formatMinutes(weeklyWorked)}</strong>
-								${weeklyOverLimit ? '<small>Supera 40 h</small>' : ''}
-							</div>
+							<p>${checkoutHelp}</p>
+							${isOnBreak ? '<p class="employee-v2-break-warning">Hay un descanso abierto. Finalízalo antes de fichar salida.</p>' : ''}
 						</div>
 					</section>
-					<section class="panel quick-actions-panel">
-						<h2>Acciones rápidas</h2>
-						<p class="helper-text">Usa estas pausas cuando ya estés trabajando. Para un descanso abierto, usa el botón principal.</p>
-						<div class="tab-actions">
+
+					<section class="employee-v2-summary-grid" aria-label="Resumen de hoy">
+						<div class="employee-v2-summary-item">
+							<span>Entrada</span>
+							<strong>${entry?.start || 'Sin registrar'}</strong>
+						</div>
+						<div class="employee-v2-summary-item">
+							<span>Descanso</span>
+							<strong>${formatMinutes(breakMinutes(entry))}</strong>
+						</div>
+						<div class="employee-v2-summary-item">
+							<span>Salida</span>
+							<strong>${entry?.end || 'Sin registrar'}</strong>
+						</div>
+						<div class="employee-v2-summary-item">
+							<span>Semana</span>
+							<strong>${formatMinutes(weeklyWorked)}</strong>
+						</div>
+					</section>
+
+					<section class="employee-v2-section">
+						<h2>Actividad de hoy</h2>
+						<ul class="employee-v2-timeline">
+							${timelineItems}
+						</ul>
+					</section>
+
+					<details class="employee-more-actions">
+						<summary>Más acciones</summary>
+						<div class="employee-v2-secondary-actions">
 							<button class="button button-secondary" type="button" data-action="quick-pause" data-minutes="15">
 								Pausa 15 min
 							</button>
@@ -629,13 +697,59 @@ import Layout from '../layouts/Layout.astro';
 								Ajustar horas
 							</button>
 						</div>
-						<div class="break-summary">
-							<span class="meta-label">Descansos de hoy</span>
+						<div class="employee-v2-break-list">
+							<span>Descansos registrados</span>
 							${renderBreakList(entry)}
 						</div>
 						<div id="manual-adjustment" class="manual-box hidden">
 							${manualAdjustmentForm()}
 						</div>
+					</details>
+				</div>
+			`;
+		}
+
+		function renderEmployeeProfile() {
+			const employee = currentEmployee();
+			const initials = employee.name
+				.split(' ')
+				.slice(0, 2)
+				.map((part) => part[0] || '')
+				.join('')
+				.toUpperCase();
+
+			return `
+				<div class="employee-v2-page employee-v2-profile">
+					<header class="employee-v2-header">
+						<h1>Perfil</h1>
+						<span>Información laboral de la demo.</span>
+					</header>
+
+					<section class="employee-v2-profile-card">
+						<div class="employee-v2-avatar" aria-hidden="true">${escapeHtml(initials)}</div>
+						<div>
+							<h2>${escapeHtml(employee.name)}</h2>
+							<p>${escapeHtml(session.email)}</p>
+							<div class="employee-v2-profile-tags">
+								${pill(employee.department, 'activo')}
+								${pill('Empleado', 'trabajando')}
+							</div>
+						</div>
+					</section>
+
+					<section class="employee-v2-section">
+						<h2>Información laboral</h2>
+						<div class="employee-v2-profile-list">
+							${summaryRow('Empresa', 'Empresa Demo')}
+							${summaryRow('Centro', 'Centro Principal')}
+							${summaryRow('Departamento', escapeHtml(employee.department))}
+							${summaryRow('Vacaciones anuales', `${employee.vacationDays} días`)}
+							${summaryRow('Responsable', 'Responsable de vacaciones')}
+						</div>
+					</section>
+
+					<section class="employee-v2-demo-note">
+						<p>Los datos y cambios de esta demo se guardan únicamente en este navegador.</p>
 					</section>
 				</div>
 			`;

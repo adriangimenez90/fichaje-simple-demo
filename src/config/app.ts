@@ -36,9 +36,10 @@ export const EMPLOYEES: Employee[] = [
 ];
 
 export const EMPLOYEE_VIEWS: NavigationView[] = [
-	{ id: 'fichar', label: 'Fichar', hint: 'Entrada, descanso y salida' },
-	{ id: 'vacaciones', label: 'Vacaciones', hint: 'Saldo y solicitudes' },
-	{ id: 'calendario', label: 'Calendario', hint: 'Registros del mes' },
+	{ id: 'fichar', label: 'Hoy', hint: 'Jornada y fichaje' },
+	{ id: 'vacaciones', label: 'Ausencias', hint: 'Vacaciones y permisos' },
+	{ id: 'calendario', label: 'Calendario', hint: 'Jornadas y ausencias' },
+	{ id: 'perfil', label: 'Perfil', hint: 'Tus datos laborales' },
 ];
 
 export const VALIDATOR_VIEWS: NavigationView[] = [
