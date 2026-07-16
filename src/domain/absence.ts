@@ -7,6 +7,7 @@ import {
 	rangesOverlap,
 } from '../lib/date';
 import type {
+	AbsenceType,
 	Employee,
 	EmployeeVacationFilter,
 	Holiday,
@@ -14,6 +15,49 @@ import type {
 	VacationConflict,
 	VacationRequest,
 } from '../lib/types';
+
+export function resolveAbsenceTypeId(
+	request: VacationRequest,
+): string {
+	return request.absenceTypeId || 'vacation';
+}
+
+export function findAbsenceType(
+	request: VacationRequest,
+	absenceTypes: readonly AbsenceType[],
+): AbsenceType | undefined {
+	const requestedType = absenceTypes.find((item) => item.id === resolveAbsenceTypeId(request));
+	return requestedType || absenceTypes.find((item) => item.id === 'vacation');
+}
+
+export function normalizeAbsenceRequest(
+	request: VacationRequest,
+): VacationRequest {
+	return {
+		...request,
+		absenceTypeId: resolveAbsenceTypeId(request),
+	};
+}
+
+export function isVacationRequest(
+	request: VacationRequest,
+): boolean {
+	return resolveAbsenceTypeId(request) === 'vacation';
+}
+
+export function absenceUsesHours(
+	request: VacationRequest,
+	absenceTypes: readonly AbsenceType[],
+): boolean {
+	return findAbsenceType(request, absenceTypes)?.unit === 'hours';
+}
+
+export function absenceDeductsVacationBalance(
+	request: VacationRequest,
+	absenceTypes: readonly AbsenceType[],
+): boolean {
+	return findAbsenceType(request, absenceTypes)?.deductsVacationBalance ?? true;
+}
 
 export function isBusinessDay(
 	date: string,

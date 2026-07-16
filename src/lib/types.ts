@@ -6,6 +6,37 @@ export type IncidentStatus = 'pendiente' | 'revisada';
 export type TeamCalendarMode = 'month' | 'planning';
 export type AdminTodayFilter = 'all' | 'trabajando' | 'pausa' | 'sin-fichar' | 'vacaciones';
 export type AdminIncidentFilter = IncidentStatus | 'all';
+export type AbsenceCategory =
+	| 'vacation'
+	| 'paid_leave'
+	| 'unpaid_leave'
+	| 'medical_leave'
+	| 'other';
+export type AbsenceUnit =
+	| 'days'
+	| 'hours';
+export type DocumentRequirement =
+	| 'none'
+	| 'optional'
+	| 'required';
+
+export type AbsenceType = {
+	id: string;
+	name: string;
+	description: string;
+	category: AbsenceCategory;
+	unit: AbsenceUnit;
+	defaultDuration: number | null;
+	deductsVacationBalance: boolean;
+	reducesExpectedHours: boolean;
+	requiresApproval: boolean;
+	documentRequirement: DocumentRequirement;
+	allowsPastRequests: boolean;
+	minimumNoticeDays: number | null;
+	calendarToken: string;
+	active: boolean;
+	sortOrder: number;
+};
 
 export type Session = {
 	id: string;
@@ -62,6 +93,11 @@ export type VacationRequest = {
 	denialReason?: string;
 	createdAt: string;
 	decidedAt?: string;
+	absenceTypeId?: string;
+	requestedHours?: number;
+	startTime?: string;
+	endTime?: string;
+	attachmentName?: string;
 };
 
 export type Incident = {
