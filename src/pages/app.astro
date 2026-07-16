@@ -46,6 +46,7 @@ import Layout from '../layouts/Layout.astro';
 			AdminTodayFilter,
 			AppUser,
 			AuditEntry,
+			DemoData,
 			Employee,
 			EmployeeVacationFilter,
 			EntryStatus,
@@ -62,8 +63,11 @@ import Layout from '../layouts/Layout.astro';
 		} from '../lib/types';
 		import { createDemoData } from '../data/demo';
 		import {
+			loadDemoDataFromStorage,
+			saveDemoDataToStorage,
+		} from '../lib/storage';
+		import {
 			ADMIN_VIEWS,
-			DEMO_VERSION,
 			DEMO_YEAR,
 			EMPLOYEE_VIEWS,
 			EMPLOYEES,
@@ -4324,63 +4328,41 @@ import Layout from '../layouts/Layout.astro';
 
 		function loadDemoData() {
 			const defaults = createDemoData();
-			if (localStorage.getItem(KEYS.demoVersion) !== DEMO_VERSION) {
-				timeEntries = defaults.timeEntries;
-				vacations = defaults.vacations;
-				incidents = defaults.incidents;
-				holidays = defaults.holidays;
-				scheduledReports = defaults.scheduledReports;
-				users = defaults.users;
-				auditLog = defaults.auditLog;
-				saveAll();
-				return;
-			}
+			applyDemoData(loadDemoDataFromStorage(defaults));
+		}
 
-			timeEntries = readCollection(KEYS.timeEntries, defaults.timeEntries);
-			vacations = readCollection(KEYS.vacations, defaults.vacations);
-			incidents = readCollection(KEYS.incidents, defaults.incidents);
-			holidays = readCollection(KEYS.holidays, defaults.holidays);
-			scheduledReports = readCollection(KEYS.scheduledReports, defaults.scheduledReports);
-			users = readCollection(KEYS.users, defaults.users);
-			auditLog = readCollection(KEYS.audit, defaults.auditLog);
-			saveAll();
+		function applyDemoData(data: DemoData) {
+			timeEntries = data.timeEntries;
+			vacations = data.vacations;
+			incidents = data.incidents;
+			holidays = data.holidays;
+			scheduledReports = data.scheduledReports;
+			users = data.users;
+			auditLog = data.auditLog;
+		}
+
+		function currentDemoData(): DemoData {
+			return {
+				timeEntries,
+				vacations,
+				incidents,
+				holidays,
+				scheduledReports,
+				users,
+				auditLog,
+			};
 		}
 
 		function resetDemoData() {
 			const defaults = createDemoData();
-			timeEntries = defaults.timeEntries;
-			vacations = defaults.vacations;
-			incidents = defaults.incidents;
-			holidays = defaults.holidays;
-			scheduledReports = defaults.scheduledReports;
-			users = defaults.users;
-			auditLog = defaults.auditLog;
+			applyDemoData(defaults);
 			addAudit('Datos demo 2026 restablecidos', 'Se borraron los cambios locales y se restauró el dataset anual ficticio.');
 			saveAll();
 			renderPage();
 		}
 
 		function saveAll() {
-			localStorage.setItem(KEYS.demoVersion, DEMO_VERSION);
-			localStorage.setItem(KEYS.timeEntries, JSON.stringify(timeEntries));
-			localStorage.setItem(KEYS.vacations, JSON.stringify(vacations));
-			localStorage.setItem(KEYS.incidents, JSON.stringify(incidents));
-			localStorage.setItem(KEYS.holidays, JSON.stringify(holidays));
-			localStorage.setItem(KEYS.scheduledReports, JSON.stringify(scheduledReports));
-			localStorage.setItem(KEYS.users, JSON.stringify(users));
-			localStorage.setItem(KEYS.audit, JSON.stringify(auditLog));
-		}
-
-		function readCollection<T>(key: string, fallback: T[]): T[] {
-			const raw = localStorage.getItem(key);
-			if (!raw) return fallback;
-
-			try {
-				const parsed = JSON.parse(raw) as T[];
-				return Array.isArray(parsed) ? parsed : fallback;
-			} catch {
-				return fallback;
-			}
+			saveDemoDataToStorage(currentDemoData());
 		}
 
 		function addAudit(action: string, detail: string) {
