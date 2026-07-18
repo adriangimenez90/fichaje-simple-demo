@@ -37,13 +37,13 @@ export const EMPLOYEES: Employee[] = [
 
 export const EMPLOYEE_VIEWS: NavigationView[] = [
 	{ id: 'fichar', label: 'Hoy', hint: 'Jornada y fichaje' },
-	{ id: 'vacaciones', label: 'Ausencias', hint: 'Vacaciones y permisos' },
+	{ id: 'vacaciones', label: 'Ausencias', hint: 'Ausencias y permisos' },
 	{ id: 'calendario', label: 'Calendario', hint: 'Jornadas y ausencias' },
 	{ id: 'perfil', label: 'Perfil', hint: 'Tus datos laborales' },
 ];
 
 export const VALIDATOR_VIEWS: NavigationView[] = [
-	{ id: 'solicitudes', label: 'Solicitudes', hint: 'Vacaciones y permisos' },
+	{ id: 'solicitudes', label: 'Solicitudes', hint: 'Ausencias y permisos' },
 	{ id: 'calendario-equipo', label: 'Calendario', hint: 'Disponibilidad del equipo' },
 	{ id: 'festivos', label: 'Festivos', hint: 'Calendario laboral' },
 ];
@@ -52,7 +52,7 @@ export const ADMIN_VIEWS: NavigationView[] = [
 	{ id: 'admin-inicio', label: 'Inicio', hint: 'Resumen de la empresa' },
 	{ id: 'personas', label: 'Personas', hint: 'Empleados y accesos' },
 	{ id: 'registros', label: 'Registros', hint: 'Jornadas e incidencias' },
-	{ id: 'vacaciones-admin', label: 'Ausencias', hint: 'Vacaciones y permisos' },
+	{ id: 'vacaciones-admin', label: 'Ausencias', hint: 'Ausencias y permisos' },
 	{ id: 'informes', label: 'Informes', hint: 'Exportación y seguimiento' },
 	{ id: 'configuracion', label: 'Configuración', hint: 'Empresa y políticas' },
 ];
