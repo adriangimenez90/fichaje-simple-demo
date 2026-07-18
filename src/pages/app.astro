@@ -209,6 +209,8 @@ import '../styles/responsible-v2.css';
 		let adminReportEmployeeId = 'all';
 		let adminReportDepartment = 'all';
 		let adminReportStatus = 'all';
+		type AdminSettingsSection = 'company' | 'calendar' | 'vacation' | 'absence-types' | 'demo';
+		let adminSettingsSection: AdminSettingsSection = 'company';
 		let selectedAdminUserId = '';
 		let selectedAdminPersonId = '';
 		let selectedAdminRecordEmployeeId = '';
@@ -350,6 +352,7 @@ import '../styles/responsible-v2.css';
 				if (action === 'clear-admin-absence-filters') clearAdminAbsenceFilters();
 				if (action === 'admin-report-type') setAdminReportType(actionButton.dataset.type || 'time');
 				if (action === 'export-admin-report') exportAdminReport();
+				if (action === 'admin-settings-section') setAdminSettingsSection(actionButton.dataset.section || 'company');
 				if (action === 'logout') {
 					localStorage.removeItem(KEYS.session);
 					window.location.href = '/';
@@ -3857,6 +3860,13 @@ import '../styles/responsible-v2.css';
 			renderPage();
 		}
 
+		function setAdminSettingsSection(section: string) {
+			adminSettingsSection = ['company', 'calendar', 'vacation', 'absence-types', 'demo'].includes(section)
+				? (section as AdminSettingsSection)
+				: 'company';
+			renderPage();
+		}
+
 		function exportAdminReport() {
 			const range = adminReportDateRange();
 			const report = adminReportData(range);
@@ -4039,46 +4049,238 @@ import '../styles/responsible-v2.css';
 
 		function renderSettings() {
 			return `
-				${sectionTitle('Ajustes', 'Configuración básica de la demo y datos guardados en este navegador.')}
-				${renderSettingsContent()}
+				<section class="admin-v2-settings">
+					<header class="admin-v2-page-header">
+						<span>Configuración</span>
+						<h1>Configuración</h1>
+						<p>Gestiona los ajustes básicos de FichajeSimple.</p>
+					</header>
+					<nav class="admin-v2-settings-nav" aria-label="Secciones de configuración">
+						${adminSettingsTab('company', 'Empresa')}
+						${adminSettingsTab('calendar', 'Calendario laboral')}
+						${adminSettingsTab('vacation', 'Vacaciones')}
+						${adminSettingsTab('absence-types', 'Tipos de ausencia')}
+						${adminSettingsTab('demo', 'Demo')}
+					</nav>
+					${renderSettingsContent()}
+				</section>
+			`;
+		}
+
+		function adminSettingsTab(section: AdminSettingsSection, label: string) {
+			return `
+				<button
+					class="admin-v2-settings-tab ${adminSettingsSection === section ? 'is-active' : ''}"
+					type="button"
+					data-action="admin-settings-section"
+					data-section="${section}"
+					aria-pressed="${adminSettingsSection === section ? 'true' : 'false'}"
+				>
+					${label}
+				</button>
 			`;
 		}
 
 		function renderSettingsContent() {
+			if (adminSettingsSection === 'calendar') return renderSettingsCalendar();
+			if (adminSettingsSection === 'vacation') return renderSettingsVacation();
+			if (adminSettingsSection === 'absence-types') return renderSettingsAbsenceTypes();
+			if (adminSettingsSection === 'demo') return renderSettingsDemo();
+			return renderSettingsCompany();
+		}
+
+		function renderSettingsCompany() {
+			const departments = departmentList();
+			const admins = users.filter((user) => user.role === 'admin_global').length;
+			const validators = users.filter((user) => user.role === 'validador_vacaciones').length;
+			const employeesWithAccess = users.filter((user) => user.role === 'empleado' && user.employeeId).length;
+
+			return `
+				<section class="admin-v2-panel admin-v2-settings-section admin-v2-settings-company">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Empresa</h2>
+							<p>Estos datos identifican la empresa utilizada en esta demostración.</p>
+						</div>
+						<button class="button button-secondary" type="button" data-action="admin-go-view" data-view="personas">Gestionar personas</button>
+					</div>
+					<div class="admin-v2-settings-grid">
+						<div class="admin-v2-settings-card">
+							<h3>Datos de empresa</h3>
+							${summaryRow('Empresa', 'Empresa Demo')}
+							${summaryRow('Centro', 'Centro Principal')}
+							${summaryRow('Personas', String(EMPLOYEES.length))}
+							${summaryRow('Departamentos', String(departments.length))}
+							${summaryRow('Accesos configurados', String(users.length))}
+						</div>
+						<div class="admin-v2-settings-card">
+							<h3>Accesos</h3>
+							${summaryRow('Administradores', String(admins))}
+							${summaryRow('Responsables de ausencias', String(validators))}
+							${summaryRow('Empleados con acceso', String(employeesWithAccess))}
+						</div>
+					</div>
+				</section>
+			`;
+		}
+
+		function renderSettingsCalendar() {
+			const sorted = holidays.slice().sort((a, b) => a.date.localeCompare(b.date));
+
+			return `
+				<section class="admin-v2-panel admin-v2-settings-section admin-v2-settings-holidays">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Calendario laboral</h2>
+							<p>Configura los días festivos que se utilizan para calcular jornadas y ausencias.</p>
+						</div>
+						${pill('Datos demo 2026', 'festivo')}
+					</div>
+					<p class="helper-text">Los festivos afectan al cálculo de días laborables y vacaciones.</p>
+					<div class="admin-v2-settings-grid">
+						<div class="admin-v2-settings-card">
+							<h3>Festivos configurados</h3>
+							${sorted.length ? sorted.map((holiday) => `
+								<div class="admin-v2-settings-holiday">
+									<div>
+										<strong>${formatDate(holiday.date)}</strong>
+										<span>${escapeHtml(holiday.name)} · ${escapeHtml(holiday.center)}</span>
+									</div>
+									<button class="button button-tertiary button-small" type="button" data-action="delete-holiday" data-id="${holiday.id}">Eliminar</button>
+								</div>
+							`).join('') : emptyState('No hay festivos configurados.')}
+						</div>
+						<div class="admin-v2-settings-card">
+							<h3>Añadir festivo</h3>
+							<form id="holiday-form" class="form-grid admin-v2-settings-holiday-form">
+								<label class="field">
+									<span>Fecha</span>
+									<input type="date" name="date" required />
+								</label>
+								<label class="field">
+									<span>Nombre</span>
+									<input type="text" name="name" placeholder="Fiesta local" required />
+								</label>
+								<input type="hidden" name="center" value="Centro Principal" />
+								<button class="button button-primary" type="submit">Añadir festivo</button>
+							</form>
+						</div>
+					</div>
+				</section>
+			`;
+		}
+
+		function renderSettingsVacation() {
+			const vacationType = ABSENCE_TYPES.find((type) => type.category === 'vacation');
+			const dayGroups = settingsVacationDayGroups();
+			const sameAllocation = dayGroups.length === 1;
+
+			return `
+				<section class="admin-v2-panel admin-v2-settings-section admin-v2-settings-vacation">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Vacaciones</h2>
+							<p>Configuración base aplicada a las solicitudes de vacaciones de la demo.</p>
+						</div>
+						<button class="button button-secondary" type="button" data-action="admin-go-view" data-view="personas">Gestionar personas</button>
+					</div>
+					<div class="admin-v2-settings-grid">
+						<div class="admin-v2-settings-card">
+							<h3>Política actual</h3>
+							${summaryRow('Unidad', vacationType?.unit === 'hours' ? 'Horas' : 'Días')}
+							${summaryRow('Aprobación', vacationType?.requiresApproval === false ? 'No requerida' : 'Requerida')}
+							${summaryRow('Saldo', vacationType?.deductsVacationBalance ? 'Descuenta saldo' : 'No descuenta saldo')}
+							${summaryRow('Cálculo', 'Días laborables')}
+						</div>
+						<div class="admin-v2-settings-card">
+							<h3>Días asignados</h3>
+							<p>${sameAllocation ? `Asignación anual: ${dayGroups[0]?.days || 0} días` : 'La asignación anual varía por persona.'}</p>
+							<div class="admin-v2-settings-summary">
+								${dayGroups.map((group) => `
+									<div>
+										<strong>${group.days} días</strong>
+										<span>${group.count} persona${group.count === 1 ? '' : 's'}</span>
+									</div>
+								`).join('')}
+							</div>
+						</div>
+					</div>
+					<div class="admin-v2-settings-card">
+						<h3>Saldo</h3>
+						<p>Las vacaciones aprobadas, disfrutadas y pendientes se tienen en cuenta en el saldo de cada persona.</p>
+					</div>
+				</section>
+			`;
+		}
+
+		function renderSettingsAbsenceTypes() {
+			const activeTypes = ABSENCE_TYPES.filter((type) => type.active);
+
+			return `
+				<section class="admin-v2-panel admin-v2-settings-section admin-v2-settings-absence-types">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Tipos de ausencia</h2>
+							<p>Catálogo base disponible para las solicitudes de la demo.</p>
+						</div>
+						${pill(`${activeTypes.length} tipos configurados`, 'correcto')}
+					</div>
+					<p class="helper-text">Este catálogo representa la configuración base de la demo. Las duraciones y condiciones deben adaptarse a la política interna y convenio aplicable de cada empresa.</p>
+					<div class="admin-v2-settings-absence-list">
+						${ABSENCE_TYPES.map((type) => `
+							<article class="admin-v2-settings-absence-item">
+								<div>
+									<strong>${escapeHtml(type.name)}</strong>
+									<span>${escapeHtml(type.description)}</span>
+								</div>
+								<div class="admin-v2-settings-absence-meta">
+									${pill(absenceCategoryLabel(type.category), type.category)}
+									<span>${type.unit === 'hours' ? 'Por horas' : 'Por días'}</span>
+									<span>${type.requiresApproval ? 'Requiere aprobación' : 'Sin aprobación'}</span>
+									<span>${absenceDocumentLabel(type.documentRequirement)}</span>
+									<span>${type.deductsVacationBalance ? 'Descuenta vacaciones' : 'No descuenta vacaciones'}</span>
+									${pill(type.active ? 'Activo' : 'Inactivo', type.active ? 'correcto' : 'sin fichaje')}
+								</div>
+							</article>
+						`).join('')}
+					</div>
+				</section>
+			`;
+		}
+
+		function renderSettingsDemo() {
 			const recentAudit = auditLog.slice(0, 5);
 
 			return `
-				<div class="grid grid-2">
-					<section class="panel">
-						<h2>Datos de la demo</h2>
-						<div class="summary-list">
-							${summaryRow('Razón social', 'Empresa Demo')}
-							${summaryRow('Centro', 'Centro Principal')}
-							${summaryRow('Modo de datos', 'Datos en navegador')}
-							${summaryRow('Validez legal', 'Demo pública con datos ficticios. No válida como registro horario real.')}
-							${summaryRow('Personalización', 'Empresa y centro preparados para parametrizar en una futura versión.')}
+				<section class="admin-v2-panel admin-v2-settings-section admin-v2-settings-demo">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Datos de la demo</h2>
+							<p>Los cambios de esta demo se guardan únicamente en este navegador.</p>
 						</div>
-					</section>
-					<section class="panel">
-						<h2>Restablecer datos demo 2026</h2>
-						<p class="helper-text">
-							La sesión, fichajes, vacaciones, incidencias y auditoría se guardan únicamente en este navegador.
-							Al restablecer se borran los cambios locales y vuelve el dataset anual 2026.
-						</p>
-						<div class="settings-reset-card">
-							<div>
-								<strong>Volver a datos iniciales</strong>
-								<span>Borra los cambios locales del navegador y deja la demo lista para enseñarla desde cero.</span>
-							</div>
-							<button class="button button-tertiary" type="button" data-action="reset-demo">Restablecer datos demo 2026</button>
+						${pill('Datos demo 2026', 'correcto')}
+					</div>
+					<div class="admin-v2-settings-grid">
+						<div class="admin-v2-settings-card">
+							<h3>Contenido demo</h3>
+							${summaryRow('Personas', String(EMPLOYEES.length))}
+							${summaryRow('Fichajes', String(timeEntries.length))}
+							${summaryRow('Solicitudes de ausencia', String(vacations.length))}
+							${summaryRow('Incidencias', String(incidents.length))}
+							${summaryRow('Festivos', String(holidays.length))}
 						</div>
-					</section>
-				</div>
-				<details class="panel top-gap settings-audit-details">
+						<div class="admin-v2-settings-card admin-v2-settings-danger">
+							<h3>Reiniciar demo</h3>
+							<p>Se eliminarán los cambios realizados en este navegador y se restaurarán los datos iniciales.</p>
+							<button class="button button-tertiary" type="button" data-action="reset-demo">Restablecer datos de demostración</button>
+						</div>
+					</div>
+				</section>
+				<details class="admin-v2-settings-card settings-audit-details">
 					<summary>
 						<span>
-							<strong>Actividad de la demo</strong>
-							<small>Auditoría reciente guardada localmente</small>
+							<strong>Actividad reciente</strong>
+							<small>Auditoría guardada localmente</small>
 						</span>
 						${pill(String(auditLog.length), 'correcto')}
 					</summary>
@@ -4097,6 +4299,16 @@ import '../styles/responsible-v2.css';
 					` : emptyState('Aún no hay actividad registrada.')}
 				</details>
 			`;
+		}
+
+		function settingsVacationDayGroups() {
+			const groups = new Map<number, number>();
+			EMPLOYEES.forEach((employee) => {
+				groups.set(employee.vacationDays, (groups.get(employee.vacationDays) || 0) + 1);
+			});
+			return Array.from(groups.entries())
+				.map(([days, count]) => ({ days, count }))
+				.sort((a, b) => a.days - b.days);
 		}
 
 		function sectionTitle(title: string, description: string) {

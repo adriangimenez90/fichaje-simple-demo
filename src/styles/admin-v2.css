@@ -1112,6 +1112,157 @@
 	min-width: 0;
 }
 
+.app-shell[data-role="admin_global"] .admin-v2-settings {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-tab {
+	min-height: 42px;
+	padding: 9px 13px;
+	border: 1px solid #dce6e2;
+	border-radius: 999px;
+	background: #ffffff;
+	color: #31413d;
+	font-weight: 680;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-tab.is-active,
+.app-shell[data-role="admin_global"] .admin-v2-settings-tab:hover {
+	border-color: #9ad4c5;
+	background: #e8f6f1;
+	color: #0f6b58;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-section {
+	margin-top: 16px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-card {
+	display: grid;
+	gap: 10px;
+	min-width: 0;
+	padding: 14px;
+	border: 1px solid #e4ebe8;
+	border-radius: 14px;
+	background: #f8fbfa;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-card h3,
+.app-shell[data-role="admin_global"] .admin-v2-settings-section h2 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-card p {
+	margin: 0;
+	color: #52615c;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-summary {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-summary div {
+	display: grid;
+	gap: 3px;
+	padding: 10px;
+	border-radius: 12px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-summary span,
+.app-shell[data-role="admin_global"] .admin-v2-settings-holiday span,
+.app-shell[data-role="admin_global"] .admin-v2-settings-absence-item span {
+	color: #66736f;
+	font-size: 0.88rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-holiday {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	min-width: 0;
+	padding: 10px;
+	border: 1px solid #e4ebe8;
+	border-radius: 12px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-holiday div {
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-holiday strong,
+.app-shell[data-role="admin_global"] .admin-v2-settings-holiday span {
+	display: block;
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-holiday-form {
+	grid-template-columns: 1fr;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-absence-list {
+	display: grid;
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-absence-item {
+	display: grid;
+	gap: 10px;
+	min-width: 0;
+	padding: 12px;
+	border: 1px solid #e4ebe8;
+	border-radius: 14px;
+	background: #fbfdfc;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-absence-item strong {
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-absence-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-absence-meta > span {
+	padding: 5px 8px;
+	border-radius: 999px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-danger {
+	border-color: #f0c984;
+	background: #fff9ef;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-settings-danger .button {
+	justify-self: start;
+	min-height: 48px;
+}
+
 @media (max-width: 1100px) {
 	.app-shell[data-role="admin_global"] .admin-v2-metrics {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1176,7 +1327,9 @@
 	.app-shell[data-role="admin_global"] .admin-v2-absence-today-list,
 	.app-shell[data-role="admin_global"] .admin-v2-reports-types,
 	.app-shell[data-role="admin_global"] .admin-v2-reports-filters,
-	.app-shell[data-role="admin_global"] .admin-v2-reports-summary-grid {
+	.app-shell[data-role="admin_global"] .admin-v2-reports-summary-grid,
+	.app-shell[data-role="admin_global"] .admin-v2-settings-grid,
+	.app-shell[data-role="admin_global"] .admin-v2-settings-summary {
 		grid-template-columns: 1fr;
 	}
 
@@ -1191,7 +1344,8 @@
 	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav,
 	.app-shell[data-role="admin_global"] .admin-v2-absence-header,
 	.app-shell[data-role="admin_global"] .admin-v2-absence-detail-head,
-	.app-shell[data-role="admin_global"] .admin-v2-reports-export {
+	.app-shell[data-role="admin_global"] .admin-v2-reports-export,
+	.app-shell[data-role="admin_global"] .admin-v2-settings-holiday {
 		align-items: stretch;
 		flex-direction: column;
 	}
@@ -1205,7 +1359,9 @@
 	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav .button,
 	.app-shell[data-role="admin_global"] .admin-v2-absence-item,
 	.app-shell[data-role="admin_global"] .admin-v2-reports-export .button,
-	.app-shell[data-role="admin_global"] .admin-v2-reports-schedule-form .button {
+	.app-shell[data-role="admin_global"] .admin-v2-reports-schedule-form .button,
+	.app-shell[data-role="admin_global"] .admin-v2-settings-holiday .button,
+	.app-shell[data-role="admin_global"] .admin-v2-settings-danger .button {
 		min-height: 48px;
 		width: 100%;
 	}
