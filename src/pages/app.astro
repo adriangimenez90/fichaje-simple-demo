@@ -5293,7 +5293,6 @@ import '../styles/responsible-v2.css';
 				to: String(formData.get('to') || todayIso()),
 				status: String(formData.get('status') || 'all'),
 			};
-			selectedTimesheetSummaryKey = '';
 			showToast('Filtros aplicados.');
 			renderPage();
 		}
@@ -5311,8 +5310,6 @@ import '../styles/responsible-v2.css';
 				...timeFilters,
 				status: 'incidencia',
 			};
-			adminIncidentFilter = 'pendiente';
-			selectedTimesheetSummaryKey = '';
 			renderNav();
 			renderPage();
 		}
