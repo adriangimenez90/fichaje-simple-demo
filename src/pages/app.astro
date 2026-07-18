@@ -189,7 +189,10 @@ import '../styles/responsible-v2.css';
 		let adminTodayFilter: AdminTodayFilter = 'all';
 		let adminIncidentFilter: AdminIncidentFilter = 'pendiente';
 		let adminUserSearch = '';
+		let adminPeopleSearch = '';
+		let adminPeopleDepartment = 'all';
 		let selectedAdminUserId = '';
+		let selectedAdminPersonId = '';
 		let selectedTimesheetSummaryKey = '';
 
 		let timeEntries: TimeEntry[] = [];
@@ -313,6 +316,8 @@ import '../styles/responsible-v2.css';
 				if (action === 'admin-today-filter') setAdminTodayFilter(actionButton.dataset.filter || 'all');
 				if (action === 'open-pending-incidents') openPendingIncidents();
 				if (action === 'select-admin-user') selectAdminUser(actionButton.dataset.id || '');
+				if (action === 'select-admin-person') selectAdminPerson(actionButton.dataset.id || '');
+				if (action === 'clear-admin-people-filters') clearAdminPeopleFilters();
 				if (action === 'select-timesheet-summary') selectTimesheetSummary(actionButton.dataset.id || '');
 				if (action === 'admin-incident-filter') setAdminIncidentFilter(actionButton.dataset.filter || 'pendiente');
 				if (action === 'logout') {
@@ -411,6 +416,30 @@ import '../styles/responsible-v2.css';
 					event.preventDefault();
 					const formData = new FormData(form);
 					historyMonth = String(formData.get('month') || historyMonth);
+					renderPage();
+				}
+			});
+
+			document.addEventListener('input', (event) => {
+				const input = event.target as HTMLInputElement;
+				if (input.id === 'admin-people-search') {
+					const cursor = input.selectionStart || input.value.length;
+					adminPeopleSearch = input.value;
+					selectedAdminPersonId = '';
+					renderPage();
+					queueMicrotask(() => {
+						const search = document.querySelector<HTMLInputElement>('#admin-people-search');
+						search?.focus();
+						search?.setSelectionRange(cursor, cursor);
+					});
+				}
+			});
+
+			document.addEventListener('change', (event) => {
+				const field = event.target as HTMLSelectElement;
+				if (field.id === 'admin-people-department') {
+					adminPeopleDepartment = field.value || 'all';
+					selectedAdminPersonId = '';
 					renderPage();
 				}
 			});
@@ -1228,26 +1257,49 @@ import '../styles/responsible-v2.css';
 		}
 
 		function renderUsers() {
-			const sortedUsers = users.slice().sort((a, b) => a.name.localeCompare(b.name));
-			const query = adminUserSearch.trim().toLowerCase();
-			const filteredUsers = query
-				? sortedUsers.filter((user) =>
-					[user.name, user.email, user.department || '', roleLabel(user.role)]
-						.some((value) => value.toLowerCase().includes(query))
-				)
-				: [];
-			const selectedUser =
-				filteredUsers.find((user) => user.id === selectedAdminUserId) ||
-				filteredUsers[0];
-			if (selectedUser) selectedAdminUserId = selectedUser.id;
+			const departments = departmentList();
+			const query = adminPeopleSearch.trim().toLowerCase();
+			const linkedAccessCount = EMPLOYEES.filter((employee) => userForEmployee(employee)?.active).length;
+			const filteredPeople = EMPLOYEES
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.filter((employee) => adminPeopleDepartment === 'all' || employee.department === adminPeopleDepartment)
+				.filter((employee) => {
+					const access = userForEmployee(employee);
+					if (!query) return true;
+					return [employee.name, employee.department, access?.email || '']
+						.some((value) => value.toLowerCase().includes(query));
+				});
+			const selectedPerson =
+				filteredPeople.find((employee) => employee.id === selectedAdminPersonId) ||
+				filteredPeople[0];
+			if (selectedPerson) selectedAdminPersonId = selectedPerson.id;
 
 			return `
-				${sectionTitle('Empleados', 'Busca una persona y revisa su ficha. Todo es ficticio y local.')}
-				<div class="admin-users-layout admin-users-simple">
-					<section class="panel">
-						<h2>Crear empleado</h2>
-						<p class="helper-text">Alta simulada para probar la demo. No se envía ninguna invitación real.</p>
-						<form id="user-form" class="form-grid top-gap">
+				<div class="admin-v2-people">
+					<header class="admin-v2-page-header admin-v2-people-header">
+						<div>
+							<span>Personas</span>
+							<h1>Personas</h1>
+							<p>Gestiona empleados, departamentos y accesos.</p>
+						</div>
+						<button class="button button-primary" type="submit" form="user-form">Añadir persona</button>
+					</header>
+
+					<div class="admin-v2-people-summary">
+						${adminPeopleMetric('Personas', String(EMPLOYEES.length))}
+						${adminPeopleMetric('Departamentos', String(departments.length))}
+						${adminPeopleMetric('Accesos activos', String(linkedAccessCount))}
+					</div>
+
+					<section class="admin-v2-panel admin-v2-people-create">
+						<div class="admin-v2-panel-head">
+							<div>
+								<h2>Añadir persona</h2>
+								<p>Alta simulada para probar la demo. No se envía ninguna invitación real.</p>
+							</div>
+						</div>
+						<form id="user-form" class="form-grid admin-v2-people-form">
 							<label class="field">
 								<span>Nombre</span>
 								<input type="text" name="name" placeholder="Nombre y apellidos" required />
@@ -1268,39 +1320,85 @@ import '../styles/responsible-v2.css';
 									<option value="admin_global">Administrador</option>
 								</select>
 							</label>
-							<button class="button button-primary" type="submit">Crear usuario</button>
+							<button class="button button-primary" type="submit">Crear acceso</button>
 						</form>
 					</section>
-					<section class="panel">
-						<div class="panel-heading">
-							<div>
-								<h2>Editar empleado</h2>
-								<p class="helper-text">Nombre, email o departamento.</p>
-							</div>
-						</div>
-						<form id="user-search-form" class="form-grid admin-user-search">
-							<label class="field">
-								<span>Buscar</span>
-								<input type="search" name="query" value="${escapeHtml(adminUserSearch)}" placeholder="Nombre, email o departamento" />
-							</label>
-							<button class="button button-secondary" type="submit">Buscar</button>
-						</form>
-						<div class="admin-user-picker top-gap">
-							${query ? (filteredUsers.length ? filteredUsers.map((user) => `
-								<button
-									class="admin-user-option ${selectedUser?.id === user.id ? 'is-active' : ''}"
-									type="button"
-									data-action="select-admin-user"
-									data-id="${user.id}"
-								>
-									<strong>${escapeHtml(user.name)}</strong>
-									<span>${escapeHtml(user.department || 'General')} · ${roleLabel(user.role)}</span>
-								</button>
-							`).join('') : emptyState('No hay empleados con esa búsqueda.')) : emptyState('Busca un empleado para editar su ficha.')}
-						</div>
-						${selectedUser ? renderAdminUserCard(selectedUser) : ''}
+
+					<section class="admin-v2-panel admin-v2-people-toolbar">
+						<label class="field">
+							<span>Buscar</span>
+							<input id="admin-people-search" type="search" value="${escapeHtml(adminPeopleSearch)}" placeholder="Buscar por nombre, email o departamento" />
+						</label>
+						<label class="field">
+							<span>Departamento</span>
+							<select id="admin-people-department">
+								<option value="all" ${adminPeopleDepartment === 'all' ? 'selected' : ''}>Todos los departamentos</option>
+								${departments.map((department) => `<option value="${escapeHtml(department)}" ${adminPeopleDepartment === department ? 'selected' : ''}>${escapeHtml(department)}</option>`).join('')}
+							</select>
+						</label>
+						<strong>${filteredPeople.length} personas</strong>
 					</section>
+
+					<div class="admin-v2-people-layout">
+						<section class="admin-v2-panel admin-v2-people-list" aria-label="Personas">
+							${filteredPeople.length ? filteredPeople.map((employee) => renderAdminPersonItem(employee, selectedPerson?.id === employee.id)).join('') : `
+								${emptyState('No hay personas que coincidan con los filtros.')}
+								<button class="button button-secondary" type="button" data-action="clear-admin-people-filters">Limpiar filtros</button>
+							`}
+						</section>
+
+						<section class="admin-v2-panel admin-v2-person-detail">
+							${selectedPerson ? renderAdminPersonDetail(selectedPerson) : emptyState('Selecciona una persona.')}
+						</section>
+					</div>
 				</div>
+			`;
+		}
+
+		function renderLegacyUserSearch() {
+			const sortedUsers = users.slice().sort((a, b) => a.name.localeCompare(b.name));
+			const query = adminUserSearch.trim().toLowerCase();
+			const filteredUsers = query
+				? sortedUsers.filter((user) =>
+					[user.name, user.email, user.department || '', roleLabel(user.role)]
+						.some((value) => value.toLowerCase().includes(query))
+				)
+				: [];
+			const selectedUser =
+				filteredUsers.find((user) => user.id === selectedAdminUserId) ||
+				filteredUsers[0];
+			if (selectedUser) selectedAdminUserId = selectedUser.id;
+
+			return `
+				<section class="admin-v2-panel">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Accesos creados</h2>
+							<p>Busca accesos demo que no estén vinculados a una persona.</p>
+						</div>
+					</div>
+					<form id="user-search-form" class="form-grid admin-user-search">
+						<label class="field">
+							<span>Buscar acceso</span>
+							<input type="search" name="query" value="${escapeHtml(adminUserSearch)}" placeholder="Nombre, email o departamento" />
+						</label>
+						<button class="button button-secondary" type="submit">Buscar</button>
+					</form>
+					<div class="admin-user-picker top-gap">
+						${query ? (filteredUsers.length ? filteredUsers.map((user) => `
+							<button
+								class="admin-user-option ${selectedUser?.id === user.id ? 'is-active' : ''}"
+								type="button"
+								data-action="select-admin-user"
+								data-id="${user.id}"
+							>
+								<strong>${escapeHtml(user.name)}</strong>
+								<span>${escapeHtml(user.department || 'General')} · ${roleLabel(user.role)}</span>
+							</button>
+						`).join('') : emptyState('No hay accesos con esa búsqueda.')) : emptyState('Busca un acceso para revisar su ficha.')}
+					</div>
+					${selectedUser ? renderAdminUserCard(selectedUser) : ''}
+				</section>
 			`;
 		}
 
@@ -3116,6 +3214,102 @@ import '../styles/responsible-v2.css';
 						${summaryRow('Departamento', employee.department)}
 					</div>
 				</article>
+			`;
+		}
+
+		function adminPeopleMetric(label: string, value: string) {
+			return `
+				<div class="admin-v2-people-metric">
+					<span>${label}</span>
+					<strong>${value}</strong>
+				</div>
+			`;
+		}
+
+		function userForEmployee(employee: Employee) {
+			return users.find((user) => user.employeeId === employee.id) ||
+				users.find((user) => user.id === employee.id) ||
+				users.find((user) => user.name === employee.name);
+		}
+
+		function personInitials(name: string) {
+			return name
+				.split(' ')
+				.filter(Boolean)
+				.slice(0, 2)
+				.map((part) => part[0]?.toUpperCase() || '')
+				.join('');
+		}
+
+		function renderAdminPersonItem(employee: Employee, selected: boolean) {
+			const access = userForEmployee(employee);
+			return `
+				<button
+					class="admin-v2-person-item ${selected ? 'is-active' : ''}"
+					type="button"
+					data-action="select-admin-person"
+					data-id="${employee.id}"
+					aria-current="${selected ? 'page' : 'false'}"
+				>
+					<span class="admin-v2-person-avatar" aria-hidden="true">${escapeHtml(personInitials(employee.name))}</span>
+					<span>
+						<strong>${escapeHtml(employee.name)}</strong>
+						<small>${escapeHtml(access?.email || 'Sin acceso asociado')}</small>
+						<em>${escapeHtml(employee.department)}</em>
+					</span>
+					${access ? pill(roleLabel(access.role), access.active ? 'activo' : 'inactivo') : pill('Sin acceso', 'sin-fichaje')}
+				</button>
+			`;
+		}
+
+		function renderAdminPersonDetail(employee: Employee) {
+			const access = userForEmployee(employee);
+			const balance = vacationBalance(employee.id);
+			return `
+				<div class="admin-v2-person-profile">
+					<div class="admin-v2-person-main">
+						<span class="admin-v2-person-avatar admin-v2-person-avatar-large" aria-hidden="true">${escapeHtml(personInitials(employee.name))}</span>
+						<div>
+							<span>Ficha de persona</span>
+							<h2>${escapeHtml(employee.name)}</h2>
+							<p>${escapeHtml(employee.department)}</p>
+						</div>
+					</div>
+
+					<div class="admin-v2-person-sections">
+						<section class="admin-v2-person-section">
+							<h3>Información laboral</h3>
+							${summaryRow('Departamento', escapeHtml(employee.department))}
+							${summaryRow('Vacaciones anuales', `${employee.vacationDays} días`)}
+						</section>
+
+						<section class="admin-v2-person-section admin-v2-person-access">
+							<h3>Acceso</h3>
+							${access ? `
+								${summaryRow('Email', escapeHtml(access.email))}
+								${summaryRow('Rol', roleLabel(access.role))}
+								${summaryRow('Estado', access.active ? 'Activo' : 'Inactivo')}
+								<div class="row-actions">
+									<button class="button button-secondary button-small" type="button" data-action="simulate-edit-user" data-id="${access.id}">Editar</button>
+									<button class="button button-secondary button-small" type="button" data-action="toggle-user" data-id="${access.id}">${access.active ? 'Desactivar' : 'Activar'}</button>
+									<button class="button button-ghost button-small" type="button" data-action="rotate-user-role" data-id="${access.id}">Cambiar rol</button>
+								</div>
+							` : `
+								<p class="helper-text">Esta persona no tiene acceso demo asociado.</p>
+							`}
+						</section>
+
+						<section class="admin-v2-person-section admin-v2-person-balance">
+							<h3>Vacaciones</h3>
+							<div>
+								${summaryRow('Disponibles', `${balance.available} días`)}
+								${summaryRow('Disfrutadas', `${balance.enjoyed} días`)}
+								${summaryRow('Aprobadas futuras', `${balance.futureApproved} días`)}
+								${summaryRow('Pendientes', `${balance.pending} días`)}
+							</div>
+						</section>
+					</div>
+				</div>
 			`;
 		}
 
@@ -4939,6 +5133,18 @@ import '../styles/responsible-v2.css';
 
 		function selectAdminUser(id: string) {
 			selectedAdminUserId = id;
+			renderPage();
+		}
+
+		function selectAdminPerson(id: string) {
+			selectedAdminPersonId = id;
+			renderPage();
+		}
+
+		function clearAdminPeopleFilters() {
+			adminPeopleSearch = '';
+			adminPeopleDepartment = 'all';
+			selectedAdminPersonId = '';
 			renderPage();
 		}
 

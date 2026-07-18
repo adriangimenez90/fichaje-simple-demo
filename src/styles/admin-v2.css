@@ -299,6 +299,188 @@
 	align-items: flex-start;
 }
 
+.app-shell[data-role="admin_global"] .admin-v2-people {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-header .button {
+	min-height: 48px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-summary {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-metric {
+	display: grid;
+	gap: 4px;
+	padding: 12px 14px;
+	border: 1px solid rgba(20, 33, 30, 0.08);
+	border-radius: 14px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-metric span {
+	color: #66736f;
+	font-size: 0.86rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-metric strong {
+	font-size: 1.45rem;
+	font-weight: 740;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-form {
+	grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+	align-items: end;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-toolbar {
+	display: grid;
+	grid-template-columns: minmax(260px, 1fr) minmax(220px, 320px) auto;
+	align-items: end;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-toolbar > strong {
+	padding: 13px 14px;
+	border-radius: 12px;
+	background: #edf6f2;
+	color: #0f6b58;
+	text-align: center;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-layout {
+	display: grid;
+	grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
+	gap: 16px;
+	align-items: start;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-people-list {
+	align-content: start;
+	max-height: calc(100vh - 220px);
+	overflow: auto;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-item {
+	display: grid;
+	grid-template-columns: 42px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 10px;
+	border: 1px solid #e4ebe8;
+	border-radius: 14px;
+	background: #fbfdfc;
+	color: inherit;
+	text-align: left;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-item + .admin-v2-person-item {
+	margin-top: 8px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-item.is-active,
+.app-shell[data-role="admin_global"] .admin-v2-person-item:hover {
+	border-color: #9ad4c5;
+	background: #eef9f5;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-item strong,
+.app-shell[data-role="admin_global"] .admin-v2-person-main h2 {
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-item small,
+.app-shell[data-role="admin_global"] .admin-v2-person-item em,
+.app-shell[data-role="admin_global"] .admin-v2-person-main span,
+.app-shell[data-role="admin_global"] .admin-v2-person-main p {
+	display: block;
+	color: #66736f;
+	font-size: 0.86rem;
+	font-style: normal;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-avatar {
+	display: inline-grid;
+	place-items: center;
+	width: 42px;
+	height: 42px;
+	border-radius: 999px;
+	background: #e3f2ed;
+	color: #0f6b58;
+	font-weight: 740;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-avatar-large {
+	width: 64px;
+	height: 64px;
+	font-size: 1.25rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-profile {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-main {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-main h2 {
+	margin: 2px 0;
+	font-size: 1.45rem;
+	font-weight: 740;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-sections {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-section {
+	display: grid;
+	gap: 10px;
+	min-width: 0;
+	padding: 14px;
+	border-radius: 14px;
+	background: #f8fbfa;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-section h3 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-access,
+.app-shell[data-role="admin_global"] .admin-v2-person-balance {
+	grid-column: span 1;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-person-access .row-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
 @media (max-width: 1100px) {
 	.app-shell[data-role="admin_global"] .admin-v2-metrics {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -310,6 +492,15 @@
 
 	.app-shell[data-role="admin_global"] .admin-v2-attention {
 		grid-row: auto;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-people-form,
+	.app-shell[data-role="admin_global"] .admin-v2-people-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-people-list {
+		max-height: none;
 	}
 }
 
@@ -337,20 +528,36 @@
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-metrics,
-	.app-shell[data-role="admin_global"] .admin-v2-team-summary {
+	.app-shell[data-role="admin_global"] .admin-v2-team-summary,
+	.app-shell[data-role="admin_global"] .admin-v2-people-summary,
+	.app-shell[data-role="admin_global"] .admin-v2-people-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-person-sections {
 		grid-template-columns: 1fr;
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-attention-item,
 	.app-shell[data-role="admin_global"] .admin-v2-upcoming article,
-	.app-shell[data-role="admin_global"] .admin-v2-panel-head {
+	.app-shell[data-role="admin_global"] .admin-v2-panel-head,
+	.app-shell[data-role="admin_global"] .admin-v2-people-header,
+	.app-shell[data-role="admin_global"] .admin-v2-person-main {
 		align-items: stretch;
 		flex-direction: column;
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-attention-item .button,
-	.app-shell[data-role="admin_global"] .admin-v2-panel-head .button {
+	.app-shell[data-role="admin_global"] .admin-v2-panel-head .button,
+	.app-shell[data-role="admin_global"] .admin-v2-person-access .button,
+	.app-shell[data-role="admin_global"] .admin-v2-people-header .button {
 		min-height: 48px;
 		width: 100%;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-person-item {
+		grid-template-columns: 42px minmax(0, 1fr);
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-person-item .status-pill {
+		grid-column: 2;
+		justify-self: start;
 	}
 }
