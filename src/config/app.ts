@@ -49,12 +49,12 @@ export const VALIDATOR_VIEWS: NavigationView[] = [
 ];
 
 export const ADMIN_VIEWS: NavigationView[] = [
-	{ id: 'dashboard', label: 'Inicio', hint: 'Resumen de hoy' },
-	{ id: 'usuarios', label: 'Empleados', hint: 'Personas y roles' },
-	{ id: 'fichajes', label: 'Fichajes', hint: 'Registros e incidencias' },
-	{ id: 'vacaciones-admin', label: 'Vacaciones', hint: 'Solicitudes y planning' },
-	{ id: 'exportaciones', label: 'Exportar', hint: 'Informes y descargas' },
-	{ id: 'configuracion', label: 'Ajustes', hint: 'Festivos y demo' },
+	{ id: 'admin-inicio', label: 'Inicio', hint: 'Resumen de la empresa' },
+	{ id: 'personas', label: 'Personas', hint: 'Empleados y accesos' },
+	{ id: 'registros', label: 'Registros', hint: 'Jornadas e incidencias' },
+	{ id: 'vacaciones-admin', label: 'Ausencias', hint: 'Vacaciones y permisos' },
+	{ id: 'informes', label: 'Informes', hint: 'Exportación y seguimiento' },
+	{ id: 'configuracion', label: 'Configuración', hint: 'Empresa y políticas' },
 ];
 
 export const STATUS_LABELS: Record<string, string> = {

@@ -1,5 +1,6 @@
 ﻿---
 import Layout from '../layouts/Layout.astro';
+import '../styles/admin-v2.css';
 import '../styles/employee-v2.css';
 import '../styles/responsible-v2.css';
 ---
@@ -203,6 +204,7 @@ import '../styles/responsible-v2.css';
 		const content = document.querySelector<HTMLDivElement>('#app-content');
 		const sidebarNav = document.querySelector<HTMLElement>('#sidebar-nav');
 		const mobileNav = document.querySelector<HTMLElement>('#mobile-nav');
+		const headerLeft = document.querySelector<HTMLElement>('.header-left');
 		const userChip = document.querySelector<HTMLElement>('#user-chip');
 		const toast = document.querySelector<HTMLElement>('#toast');
 		let toastTimer: number | undefined;
@@ -256,6 +258,11 @@ import '../styles/responsible-v2.css';
 				const viewButton = target.closest<HTMLElement>('[data-view]');
 				const actionButton = target.closest<HTMLElement>('[data-action]');
 
+				if (actionButton?.dataset.action === 'admin-go-view') {
+					adminGoView(actionButton.dataset.view || '');
+					return;
+				}
+
 				if (viewButton) {
 					activeView = viewButton.dataset.view || activeView;
 					renderPage();
@@ -308,6 +315,10 @@ import '../styles/responsible-v2.css';
 				if (action === 'select-admin-user') selectAdminUser(actionButton.dataset.id || '');
 				if (action === 'select-timesheet-summary') selectTimesheetSummary(actionButton.dataset.id || '');
 				if (action === 'admin-incident-filter') setAdminIncidentFilter(actionButton.dataset.filter || 'pendiente');
+				if (action === 'logout') {
+					localStorage.removeItem(KEYS.session);
+					window.location.href = '/';
+				}
 				if (action === 'reset-demo') {
 					resetDemoData();
 					showToast('Datos demo 2026 restablecidos. Se han borrado los cambios locales del navegador.');
@@ -423,6 +434,53 @@ import '../styles/responsible-v2.css';
 
 		function renderNav() {
 			const views = getViews();
+			renderHeaderForRole();
+			if (session.role === 'admin_global') {
+				const adminItems = views.map(renderNavButton).join('');
+				if (sidebarNav) {
+					sidebarNav.innerHTML = `
+						<div class="admin-v2-sidebar-top">
+							<div class="admin-v2-brand">
+								<img src="/brand/fichajesimple-icon.png" alt="FichajeSimple" />
+								<div>
+									<strong>FichajeSimple</strong>
+									<span>Administración</span>
+								</div>
+							</div>
+						</div>
+						<div class="admin-v2-nav-list">
+							${adminItems}
+						</div>
+						<div class="admin-v2-sidebar-bottom">
+							<div>
+								<span>Administrador</span>
+								<strong>${escapeHtml(session.name)}</strong>
+								<small>Empresa Demo</small>
+							</div>
+							<button class="button button-secondary button-small" type="button" data-action="logout">Cerrar sesión</button>
+							<button class="button button-tertiary button-small" type="button" data-action="reset-demo">Reiniciar demo</button>
+						</div>
+					`;
+				}
+				if (mobileNav) {
+					mobileNav.innerHTML = views
+						.map(
+							(view) => `
+								<button
+									class="button nav-button"
+									type="button"
+									data-view="${view.id}"
+									aria-current="${activeView === view.id ? 'page' : 'false'}"
+								>
+									${adminNavIcon(view.id)}
+									<span>${view.label}</span>
+								</button>
+							`,
+						)
+						.join('');
+				}
+				return;
+			}
 			const currentRoleLabel = roleLabel(session.role);
 			const groupedViews = navigationGroups(views);
 			const navIntro = `
@@ -468,13 +526,57 @@ import '../styles/responsible-v2.css';
 					data-view="${view.id}"
 					aria-current="${activeView === view.id ? 'page' : 'false'}"
 				>
-					<span class="nav-dot" aria-hidden="true"></span>
+					${session.role === 'admin_global' ? adminNavIcon(view.id) : '<span class="nav-dot" aria-hidden="true"></span>'}
 					<span>
 						<strong>${view.label}</strong>
 						<small>${view.hint}</small>
 					</span>
 				</button>
 			`;
+		}
+
+		function renderHeaderForRole() {
+			if (!headerLeft) return;
+			if (session.role !== 'admin_global') {
+				headerLeft.innerHTML = `
+					<div class="brand-lockup" aria-label="FichajeSimple">
+						<img class="brand-icon" src="/brand/fichajesimple-icon.png" alt="FichajeSimple" />
+						<div>
+							<strong>FichajeSimple</strong>
+							<span class="muted-line">Empresa Demo · Centro Principal</span>
+						</div>
+					</div>
+					<span class="demo-badge">Demo pública · Datos ficticios · Navegador</span>
+				`;
+				return;
+			}
+			const active = ADMIN_VIEWS.find((view) => view.id === activeView) || ADMIN_VIEWS[0];
+			headerLeft.innerHTML = `
+				<div class="admin-v2-header-title">
+					<strong>${active.label}</strong>
+					<span>${active.hint}</span>
+				</div>
+			`;
+		}
+
+		function adminNavIcon(viewId: string) {
+			const common = 'class="admin-v2-nav-icon" viewBox="0 0 24 24" aria-hidden="true"';
+			if (viewId === 'admin-inicio') {
+				return `<svg ${common}><rect x="4" y="4" width="7" height="7" rx="1.5"></rect><rect x="13" y="4" width="7" height="7" rx="1.5"></rect><rect x="4" y="13" width="7" height="7" rx="1.5"></rect><rect x="13" y="13" width="7" height="7" rx="1.5"></rect></svg>`;
+			}
+			if (viewId === 'personas') {
+				return `<svg ${common}><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 20a5.5 5.5 0 0 1 11 0"></path><path d="M14 18.5a4.5 4.5 0 0 1 6.5 1.5"></path></svg>`;
+			}
+			if (viewId === 'registros') {
+				return `<svg ${common}><circle cx="8" cy="8" r="4"></circle><path d="M8 6v2.5l2 1.2"></path><path d="M14 6h6M14 12h6M5 17h15"></path></svg>`;
+			}
+			if (viewId === 'vacaciones-admin') {
+				return `<svg ${common}><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M13 14h2M8 17h2"></path></svg>`;
+			}
+			if (viewId === 'informes') {
+				return `<svg ${common}><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h5M9 17v-4M12 17v-7M15 17v-2"></path></svg>`;
+			}
+			return `<svg ${common}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 2-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V20h-3v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-2-2 .1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4v-3h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2-2 .1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h3v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 2 2-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1v3h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>`;
 		}
 
 		function employeeNavIcon(viewId: string) {
@@ -523,9 +625,9 @@ import '../styles/responsible-v2.css';
 				historial: renderHistory,
 				vacaciones: renderEmployeeVacations,
 				perfil: renderEmployeeProfile,
-				dashboard: renderAdminDashboard,
-				usuarios: renderUsers,
-				fichajes: renderAdminTimesheets,
+				'admin-inicio': renderAdminDashboard,
+				personas: renderUsers,
+				registros: renderAdminTimesheets,
 				incidencias: renderAdminIncidents,
 				'vacaciones-admin': renderAdminVacations,
 				festivos: renderHolidays,
@@ -533,6 +635,9 @@ import '../styles/responsible-v2.css';
 				exportaciones: renderExports,
 				auditoria: renderAudit,
 				configuracion: renderSettings,
+				dashboard: renderAdminDashboard,
+				usuarios: renderUsers,
+				fichajes: renderAdminTimesheets,
 				solicitudes: renderValidatorRequests,
 				'calendario-equipo': renderTeamCalendar,
 				'historico-vacaciones': renderVacationHistory,
@@ -1011,70 +1116,114 @@ import '../styles/responsible-v2.css';
 		}
 
 		function renderAdminDashboard() {
-			const today = todayIso();
-			const statuses = EMPLOYEES.map((employee) => ({
-				employee,
-				entry: findEntry(employee.id, today),
-			}));
-			const workingNow = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'trabajando').length;
-			const inPause = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'pausa').length;
-			const missing = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'sin-fichar').length;
-			const vacationToday = statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === 'vacaciones').length;
-			const filteredStatuses = adminTodayFilter === 'all'
-				? statuses
-				: statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === adminTodayFilter);
-			const filterLabel = adminTodayFilterLabel(adminTodayFilter);
+			const summary = adminTodayWorkSummary();
+			const attention = adminAttentionItems();
+			const upcoming = adminUpcomingAbsences();
+			const recentActivity = auditLog.slice(0, 5);
 
 			return `
-				${sectionTitle('Inicio', 'Qué pasa hoy en Empresa Demo')}
-				<div class="grid grid-4 admin-status-strip">
-					${adminDashboardMetric('Trabajando', String(workingNow), 'trabajando', '', '', 'trabajando')}
-					${adminDashboardMetric('En descanso', String(inPause), 'pausa', '', '', 'pausa')}
-					${adminDashboardMetric('Sin fichar', String(missing), missing ? 'pendiente' : 'correcto', '', '', 'sin-fichar')}
-					${adminDashboardMetric('De vacaciones hoy', String(vacationToday), 'vacaciones', '', '', 'vacaciones')}
-				</div>
-				<section class="panel top-gap admin-primary-list">
-					<div class="panel-heading">
+				<div class="admin-v2-home">
+					<header class="admin-v2-page-header">
 						<div>
-							<h2>Estado de hoy</h2>
-							<p class="helper-text">Mostrando: ${filterLabel}.</p>
+							<span>Inicio</span>
+							<h1>Buenos días</h1>
+							<p>Este es el estado de Empresa Demo hoy.</p>
 						</div>
-						${adminTodayFilter !== 'all' ? `<button class="button button-tertiary button-small" type="button" data-action="admin-today-filter" data-filter="all">Ver todos</button>` : ''}
+					</header>
+
+					<div class="admin-v2-metrics">
+						${adminV2Metric('Personas', String(EMPLOYEES.length), 'Equipo activo en la demo', 'personas')}
+						${adminV2Metric('Trabajando ahora', String(summary.working), 'Jornada abierta sin descanso', 'registros')}
+						${adminV2Metric('Ausentes hoy', String(summary.absent), 'Ausencias aprobadas activas', 'vacaciones-admin')}
+						${adminV2Metric('Incidencias pendientes', String(summary.pendingIncidents), 'Requieren revisión', 'registros')}
 					</div>
-					<div class="table-wrap admin-today-table">
-						<table>
-							<thead>
-								<tr>
-									<th>Empleado</th>
-									<th>Estado</th>
-									<th>Entrada</th>
-									<th>Salida</th>
-									<th>Descanso</th>
-									<th>Departamento</th>
-								</tr>
-							</thead>
-							<tbody>
-								${filteredStatuses.map(({ employee, entry }) => {
-									const status = adminTodayStatus(employee, entry);
+
+					<div class="admin-v2-grid">
+						<section class="admin-v2-panel admin-v2-attention">
+							<div class="admin-v2-panel-head">
+								<div>
+									<h2>Necesita tu atención</h2>
+									<p>Prioridades abiertas para revisar hoy.</p>
+								</div>
+							</div>
+							<div class="admin-v2-attention-list">
+								${attention.length ? attention.map((item) => `
+									<article class="admin-v2-attention-item">
+										<div>
+											<span>${item.type}</span>
+											<strong>${escapeHtml(item.person)}</strong>
+											<p>${escapeHtml(item.detail)}</p>
+											<small>${formatDate(item.date)}</small>
+										</div>
+										${adminGoViewButton(item.actionLabel, item.view)}
+									</article>
+								`).join('') : emptyState('Todo al día. No hay acciones urgentes pendientes.')}
+							</div>
+						</section>
+
+						<section class="admin-v2-panel">
+							<div class="admin-v2-panel-head">
+								<div>
+									<h2>Equipo hoy</h2>
+									<p>Resumen operativo sin listar a todo el equipo.</p>
+								</div>
+								${adminGoViewButton('Ver registros', 'registros')}
+							</div>
+							<div class="admin-v2-team-summary">
+								${adminV2State('Trabajando', summary.working, 'trabajando')}
+								${adminV2State('En pausa', summary.paused, 'pausa')}
+								${adminV2State('Finalizada', summary.finished, 'correcto')}
+								${adminV2State('Sin fichar', summary.missing, 'pendiente')}
+								${adminV2State('Ausentes', summary.absent, 'vacaciones')}
+							</div>
+						</section>
+
+						<section class="admin-v2-panel">
+							<div class="admin-v2-panel-head">
+								<div>
+									<h2>Próximas ausencias</h2>
+									<p>Ausencias aprobadas desde hoy.</p>
+								</div>
+								${adminGoViewButton('Ver todas', 'vacaciones-admin')}
+							</div>
+							<div class="admin-v2-upcoming">
+								${upcoming.length ? upcoming.map((request) => {
+									const employee = employeeById(request.employeeId);
 									return `
-									<tr>
-										<td><strong>${employee.name}</strong></td>
-										<td>${pill(status.label, status.key)}</td>
-										<td>${entry?.start || 'Sin registrar'}</td>
-										<td>${entry?.end || 'Sin registrar'}</td>
-										<td>${formatBreaks(entry)}</td>
-										<td>${employee.department}</td>
-									</tr>
-								`;
-								}).join('')}
-							</tbody>
-						</table>
+										<article>
+											<div>
+												<strong>${employeeName(request.employeeId)}</strong>
+												<span>${escapeHtml(employee?.department || 'Sin departamento')}</span>
+											</div>
+											<div>
+												<span>${escapeHtml(absenceTypeName(request))}</span>
+												<small>${absenceRequestDateLabel(request)}</small>
+											</div>
+										</article>
+									`;
+								}).join('') : emptyState('No hay ausencias próximas aprobadas.')}
+							</div>
+						</section>
+
+						<section class="admin-v2-panel">
+							<div class="admin-v2-panel-head">
+								<div>
+									<h2>Actividad reciente</h2>
+									<p>Últimos cambios guardados en la demo.</p>
+								</div>
+							</div>
+							<div class="admin-v2-activity">
+								${recentActivity.length ? recentActivity.map((entry) => `
+									<article>
+										<strong>${escapeHtml(entry.action)}</strong>
+										<span>${escapeHtml(entry.detail)}</span>
+										<small>${formatDateTime(entry.at)}</small>
+									</article>
+								`).join('') : emptyState('Aún no hay actividad reciente.')}
+							</div>
+						</section>
 					</div>
-					<div class="admin-today-card-list">
-						${filteredStatuses.map(({ employee, entry }) => renderAdminTodayCard(employee, entry)).join('')}
-					</div>
-					${filteredStatuses.length ? '' : emptyState('No hay empleados con este estado ahora mismo.')}
-				</section>
+				</div>
 			`;
 		}
 
@@ -1190,7 +1339,7 @@ import '../styles/responsible-v2.css';
 						</label>
 						<div class="table-actions">
 							<button class="button button-secondary" type="submit">Aplicar filtros</button>
-							<button class="button button-tertiary" type="button" data-view="exportaciones">Ir a Exportar</button>
+							<button class="button button-tertiary" type="button" data-action="admin-go-view" data-view="informes">Ir a Informes</button>
 						</div>
 					</form>
 				</section>
@@ -2803,6 +2952,106 @@ import '../styles/responsible-v2.css';
 					<div class="top-gap-small">${pill(STATUS_LABELS[status] || status, status)}</div>
 				</div>
 			`;
+		}
+
+		function adminV2Metric(
+			label: string,
+			value: string,
+			helper: string,
+			view: string,
+			filter: AdminTodayFilter | '' = '',
+		) {
+			const attrs = filter
+				? `data-action="admin-today-filter" data-filter="${filter}"`
+				: `data-action="admin-go-view" data-view="${view}"`;
+			return `
+				<button class="admin-v2-metric" type="button" ${attrs}>
+					<span>${label}</span>
+					<strong>${value}</strong>
+					<small>${helper}</small>
+				</button>
+			`;
+		}
+
+		function adminV2State(label: string, value: number, status: string) {
+			return `
+				<div class="admin-v2-state">
+					<span>${label}</span>
+					<strong>${value}</strong>
+					${pill(label, status)}
+				</div>
+			`;
+		}
+
+		function adminGoViewButton(label: string, view: string) {
+			return `<button class="button button-secondary button-small" type="button" data-action="admin-go-view" data-view="${view}">${label}</button>`;
+		}
+
+		function adminTodayWorkSummary() {
+			const today = todayIso();
+			const statuses = EMPLOYEES.map((employee) => ({
+				employee,
+				entry: findEntry(employee.id, today),
+			}));
+			const count = (key: string) => statuses.filter(({ employee, entry }) => adminTodayStatus(employee, entry).key === key).length;
+			return {
+				statuses,
+				working: count('trabajando'),
+				paused: count('pausa'),
+				finished: count('correcto'),
+				missing: count('sin-fichar'),
+				absent: count('vacaciones'),
+				pendingIncidents: incidents.filter((incident) => incident.status === 'pendiente').length,
+			};
+		}
+
+		function adminAttentionItems() {
+			const today = todayIso();
+			const pendingIncidents = incidents
+				.filter((incident) => incident.status === 'pendiente')
+				.slice(0, 3)
+				.map((incident) => ({
+					type: 'Incidencia',
+					person: employeeName(incident.employeeId),
+					detail: incident.type,
+					date: incident.date,
+					view: 'registros',
+					actionLabel: 'Revisar',
+				}));
+			const pendingAbsences = vacations
+				.filter((request) => request.status === 'pendiente')
+				.slice(0, 3)
+				.map((request) => ({
+					type: 'Solicitud',
+					person: employeeName(request.employeeId),
+					detail: absenceTypeName(request),
+					date: request.from,
+					view: 'vacaciones-admin',
+					actionLabel: 'Ver ausencia',
+				}));
+			const incompleteEntries = timeEntries
+				.filter((entry) => entry.date < today && entry.start && !entry.end)
+				.slice(0, 2)
+				.map((entry) => ({
+					type: 'Registro',
+					person: employeeName(entry.employeeId),
+					detail: 'Jornada sin salida registrada',
+					date: entry.date,
+					view: 'registros',
+					actionLabel: 'Revisar',
+				}));
+			return [...pendingIncidents, ...pendingAbsences, ...incompleteEntries]
+				.sort((first, second) => second.date.localeCompare(first.date))
+				.slice(0, 5);
+		}
+
+		function adminUpcomingAbsences() {
+			const today = todayIso();
+			return vacations
+				.filter((request) => request.status === 'aprobada' && request.to >= today)
+				.slice()
+				.sort((first, second) => first.from.localeCompare(second.from))
+				.slice(0, 5);
 		}
 
 		function adminDashboardMetric(
@@ -4669,7 +4918,7 @@ import '../styles/responsible-v2.css';
 		}
 
 		function openPendingIncidents() {
-			activeView = 'fichajes';
+			activeView = 'registros';
 			timeFilters = {
 				...timeFilters,
 				status: 'incidencia',
@@ -4678,6 +4927,14 @@ import '../styles/responsible-v2.css';
 			selectedTimesheetSummaryKey = '';
 			renderNav();
 			renderPage();
+		}
+
+		function adminGoView(view: string) {
+			if (!ADMIN_VIEWS.some((item) => item.id === view)) return;
+			activeView = view;
+			renderNav();
+			renderPage();
+			document.querySelector<HTMLElement>('#app-main')?.focus();
 		}
 
 		function selectAdminUser(id: string) {
@@ -5126,7 +5383,7 @@ import '../styles/responsible-v2.css';
 		}
 
 		function defaultViewForRole(role: Role) {
-			if (role === 'admin_global') return 'dashboard';
+			if (role === 'admin_global') return 'admin-inicio';
 			if (role === 'validador_vacaciones') return 'solicitudes';
 			return 'fichar';
 		}
@@ -5138,7 +5395,7 @@ import '../styles/responsible-v2.css';
 		}
 
 		function roleHint(role: Role) {
-			if (role === 'admin_global') return 'Gestión diaria de empleados, fichajes, vacaciones y exportaciones';
+			if (role === 'admin_global') return 'Gestión diaria de personas, registros, ausencias e informes';
 			if (role === 'validador_vacaciones') return 'Revisión de vacaciones, permisos, calendario del equipo y festivos';
 			return 'Fichaje personal, vacaciones y calendario';
 		}

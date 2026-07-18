@@ -1,0 +1,356 @@
+.app-shell[data-role="admin_global"] {
+	background: #f4f6f5;
+	color: #14211e;
+	overflow-x: hidden;
+}
+
+.app-shell[data-role="admin_global"] .app-header {
+	min-height: 62px;
+	padding: 10px 24px;
+	background: rgba(255, 255, 255, 0.94);
+	border-bottom: 1px solid rgba(20, 33, 30, 0.08);
+	box-shadow: none;
+}
+
+.app-shell[data-role="admin_global"] .header-left {
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .header-actions {
+	display: none;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-header-title {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-header-title strong {
+	font-size: 1.05rem;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-header-title span {
+	color: #66736f;
+	font-size: 0.9rem;
+}
+
+.app-shell[data-role="admin_global"] .sidebar {
+	position: sticky;
+	top: 0;
+	display: grid;
+	grid-template-rows: auto 1fr auto;
+	width: 244px;
+	height: 100vh;
+	padding: 18px 14px;
+	background: #ffffff;
+	border-right: 1px solid rgba(20, 33, 30, 0.08);
+	box-shadow: none;
+}
+
+.app-shell[data-role="admin_global"] .sidebar-nav {
+	display: contents;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 4px 4px 18px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-brand img {
+	width: 34px;
+	height: 34px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-brand strong,
+.app-shell[data-role="admin_global"] .admin-v2-sidebar-bottom strong {
+	display: block;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-brand span,
+.app-shell[data-role="admin_global"] .admin-v2-sidebar-bottom span,
+.app-shell[data-role="admin_global"] .admin-v2-sidebar-bottom small {
+	color: #66736f;
+	font-size: 0.84rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-nav-list {
+	display: grid;
+	align-content: start;
+	gap: 6px;
+}
+
+.app-shell[data-role="admin_global"] .nav-button {
+	display: grid;
+	grid-template-columns: 22px minmax(0, 1fr);
+	align-items: center;
+	gap: 10px;
+	min-height: 48px;
+	padding: 10px;
+	border-radius: 12px;
+	background: transparent;
+	color: #31413d;
+	text-align: left;
+}
+
+.app-shell[data-role="admin_global"] .nav-button[aria-current="page"] {
+	background: #e8f6f1;
+	color: #0f6b58;
+	box-shadow: inset 3px 0 0 #1c9b80;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-nav-icon {
+	width: 22px;
+	height: 22px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-sidebar-bottom {
+	display: grid;
+	gap: 10px;
+	padding-top: 14px;
+	border-top: 1px solid rgba(20, 33, 30, 0.08);
+}
+
+.app-shell[data-role="admin_global"] .app-main {
+	width: min(100%, 1500px);
+	margin: 0 auto;
+	padding: 24px;
+	overflow-x: hidden;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-home {
+	display: grid;
+	gap: 18px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-page-header {
+	padding: 4px 0 2px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-page-header span,
+.app-shell[data-role="admin_global"] .admin-v2-panel-head p,
+.app-shell[data-role="admin_global"] .admin-v2-attention-item small,
+.app-shell[data-role="admin_global"] .admin-v2-upcoming small,
+.app-shell[data-role="admin_global"] .admin-v2-activity small {
+	color: #66736f;
+	font-size: 0.9rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-page-header h1 {
+	margin: 2px 0 4px;
+	font-size: 2rem;
+	font-weight: 760;
+	letter-spacing: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-page-header p {
+	margin: 0;
+	color: #485752;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-metrics {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-metric {
+	display: grid;
+	gap: 5px;
+	min-height: 118px;
+	padding: 16px;
+	border: 1px solid rgba(20, 33, 30, 0.08);
+	border-radius: 16px;
+	background: #ffffff;
+	color: inherit;
+	text-align: left;
+	box-shadow: 0 12px 28px rgba(20, 33, 30, 0.05);
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-metric span,
+.app-shell[data-role="admin_global"] .admin-v2-state span,
+.app-shell[data-role="admin_global"] .admin-v2-attention-item span,
+.app-shell[data-role="admin_global"] .admin-v2-upcoming span,
+.app-shell[data-role="admin_global"] .admin-v2-activity span {
+	color: #66736f;
+	font-size: 0.88rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-metric strong {
+	font-size: 2rem;
+	font-weight: 760;
+	line-height: 1;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-metric small {
+	color: #52615c;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+	gap: 16px;
+	align-items: start;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-panel {
+	display: grid;
+	gap: 14px;
+	min-width: 0;
+	padding: 16px;
+	border: 1px solid rgba(20, 33, 30, 0.08);
+	border-radius: 18px;
+	background: #ffffff;
+	box-shadow: 0 12px 28px rgba(20, 33, 30, 0.05);
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-attention {
+	grid-row: span 2;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-panel-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-panel-head h2 {
+	margin: 0;
+	font-size: 1.15rem;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-panel-head p {
+	margin: 3px 0 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-attention-list,
+.app-shell[data-role="admin_global"] .admin-v2-upcoming,
+.app-shell[data-role="admin_global"] .admin-v2-activity {
+	display: grid;
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-attention-item,
+.app-shell[data-role="admin_global"] .admin-v2-upcoming article,
+.app-shell[data-role="admin_global"] .admin-v2-activity article {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	min-width: 0;
+	padding: 12px;
+	border: 1px solid #e4ebe8;
+	border-radius: 14px;
+	background: #f9fbfa;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-attention-item div,
+.app-shell[data-role="admin_global"] .admin-v2-upcoming article div,
+.app-shell[data-role="admin_global"] .admin-v2-activity article {
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-attention-item strong,
+.app-shell[data-role="admin_global"] .admin-v2-upcoming strong,
+.app-shell[data-role="admin_global"] .admin-v2-activity strong {
+	display: block;
+	overflow-wrap: anywhere;
+	font-weight: 700;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-attention-item p {
+	margin: 2px 0;
+	color: #485752;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-team-summary {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-state {
+	display: grid;
+	gap: 6px;
+	min-width: 0;
+	padding: 10px;
+	border-radius: 12px;
+	background: #f8fbfa;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-state strong {
+	font-size: 1.35rem;
+	font-weight: 740;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-upcoming article {
+	align-items: flex-start;
+}
+
+@media (max-width: 1100px) {
+	.app-shell[data-role="admin_global"] .admin-v2-metrics {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-attention {
+		grid-row: auto;
+	}
+}
+
+@media (max-width: 860px) {
+	.app-shell[data-role="admin_global"] {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="admin_global"] .sidebar {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .app-main {
+		padding: 16px 14px calc(96px + env(safe-area-inset-bottom));
+	}
+
+	.app-shell[data-role="admin_global"] .mobile-nav {
+		display: grid;
+	}
+}
+
+@media (max-width: 560px) {
+	.app-shell[data-role="admin_global"] .app-header {
+		padding: 8px 14px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-metrics,
+	.app-shell[data-role="admin_global"] .admin-v2-team-summary {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-attention-item,
+	.app-shell[data-role="admin_global"] .admin-v2-upcoming article,
+	.app-shell[data-role="admin_global"] .admin-v2-panel-head {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-attention-item .button,
+	.app-shell[data-role="admin_global"] .admin-v2-panel-head .button {
+		min-height: 48px;
+		width: 100%;
+	}
+}
