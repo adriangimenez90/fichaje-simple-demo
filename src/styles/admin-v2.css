@@ -945,6 +945,173 @@
 	margin: 0;
 }
 
+.app-shell[data-role="admin_global"] .admin-v2-reports {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-builder {
+	gap: 18px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-types {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-report-type {
+	display: grid;
+	gap: 6px;
+	min-height: 104px;
+	padding: 14px;
+	border: 1px solid #e4ebe8;
+	border-radius: 14px;
+	background: #fbfdfc;
+	color: inherit;
+	text-align: left;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-report-type.is-active,
+.app-shell[data-role="admin_global"] .admin-v2-report-type:hover {
+	border-color: #9ad4c5;
+	background: #eef9f5;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-report-type strong {
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-report-type span {
+	color: #66736f;
+	font-size: 0.9rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-section {
+	display: grid;
+	gap: 12px;
+	min-width: 0;
+	padding: 14px;
+	border-radius: 14px;
+	background: #f8fbfa;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-section h3,
+.app-shell[data-role="admin_global"] .admin-v2-reports-export h2 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-filters {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(180px, 1fr));
+	gap: 10px;
+	align-items: end;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-summary-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-summary-item {
+	display: grid;
+	gap: 5px;
+	padding: 12px 14px;
+	border: 1px solid rgba(20, 33, 30, 0.08);
+	border-radius: 14px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-summary-item span {
+	color: #66736f;
+	font-size: 0.86rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-summary-item strong {
+	font-size: 1.35rem;
+	font-weight: 740;
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-summary-item small {
+	color: #52615c;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-preview {
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-preview .report-table-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-preview .report-table {
+	width: 100%;
+	min-width: 760px;
+	border-collapse: collapse;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-preview .report-table th,
+.app-shell[data-role="admin_global"] .admin-v2-reports-preview .report-table td {
+	padding: 11px 10px;
+	border-bottom: 1px solid #e4ebe8;
+	text-align: left;
+	vertical-align: top;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-preview .report-table th {
+	color: #66736f;
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-mobile-list {
+	display: none;
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-mobile-card {
+	display: grid;
+	gap: 8px;
+	padding: 12px;
+	border: 1px solid #e4ebe8;
+	border-radius: 14px;
+	background: #fbfdfc;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-export {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 14px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-export p,
+.app-shell[data-role="admin_global"] .admin-v2-reports-scheduled p {
+	margin: 3px 0 0;
+	color: #66736f;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-export .button {
+	min-height: 48px;
+	white-space: nowrap;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-schedule-form {
+	grid-template-columns: repeat(5, minmax(150px, 1fr)) auto;
+	align-items: end;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-reports-scheduled-table {
+	min-width: 0;
+}
+
 @media (max-width: 1100px) {
 	.app-shell[data-role="admin_global"] .admin-v2-metrics {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -963,7 +1130,8 @@
 	.app-shell[data-role="admin_global"] .admin-v2-records-layout,
 	.app-shell[data-role="admin_global"] .admin-v2-records-toolbar,
 	.app-shell[data-role="admin_global"] .admin-v2-absence-layout,
-	.app-shell[data-role="admin_global"] .admin-v2-absence-toolbar {
+	.app-shell[data-role="admin_global"] .admin-v2-absence-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-schedule-form {
 		grid-template-columns: 1fr;
 	}
 
@@ -1005,7 +1173,10 @@
 	.app-shell[data-role="admin_global"] .admin-v2-record-detail-grid,
 	.app-shell[data-role="admin_global"] .admin-v2-absence-metrics,
 	.app-shell[data-role="admin_global"] .admin-v2-absence-detail-grid,
-	.app-shell[data-role="admin_global"] .admin-v2-absence-today-list {
+	.app-shell[data-role="admin_global"] .admin-v2-absence-today-list,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-types,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-filters,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-summary-grid {
 		grid-template-columns: 1fr;
 	}
 
@@ -1019,7 +1190,8 @@
 	.app-shell[data-role="admin_global"] .admin-v2-record-detail-head,
 	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav,
 	.app-shell[data-role="admin_global"] .admin-v2-absence-header,
-	.app-shell[data-role="admin_global"] .admin-v2-absence-detail-head {
+	.app-shell[data-role="admin_global"] .admin-v2-absence-detail-head,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-export {
 		align-items: stretch;
 		flex-direction: column;
 	}
@@ -1031,7 +1203,9 @@
 	.app-shell[data-role="admin_global"] .admin-v2-records-header .button,
 	.app-shell[data-role="admin_global"] .admin-v2-record-mobile-card .button,
 	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav .button,
-	.app-shell[data-role="admin_global"] .admin-v2-absence-item {
+	.app-shell[data-role="admin_global"] .admin-v2-absence-item,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-export .button,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-schedule-form .button {
 		min-height: 48px;
 		width: 100%;
 	}
@@ -1055,6 +1229,14 @@
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-record-mobile-list {
+		display: grid;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-reports-preview .report-table-wrap {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-reports-mobile-list {
 		display: grid;
 	}
 }

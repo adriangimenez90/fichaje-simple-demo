@@ -200,6 +200,15 @@ import '../styles/responsible-v2.css';
 		let adminAbsenceType = 'all';
 		let adminAbsenceDepartment = 'all';
 		let adminAbsencePeriod: AdminAbsencePeriod = 'all';
+		type AdminReportType = 'time' | 'incidents' | 'absences';
+		type AdminReportPeriod = 'week' | 'month' | 'previous-month' | 'custom';
+		let adminReportType: AdminReportType = 'time';
+		let adminReportPeriod: AdminReportPeriod = 'month';
+		let adminReportFrom = startOfMonthIso(new Date());
+		let adminReportTo = todayIso();
+		let adminReportEmployeeId = 'all';
+		let adminReportDepartment = 'all';
+		let adminReportStatus = 'all';
 		let selectedAdminUserId = '';
 		let selectedAdminPersonId = '';
 		let selectedAdminRecordEmployeeId = '';
@@ -339,6 +348,8 @@ import '../styles/responsible-v2.css';
 				if (action === 'admin-records-today') setAdminRecordsDate(todayIso());
 				if (action === 'select-admin-absence') selectAdminAbsence(actionButton.dataset.id || '');
 				if (action === 'clear-admin-absence-filters') clearAdminAbsenceFilters();
+				if (action === 'admin-report-type') setAdminReportType(actionButton.dataset.type || 'time');
+				if (action === 'export-admin-report') exportAdminReport();
 				if (action === 'logout') {
 					localStorage.removeItem(KEYS.session);
 					window.location.href = '/';
@@ -474,6 +485,12 @@ import '../styles/responsible-v2.css';
 						search?.setSelectionRange(cursor, cursor);
 					});
 				}
+				if (input.id === 'admin-report-from' || input.id === 'admin-report-to') {
+					if (input.id === 'admin-report-from') adminReportFrom = input.value || adminReportFrom;
+					if (input.id === 'admin-report-to') adminReportTo = input.value || adminReportTo;
+					adminReportPeriod = 'custom';
+					renderPage();
+				}
 			});
 
 			document.addEventListener('change', (event) => {
@@ -511,6 +528,21 @@ import '../styles/responsible-v2.css';
 				if (field.id === 'admin-absence-period') {
 					adminAbsencePeriod = (field.value || 'all') as AdminAbsencePeriod;
 					selectedAdminAbsenceId = '';
+					renderPage();
+				}
+				if (field.id === 'admin-report-period') {
+					setAdminReportPeriod(field.value || 'month');
+				}
+				if (field.id === 'admin-report-employee') {
+					adminReportEmployeeId = field.value || 'all';
+					renderPage();
+				}
+				if (field.id === 'admin-report-department') {
+					adminReportDepartment = field.value || 'all';
+					renderPage();
+				}
+				if (field.id === 'admin-report-status') {
+					adminReportStatus = field.value || 'all';
 					renderPage();
 				}
 			});
@@ -3392,95 +3424,125 @@ import '../styles/responsible-v2.css';
 
 		function renderReports() {
 			return `
-				${sectionTitle('Informes', 'Previsualiza reportes de control horario y programa envíos simulados por email.')}
-				${renderReportsContent()}
+				<section class="admin-v2-reports">
+					<header class="admin-v2-page-header">
+						<span>Informes</span>
+						<h1>Informes</h1>
+						<p>Consulta y exporta la información de jornada de tu empresa.</p>
+					</header>
+					${renderReportsContent()}
+				</section>
 			`;
 		}
 
 		function renderReportsContent() {
-			const weeklyRows = buildHoursReport(7);
-			const monthlyRows = buildHoursReport(30);
-			const missingRows = buildMissingPunchReport();
-			const pendingIncidentRows = incidents
-				.filter((incident) => incident.status === 'pendiente')
-				.slice(0, 8)
-				.map((incident) => [
-					employeeName(incident.employeeId),
-					formatDate(incident.date),
-					escapeHtml(incident.type),
-					escapeHtml(incident.detail),
-					pill('Pendiente', 'pendiente'),
-				]);
-			const vacationRows = vacations
-				.filter((request) => request.status === 'aprobada' || request.status === 'pendiente')
-				.sort((a, b) => a.from.localeCompare(b.from))
-				.slice(0, 8)
-				.map((request) => [
-					employeeName(request.employeeId),
-					`${formatDate(request.from)} - ${formatDate(request.to)}`,
-					String(request.days),
-					pill(request.status),
-					escapeHtml(request.comment || 'Sin comentario'),
-				]);
-			const pendingIncidentsCount = incidents.filter((incident) => incident.status === 'pendiente').length;
-			const missingTodayCount = buildMissingPunchReport().length;
-			const pendingVacationCount = vacations.filter((request) => request.status === 'pendiente').length;
+			const range = adminReportDateRange();
+			const report = adminReportData(range);
+			const activeRangeLabel = `${formatDate(range.from)} - ${formatDate(range.to)}`;
 
 			return `
-				<div class="report-overview">
-					${metricCard('Incidencias pendientes', String(pendingIncidentsCount), pendingIncidentsCount ? 'incidencia' : 'correcto', 'Requieren revisión administrativa')}
-					${metricCard('Sin fichaje hoy', String(missingTodayCount), missingTodayCount ? 'pendiente' : 'correcto', 'Personas sin entrada registrada')}
-					${metricCard('Vacaciones pendientes', String(pendingVacationCount), pendingVacationCount ? 'pendiente' : 'correcto', 'Solicitudes esperando decisión')}
-					${metricCard('Informes programados', String(scheduledReports.length), 'trabajando', 'Envío automático simulado')}
-				</div>
-				<section class="panel">
-					<div class="panel-heading">
+				<section class="admin-v2-panel admin-v2-reports-builder">
+					<div class="admin-v2-panel-head">
 						<div>
-							<h2>Informes rápidos</h2>
-							<p class="helper-text">Estas tablas son una previsualización con datos ficticios guardados en el navegador.</p>
+							<h2>Qué quieres consultar</h2>
+							<p>Elige un informe, revisa el resumen y descarga el CSV con los filtros aplicados.</p>
 						</div>
 					</div>
-					<div class="reports-grid">
-						${reportPreview(
-							'Reporte semanal de horas',
-							'Últimos 7 días naturales.',
-							['Empleado', 'Días con fichaje', 'Días sin fichaje', 'Horas registradas', 'Incidencias', 'Vacaciones', 'Estado'],
-							weeklyRows,
-						)}
-						${reportPreview(
-							'Reporte mensual de horas',
-							'Últimos 30 días naturales.',
-							['Empleado', 'Días con fichaje', 'Días sin fichaje', 'Horas registradas', 'Incidencias', 'Vacaciones', 'Estado'],
-							monthlyRows,
-						)}
-						${reportPreview(
-							'Empleados sin fichaje',
-							'Personas sin entrada registrada hoy.',
-							['Empleado', 'Fecha', 'Departamento', 'Estado', 'Acción sugerida'],
-							missingRows,
-						)}
-						${reportPreview(
-							'Incidencias pendientes',
-							'Ajustes y anomalías pendientes de revisar.',
-							['Empleado', 'Fecha', 'Tipo', 'Detalle', 'Estado'],
-							pendingIncidentRows,
-						)}
-						${reportPreview(
-							'Vacaciones aprobadas/pendientes',
-							'Próximas solicitudes con impacto en planificación.',
-							['Empleado', 'Rango', 'Días', 'Estado', 'Comentario'],
-							vacationRows,
-						)}
+					<div class="admin-v2-reports-types">
+						${adminReportTypeCard('time', 'Registro horario', 'Entradas, salidas, pausas y tiempo trabajado.')}
+						${adminReportTypeCard('incidents', 'Incidencias', 'Jornadas incompletas o que requieren revisión.')}
+						${adminReportTypeCard('absences', 'Ausencias', 'Vacaciones, permisos y otras ausencias.')}
+					</div>
+
+					<div class="admin-v2-reports-section">
+						<div>
+							<h3>Periodo</h3>
+							<p class="helper-text">Rango activo: ${activeRangeLabel}</p>
+						</div>
+						<div class="admin-v2-reports-filters">
+							<label class="field">
+								<span>Periodo</span>
+								<select id="admin-report-period">
+									<option value="week" ${adminReportPeriod === 'week' ? 'selected' : ''}>Esta semana</option>
+									<option value="month" ${adminReportPeriod === 'month' ? 'selected' : ''}>Este mes</option>
+									<option value="previous-month" ${adminReportPeriod === 'previous-month' ? 'selected' : ''}>Mes anterior</option>
+									<option value="custom" ${adminReportPeriod === 'custom' ? 'selected' : ''}>Personalizado</option>
+								</select>
+							</label>
+							<label class="field">
+								<span>Fecha desde</span>
+								<input id="admin-report-from" type="date" value="${range.from}" />
+							</label>
+							<label class="field">
+								<span>Fecha hasta</span>
+								<input id="admin-report-to" type="date" value="${range.to}" />
+							</label>
+						</div>
+					</div>
+
+					<div class="admin-v2-reports-section">
+						<div>
+							<h3>Filtros</h3>
+							<p class="helper-text">Acota el informe antes de revisar la vista previa.</p>
+						</div>
+						<div class="admin-v2-reports-filters">
+							<label class="field">
+								<span>Persona</span>
+								<select id="admin-report-employee">
+									<option value="all" ${adminReportEmployeeId === 'all' ? 'selected' : ''}>Todas las personas</option>
+									${EMPLOYEES.map((employee) => `<option value="${employee.id}" ${adminReportEmployeeId === employee.id ? 'selected' : ''}>${employee.name}</option>`).join('')}
+								</select>
+							</label>
+							<label class="field">
+								<span>Departamento</span>
+								<select id="admin-report-department">
+									<option value="all" ${adminReportDepartment === 'all' ? 'selected' : ''}>Todos los departamentos</option>
+									${departmentList().map((department) => `<option value="${department}" ${adminReportDepartment === department ? 'selected' : ''}>${department}</option>`).join('')}
+								</select>
+							</label>
+							${adminReportStatusFilter()}
+						</div>
 					</div>
 				</section>
-				<section class="panel top-gap">
-					<div class="panel-heading">
+
+				<section class="admin-v2-panel admin-v2-reports-summary">
+					<div class="admin-v2-panel-head">
 						<div>
-							<h2>Programar informe</h2>
-							<p class="helper-text">En producción estos informes se enviarían automáticamente por email.</p>
+							<h2>Resumen del informe</h2>
+							<p>${adminReportTitle()} · ${activeRangeLabel}</p>
 						</div>
 					</div>
-					<form id="report-schedule-form" class="form-grid report-schedule-form">
+					<div class="admin-v2-reports-summary-grid">
+						${report.summary.map((item) => adminReportSummaryMetric(item.label, item.value, item.hint)).join('')}
+					</div>
+				</section>
+
+				<section class="admin-v2-panel admin-v2-reports-preview">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Vista previa</h2>
+							<p>${report.total > report.previewRows.length ? `Mostrando ${report.previewRows.length} de ${report.total} registros` : `${report.total} registros`}</p>
+						</div>
+					</div>
+					${report.previewRows.length ? renderAdminReportPreview(report.headers, report.previewRows) : emptyState('No hay datos para este periodo y filtros.')}
+				</section>
+
+				<section class="admin-v2-panel admin-v2-reports-export">
+					<div>
+						<h2>Exportar</h2>
+						<p class="helper-text">Descarga un CSV con el informe filtrado. La demo usa datos ficticios guardados en este navegador.</p>
+					</div>
+					<button class="button button-primary" type="button" data-action="export-admin-report" ${report.total ? '' : 'disabled'}>Descargar CSV</button>
+				</section>
+
+				<section class="admin-v2-panel admin-v2-reports-scheduled">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Envíos programados</h2>
+							<p>Configura recordatorios o envíos simulados de informes en esta demo.</p>
+						</div>
+					</div>
+					<form id="report-schedule-form" class="form-grid report-schedule-form admin-v2-reports-schedule-form">
 						<label class="field">
 							<span>Tipo de informe</span>
 							<select name="reportType">
@@ -3522,14 +3584,338 @@ import '../styles/responsible-v2.css';
 								<option value="CSV + PDF">CSV + PDF</option>
 							</select>
 						</label>
-						<button class="button button-primary" type="submit">Guardar programación</button>
+						<button class="button button-secondary" type="submit">Guardar programación</button>
 					</form>
-				</section>
-				<section class="panel top-gap">
-					<h2>Informes programados</h2>
-					${renderScheduledReportsTable()}
+					<div class="admin-v2-reports-scheduled-table">
+						${renderScheduledReportsTable()}
+					</div>
 				</section>
 			`;
+		}
+
+		function adminReportTypeCard(type: AdminReportType, title: string, description: string) {
+			return `
+				<button
+					class="admin-v2-report-type ${adminReportType === type ? 'is-active' : ''}"
+					type="button"
+					data-action="admin-report-type"
+					data-type="${type}"
+					aria-pressed="${adminReportType === type ? 'true' : 'false'}"
+				>
+					<strong>${title}</strong>
+					<span>${description}</span>
+				</button>
+			`;
+		}
+
+		function adminReportStatusFilter() {
+			if (adminReportType === 'incidents') return '';
+			if (adminReportType === 'absences') {
+				return `
+					<label class="field">
+						<span>Estado</span>
+						<select id="admin-report-status">
+							<option value="all" ${adminReportStatus === 'all' ? 'selected' : ''}>Todos los estados</option>
+							<option value="pendiente" ${adminReportStatus === 'pendiente' ? 'selected' : ''}>Pendientes</option>
+							<option value="aprobada" ${adminReportStatus === 'aprobada' ? 'selected' : ''}>Aprobadas</option>
+							<option value="denegada" ${adminReportStatus === 'denegada' ? 'selected' : ''}>Denegadas</option>
+							<option value="cancelada" ${adminReportStatus === 'cancelada' ? 'selected' : ''}>Canceladas</option>
+						</select>
+					</label>
+				`;
+			}
+
+			return `
+				<label class="field">
+					<span>Estado</span>
+					<select id="admin-report-status">
+						<option value="all" ${adminReportStatus === 'all' ? 'selected' : ''}>Todos</option>
+						<option value="correcto" ${adminReportStatus === 'correcto' ? 'selected' : ''}>Correctos</option>
+						<option value="incidencia" ${adminReportStatus === 'incidencia' ? 'selected' : ''}>Con incidencia</option>
+					</select>
+				</label>
+			`;
+		}
+
+		function adminReportDateRange() {
+			const today = todayIso();
+			if (adminReportPeriod === 'week') {
+				const from = startOfWeekIso(today);
+				return { from, to: minDate(addDaysIso(from, 6), today), valid: true };
+			}
+			if (adminReportPeriod === 'previous-month') {
+				const current = new Date(`${today}T12:00:00`);
+				const previous = new Date(current.getFullYear(), current.getMonth() - 1, 1);
+				return {
+					from: isoFromDate(previous),
+					to: isoFromDate(new Date(previous.getFullYear(), previous.getMonth() + 1, 0)),
+					valid: true,
+				};
+			}
+			if (adminReportPeriod === 'custom') {
+				return {
+					from: adminReportFrom,
+					to: adminReportTo,
+					valid: Boolean(adminReportFrom && adminReportTo && adminReportFrom <= adminReportTo),
+				};
+			}
+			return { from: startOfMonthIso(new Date(`${today}T12:00:00`)), to: today, valid: true };
+		}
+
+		function adminReportData(range: { from: string; to: string; valid: boolean }) {
+			if (!range.valid) {
+				return {
+					headers: adminReportHeaders(),
+					previewRows: [],
+					total: 0,
+					summary: [
+						{ label: 'Periodo', value: 'Revisar fechas', hint: 'La fecha desde no puede ser posterior a la fecha hasta.' },
+					],
+				};
+			}
+
+			if (adminReportType === 'incidents') return adminIncidentReportData(range.from, range.to);
+			if (adminReportType === 'absences') return adminAbsenceReportData(range.from, range.to);
+			return adminTimeReportData(range.from, range.to);
+		}
+
+		function adminReportHeaders() {
+			if (adminReportType === 'incidents') return ['Fecha', 'Persona', 'Incidencia', 'Estado'];
+			if (adminReportType === 'absences') return ['Persona', 'Tipo', 'Periodo', 'Duración', 'Estado'];
+			return ['Fecha', 'Persona', 'Entrada', 'Salida', 'Pausas', 'Trabajado', 'Estado'];
+		}
+
+		function adminTimeReportData(from: string, to: string) {
+			const entries = adminFilteredTimeEntries(from, to);
+			const people = new Set(entries.map((entry) => entry.employeeId));
+			const incidentCount = adminFilteredIncidents(from, to, false).length;
+			const worked = entries.reduce((sum, entry) => sum + workedMinutes(entry), 0);
+			const rows = entries.slice(0, 10).map((entry) => [
+				formatDate(entry.date),
+				employeeName(entry.employeeId),
+				entry.start || '',
+				entry.end || '',
+				formatBreaks(entry),
+				formatMinutes(workedMinutes(entry)),
+				pill(STATUS_LABELS[entry.status] || entry.status, entry.status),
+			]);
+
+			return {
+				headers: adminReportHeaders(),
+				previewRows: rows,
+				total: entries.length,
+				summary: [
+					{ label: 'Jornadas incluidas', value: String(entries.length), hint: 'Registros dentro del periodo.' },
+					{ label: 'Horas registradas', value: formatMinutes(worked), hint: 'Suma de tiempo trabajado.' },
+					{ label: 'Personas', value: String(people.size), hint: 'Con registros incluidos.' },
+					{ label: 'Incidencias detectadas', value: String(incidentCount), hint: 'Incidencias del mismo filtro.' },
+				],
+			};
+		}
+
+		function adminIncidentReportData(from: string, to: string) {
+			const rows = adminFilteredIncidents(from, to)
+				.slice(0, 10)
+				.map((incident) => [
+					formatDate(incident.date),
+					employeeName(incident.employeeId),
+					`${escapeHtml(incident.type)} · ${escapeHtml(incident.detail)}`,
+					pill(STATUS_LABELS[incident.status] || incident.status, incident.status),
+				]);
+			const all = adminFilteredIncidents(from, to);
+			const people = new Set(all.map((incident) => incident.employeeId));
+			const pending = all.filter((incident) => incident.status === 'pendiente').length;
+
+			return {
+				headers: adminReportHeaders(),
+				previewRows: rows,
+				total: all.length,
+				summary: [
+					{ label: 'Incidencias incluidas', value: String(all.length), hint: 'Dentro del periodo.' },
+					{ label: 'Personas afectadas', value: String(people.size), hint: 'Con alguna incidencia.' },
+					{ label: 'Pendientes', value: String(pending), hint: 'Aún requieren revisión.' },
+					{ label: 'Periodo', value: `${formatDate(from)} - ${formatDate(to)}`, hint: 'Rango consultado.' },
+				],
+			};
+		}
+
+		function adminAbsenceReportData(from: string, to: string) {
+			const requests = adminFilteredAbsences(from, to);
+			const people = new Set(requests.map((request) => request.employeeId));
+			const dayRequests = requests.filter((request) => !absenceUsesHours(request, ABSENCE_TYPES));
+			const hourRequests = requests.filter((request) => absenceUsesHours(request, ABSENCE_TYPES));
+			const days = dayRequests.reduce((sum, request) => sum + vacationRequestDays(request), 0);
+			const hours = hourRequests.reduce((sum, request) => sum + (request.requestedHours || 0), 0);
+			const rows = requests.slice(0, 10).map((request) => [
+				employeeName(request.employeeId),
+				escapeHtml(absenceTypeName(request)),
+				adminAbsenceDateLabel(request),
+				adminAbsenceDurationLabel(request),
+				pill(request.status),
+			]);
+
+			return {
+				headers: adminReportHeaders(),
+				previewRows: rows,
+				total: requests.length,
+				summary: [
+					{ label: 'Solicitudes incluidas', value: String(requests.length), hint: 'Ausencias dentro del periodo.' },
+					{ label: 'Personas', value: String(people.size), hint: 'Con ausencias incluidas.' },
+					{ label: 'Días de ausencia', value: `${days} días`, hint: 'Solo solicitudes por días.' },
+					{ label: 'Horas solicitadas', value: `${hours.toLocaleString('es-ES', { maximumFractionDigits: 2 })} h`, hint: 'Solo permisos por horas.' },
+				],
+			};
+		}
+
+		function adminFilteredEmployees() {
+			return EMPLOYEES.filter((employee) => {
+				if (adminReportEmployeeId !== 'all' && employee.id !== adminReportEmployeeId) return false;
+				if (adminReportDepartment !== 'all' && employee.department !== adminReportDepartment) return false;
+				return true;
+			});
+		}
+
+		function adminFilteredEmployeeIds() {
+			return new Set(adminFilteredEmployees().map((employee) => employee.id));
+		}
+
+		function adminFilteredTimeEntries(from: string, to: string) {
+			const employeeIds = adminFilteredEmployeeIds();
+			return timeEntries
+				.slice()
+				.filter((entry) => employeeIds.has(entry.employeeId))
+				.filter((entry) => dateInRange(entry.date, from, to))
+				.filter((entry) => adminReportStatus === 'all' || entry.status === adminReportStatus)
+				.sort((first, second) => first.date.localeCompare(second.date) || employeeName(first.employeeId).localeCompare(employeeName(second.employeeId), 'es'));
+		}
+
+		function adminFilteredIncidents(from: string, to: string, ignoreTimeStatus = true) {
+			const employeeIds = adminFilteredEmployeeIds();
+			return incidents
+				.slice()
+				.filter((incident) => employeeIds.has(incident.employeeId))
+				.filter((incident) => dateInRange(incident.date, from, to))
+				.filter((incident) => ignoreTimeStatus || adminReportStatus === 'all' || adminReportStatus === 'incidencia')
+				.sort((first, second) => first.date.localeCompare(second.date) || employeeName(first.employeeId).localeCompare(employeeName(second.employeeId), 'es'));
+		}
+
+		function adminFilteredAbsences(from: string, to: string) {
+			const employeeIds = adminFilteredEmployeeIds();
+			return vacations
+				.slice()
+				.filter((request) => employeeIds.has(request.employeeId))
+				.filter((request) => rangesOverlap(from, to, request.from, request.to))
+				.filter((request) => adminReportStatus === 'all' || request.status === adminReportStatus)
+				.sort(adminAbsenceSort);
+		}
+
+		function adminReportSummaryMetric(label: string, value: string, hint: string) {
+			return `
+				<div class="admin-v2-reports-summary-item">
+					<span>${label}</span>
+					<strong>${value}</strong>
+					<small>${hint}</small>
+				</div>
+			`;
+		}
+
+		function renderAdminReportPreview(headers: string[], rows: (string | number)[][]) {
+			return `
+				${renderSimpleTable(headers, rows)}
+				<div class="admin-v2-reports-mobile-list">
+					${rows.map((row) => `
+						<article class="admin-v2-reports-mobile-card">
+							<strong>${row[1] || row[0]}</strong>
+							${headers.map((header, index) => summaryRow(header, String(row[index] || ''))).join('')}
+						</article>
+					`).join('')}
+				</div>
+			`;
+		}
+
+		function adminReportTitle() {
+			if (adminReportType === 'incidents') return 'Incidencias';
+			if (adminReportType === 'absences') return 'Ausencias';
+			return 'Registro horario';
+		}
+
+		function setAdminReportType(type: string) {
+			adminReportType = type === 'incidents' || type === 'absences' ? type : 'time';
+			adminReportStatus = 'all';
+			renderPage();
+		}
+
+		function setAdminReportPeriod(period: string) {
+			adminReportPeriod = ['week', 'month', 'previous-month', 'custom'].includes(period)
+				? (period as AdminReportPeriod)
+				: 'month';
+			if (adminReportPeriod !== 'custom') {
+				const range = adminReportDateRange();
+				adminReportFrom = range.from;
+				adminReportTo = range.to;
+			}
+			renderPage();
+		}
+
+		function exportAdminReport() {
+			const range = adminReportDateRange();
+			const report = adminReportData(range);
+			if (!range.valid) {
+				showToast('Revisa las fechas del informe antes de exportar.');
+				return;
+			}
+			if (!report.total) {
+				showToast('No hay datos para este periodo y filtros.');
+				return;
+			}
+
+			const rows = adminReportCsvRows(range.from, range.to);
+			downloadCsv(adminReportFileName(range.from, range.to), rows);
+			addAudit('Exportación CSV', `${adminReportTitle()} exportado (${rows.length} registros).`);
+			saveAll();
+			showToast('CSV descargado.');
+		}
+
+		function adminReportCsvRows(from: string, to: string): Record<string, string | number>[] {
+			if (adminReportType === 'incidents') {
+				return adminFilteredIncidents(from, to).map((incident) => ({
+					Fecha: formatDate(incident.date),
+					Persona: employeeName(incident.employeeId),
+					Incidencia: incident.type,
+					Detalle: incident.detail,
+					Estado: incident.status,
+				}));
+			}
+
+			if (adminReportType === 'absences') {
+				return adminFilteredAbsences(from, to).map((request) => ({
+					Persona: employeeName(request.employeeId),
+					Tipo: absenceTypeName(request),
+					Periodo: adminAbsenceDateLabel(request),
+					Duración: adminAbsenceDurationLabel(request),
+					Estado: request.status,
+				}));
+			}
+
+			return adminFilteredTimeEntries(from, to).map((entry) => ({
+				Fecha: formatDate(entry.date),
+				Persona: employeeName(entry.employeeId),
+				Entrada: entry.start || '',
+				Salida: entry.end || '',
+				Pausas: formatBreaks(entry),
+				Trabajado: formatMinutes(workedMinutes(entry)),
+				Estado: entry.status,
+			}));
+		}
+
+		function adminReportFileName(from: string, to: string) {
+			const prefix = adminReportType === 'incidents'
+				? 'incidencias'
+				: adminReportType === 'absences'
+					? 'ausencias'
+					: 'registro-horario';
+			const suffix = from.slice(0, 7) === to.slice(0, 7) ? from.slice(0, 7) : `${from}_${to}`;
+			return `${prefix}-${suffix}.csv`;
 		}
 
 		function renderExports() {
