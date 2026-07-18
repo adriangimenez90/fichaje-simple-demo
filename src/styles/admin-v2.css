@@ -127,6 +127,14 @@
 	overflow-x: hidden;
 }
 
+.app-shell[data-role="admin_global"] input,
+.app-shell[data-role="admin_global"] select,
+.app-shell[data-role="admin_global"] textarea {
+	max-width: 100%;
+	min-height: 46px;
+	font-size: 16px;
+}
+
 .app-shell[data-role="admin_global"] .admin-v2-mobile-detail-nav {
 	display: none;
 }
@@ -1306,7 +1314,7 @@
 	}
 
 	.app-shell[data-role="admin_global"] .app-main {
-		padding: 16px 14px calc(112px + env(safe-area-inset-bottom));
+		padding: 14px 14px calc(122px + env(safe-area-inset-bottom));
 	}
 
 	.app-shell[data-role="admin_global"] .mobile-nav {
@@ -1317,8 +1325,8 @@
 		z-index: 50;
 		display: flex;
 		gap: 6px;
-		min-height: calc(72px + env(safe-area-inset-bottom));
-		padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+		min-height: calc(68px + env(safe-area-inset-bottom));
+		padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
 		border: 1px solid rgba(20, 33, 30, 0.1);
 		border-radius: 18px;
 		background: rgba(255, 255, 255, 0.97);
@@ -1341,7 +1349,7 @@
 		justify-items: center;
 		align-content: center;
 		gap: 4px;
-		min-height: 56px;
+		min-height: 54px;
 		padding: 6px 4px;
 		border-radius: 13px;
 		color: #3f504b;
@@ -1436,7 +1444,30 @@
 
 @media (max-width: 560px) {
 	.app-shell[data-role="admin_global"] .app-header {
-		padding: 8px 14px;
+		min-height: 54px;
+		padding: 6px 14px;
+	}
+
+	.app-shell[data-role="admin_global"] .brand-lockup span,
+	.app-shell[data-role="admin_global"] .demo-badge,
+	.app-shell[data-role="admin_global"] .reset-demo-button {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .header-actions {
+		gap: 6px;
+	}
+
+	.app-shell[data-role="admin_global"] .header-actions .button {
+		min-height: 36px;
+		padding: 6px 9px;
+		font-size: 0.78rem;
+	}
+
+	.app-shell[data-role="admin_global"] .user-chip {
+		max-width: 126px;
+		padding: 6px 8px;
+		font-size: 0.78rem;
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-metrics,
@@ -1474,6 +1505,73 @@
 
 	.app-shell[data-role="admin_global"] .admin-v2-home .admin-v2-metric small {
 		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-panel,
+	.app-shell[data-role="admin_global"] .admin-v2-people-list,
+	.app-shell[data-role="admin_global"] .admin-v2-person-detail,
+	.app-shell[data-role="admin_global"] .admin-v2-record-detail,
+	.app-shell[data-role="admin_global"] .admin-v2-absence-detail {
+		padding: 12px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-attention-item,
+	.app-shell[data-role="admin_global"] .admin-v2-upcoming article,
+	.app-shell[data-role="admin_global"] .admin-v2-activity article,
+	.app-shell[data-role="admin_global"] .admin-v2-record-mobile-card,
+	.app-shell[data-role="admin_global"] .admin-v2-absence-item,
+	.app-shell[data-role="admin_global"] .admin-v2-person-item {
+		padding: 10px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-people-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-records-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-absence-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-filters {
+		gap: 10px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav strong {
+		grid-column: 1 / -1;
+		order: -1;
+		text-align: center;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-settings-nav,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-types {
+		display: flex;
+		flex-wrap: nowrap;
+		gap: 8px;
+		overflow-x: auto;
+		scrollbar-width: none;
+		scroll-snap-type: x proximity;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-settings-nav::-webkit-scrollbar,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-types::-webkit-scrollbar {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-settings-tab,
+	.app-shell[data-role="admin_global"] .admin-v2-report-type {
+		flex: 0 0 auto;
+		scroll-snap-align: start;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-report-type {
+		width: min(78vw, 260px);
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-reports-preview,
+	.app-shell[data-role="admin_global"] .admin-v2-reports-preview .report-table-wrap {
+		max-width: 100%;
+		overflow-x: auto;
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-attention-item,

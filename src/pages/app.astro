@@ -1925,6 +1925,11 @@ import '../styles/responsible-v2.css';
 			const employee = employeeById(request.employeeId);
 			const type = findAbsenceType(request, ABSENCE_TYPES);
 			const hasDocument = Boolean(request.attachmentName);
+			const documentBadge = hasDocument
+				? 'Justificante'
+				: type?.documentRequirement === 'required'
+					? 'Requiere justificante'
+					: '';
 
 			return `
 				<button
@@ -1943,7 +1948,7 @@ import '../styles/responsible-v2.css';
 					<span class="admin-v2-absence-item-side">
 						${pill(request.status)}
 						<small>${adminAbsenceDurationLabel(request)}</small>
-						<small>${hasDocument ? 'Justificante indicado' : adminAbsenceDocumentRequirementLabel(type?.documentRequirement || 'none')}</small>
+						${documentBadge ? `<small>${documentBadge}</small>` : ''}
 					</span>
 				</button>
 			`;
@@ -2443,6 +2448,11 @@ import '../styles/responsible-v2.css';
 			const hasDocument = Boolean(request.attachmentName);
 			const type = findAbsenceType(request, ABSENCE_TYPES);
 			const urgency = responsibleUrgencyLabel(request);
+			const documentBadge = hasDocument
+				? 'Justificante indicado'
+				: type?.documentRequirement === 'required'
+					? 'Falta justificante'
+					: '';
 
 			return `
 				<button
@@ -2464,7 +2474,7 @@ import '../styles/responsible-v2.css';
 					<span class="responsible-v2-request-footer">
 						${pill(request.status)}
 						${urgency ? `<small class="responsible-v2-urgency">${urgency}</small>` : ''}
-						<small>${hasDocument ? 'Justificante indicado' : 'Sin justificante'}</small>
+						${documentBadge ? `<small>${documentBadge}</small>` : ''}
 						<small>${conflicts.length} coincidencias</small>
 					</span>
 				</button>

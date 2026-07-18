@@ -72,7 +72,7 @@
 	grid-column: 1 / -1;
 	width: min(100%, 600px);
 	margin: 0 auto;
-	padding: 18px 16px calc(104px + env(safe-area-inset-bottom));
+	padding: 18px 16px calc(120px + env(safe-area-inset-bottom));
 	overflow-x: hidden;
 }
 
@@ -360,7 +360,10 @@
 .app-shell[data-role="empleado"] .manual-box input,
 .app-shell[data-role="empleado"] .manual-box select,
 .app-shell[data-role="empleado"] .manual-box textarea {
+	width: 100%;
 	max-width: 100%;
+	min-height: 46px;
+	font-size: 16px;
 }
 
 .app-shell[data-role="empleado"] .employee-v2-profile-card {
@@ -506,6 +509,8 @@
 .app-shell[data-role="empleado"] .employee-v2-absence-form textarea {
 	width: 100%;
 	max-width: 100%;
+	min-height: 46px;
+	font-size: 16px;
 }
 
 .app-shell[data-role="empleado"] .employee-v2-absence-type-info,
@@ -657,8 +662,9 @@
 
 @media (max-width: 430px) {
 	.app-shell[data-role="empleado"] .app-header {
-		padding-top: 8px;
-		padding-bottom: 8px;
+		min-height: 54px;
+		padding-top: 6px;
+		padding-bottom: 6px;
 	}
 
 	.app-shell[data-role="empleado"] .brand-lockup span,
@@ -670,13 +676,22 @@
 		gap: 6px;
 	}
 
+	.app-shell[data-role="empleado"] .header-actions .button {
+		min-height: 36px;
+		padding: 6px 9px;
+		font-size: 0.78rem;
+	}
+
 	.app-shell[data-role="empleado"] .user-chip {
-		max-width: 122px;
+		max-width: 112px;
+		padding: 6px 8px;
+		font-size: 0.78rem;
 	}
 
 	.app-shell[data-role="empleado"] .app-main {
 		padding-right: 14px;
 		padding-left: 14px;
+		padding-bottom: calc(124px + env(safe-area-inset-bottom));
 	}
 
 	.app-shell[data-role="empleado"] .employee-v2-status-card {
@@ -699,7 +714,21 @@
 	}
 
 	.app-shell[data-role="empleado"] .employee-v2-absence-filters {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		display: flex;
+		gap: 8px;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.app-shell[data-role="empleado"] .employee-v2-absence-filters::-webkit-scrollbar {
+		display: none;
+	}
+
+	.app-shell[data-role="empleado"] .employee-v2-absence-filters .button,
+	.app-shell[data-role="empleado"] .employee-v2-absence-filters button {
+		flex: 0 0 auto;
+		min-height: 42px;
+		white-space: nowrap;
 	}
 
 	.app-shell[data-role="empleado"] .mobile-nav .nav-button {
