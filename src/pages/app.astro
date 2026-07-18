@@ -45,6 +45,7 @@ import '../styles/responsible-v2.css';
 
 	<script>
 		type EmployeeAbsenceFilter = 'all' | 'pending' | 'approved' | 'history';
+		type ResponsibleAbsenceCategoryFilter = 'all' | 'vacation' | 'paid_leave' | 'other';
 
 		import type {
 			AbsenceCategory,
@@ -168,6 +169,8 @@ import '../styles/responsible-v2.css';
 			department: 'all',
 		};
 		let validatorRequestFilter: VacationStatus | 'all' = 'pendiente';
+		let responsibleAbsenceCategoryFilter: ResponsibleAbsenceCategoryFilter = 'all';
+		let responsibleMobileDetailOpen = false;
 		let timeFilters = {
 			employeeId: 'all',
 			from: startOfMonthIso(new Date()),
@@ -309,6 +312,10 @@ import '../styles/responsible-v2.css';
 				if (action === 'review-incident') reviewIncident(actionButton.dataset.id || '');
 				if (action === 'select-vacation') selectVacation(actionButton.dataset.id || '');
 				if (action === 'validator-request-filter') setValidatorRequestFilter(actionButton.dataset.filter || 'pendiente');
+				if (action === 'responsible-category-filter') setResponsibleCategoryFilter(actionButton.dataset.category || 'all');
+				if (action === 'responsible-back-to-requests') responsibleBackToRequests();
+				if (action === 'responsible-previous-request') moveResponsibleRequest(-1);
+				if (action === 'responsible-next-request') moveResponsibleRequest(1);
 				if (action === 'approve-vacation') resolveVacation('aprobada', actionButton.dataset.id || '');
 				if (action === 'deny-vacation') resolveVacation('denegada', actionButton.dataset.id || '');
 				if (action === 'delete-holiday') deleteHoliday(actionButton.dataset.id || '');
@@ -594,7 +601,7 @@ import '../styles/responsible-v2.css';
 							data-view="${view.id}"
 							aria-current="${activeView === view.id ? 'page' : 'false'}"
 						>
-							${session.role === 'empleado' ? employeeNavIcon(view.id) : ''}
+							${session.role === 'empleado' ? employeeNavIcon(view.id) : responsibleNavIcon(view.id)}
 							<span>${view.label}</span>
 						</button>
 					`,
@@ -666,6 +673,17 @@ import '../styles/responsible-v2.css';
 			return `<svg ${common}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 2-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V20h-3v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-2-2 .1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4v-3h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2-2 .1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h3v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 2 2-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1v3h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>`;
 		}
 
+		function responsibleNavIcon(viewId: string) {
+			const common = 'class="responsible-v2-nav-icon" viewBox="0 0 24 24" aria-hidden="true"';
+			if (viewId === 'solicitudes') {
+				return `<svg ${common}><path d="M7 4h10l2 3v13H5V7z"></path><path d="M8 9h8M8 13h6M8 17h5"></path></svg>`;
+			}
+			if (viewId === 'calendario-equipo') {
+				return `<svg ${common}><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M13 14h2"></path></svg>`;
+			}
+			return `<svg ${common}><path d="M12 3v18M5 8h14M7 4h10v4H7zM6 12h12v8H6z"></path></svg>`;
+		}
+
 		function employeeNavIcon(viewId: string) {
 			if (viewId === 'fichar') {
 				return `
@@ -723,9 +741,21 @@ import '../styles/responsible-v2.css';
 
 			content.innerHTML = viewMap[activeView]?.() || viewMap[defaultViewForRole(session.role)]?.() || renderPunchClock();
 			updateLiveClock();
+			if (session.role === 'admin_global') {
+				queueMicrotask(ensureActiveMobileNavVisible);
+			}
 			if (session.role === 'empleado' && activeView === 'vacaciones') {
 				queueMicrotask(updateEmployeeAbsenceForm);
 			}
+		}
+
+		function ensureActiveMobileNavVisible() {
+			if (!mobileNav || session.role !== 'admin_global') return;
+			const active = mobileNav.querySelector<HTMLElement>('.nav-button[aria-current="page"]');
+			if (!active) return;
+
+			const left = active.offsetLeft - Math.max((mobileNav.clientWidth - active.clientWidth) / 2, 0);
+			mobileNav.scrollTo({ left: Math.max(left, 0), behavior: 'smooth' });
 		}
 
 		function renderPunchClock() {
@@ -2258,12 +2288,74 @@ import '../styles/responsible-v2.css';
 			};
 			const rankDiff = rank(first) - rank(second);
 			if (rankDiff) return rankDiff;
+			if (first.status === 'pendiente' && second.status === 'pendiente') {
+				const firstDate = first.createdAt || first.from;
+				const secondDate = second.createdAt || second.from;
+				return firstDate.localeCompare(secondDate) || first.from.localeCompare(second.from);
+			}
 			if (rank(first) === 1) {
 				const dateDiff = first.from.localeCompare(second.from);
 				if (dateDiff) return dateDiff;
 				return (first.startTime || '').localeCompare(second.startTime || '');
 			}
 			return second.createdAt.localeCompare(first.createdAt);
+		}
+
+		function responsibleRequestMatchesCategory(
+			request: VacationRequest,
+			categoryFilter: ResponsibleAbsenceCategoryFilter = responsibleAbsenceCategoryFilter,
+		) {
+			if (categoryFilter === 'all') return true;
+			const category = findAbsenceType(request, ABSENCE_TYPES)?.category || 'vacation';
+			if (categoryFilter === 'other') {
+				return ['unpaid_leave', 'medical_leave', 'other'].includes(category);
+			}
+			return category === categoryFilter;
+		}
+
+		function responsibleFilteredRequests() {
+			return vacations
+				.slice()
+				.sort(responsibleRequestSort)
+				.filter((request) => validatorRequestFilter === 'all' || request.status === validatorRequestFilter)
+				.filter(responsibleRequestMatchesCategory);
+		}
+
+		function responsibleCategoryClass(request: VacationRequest) {
+			const category = findAbsenceType(request, ABSENCE_TYPES)?.category || 'vacation';
+			if (category === 'vacation') return 'category-vacation';
+			if (category === 'paid_leave') return 'category-paid';
+			if (category === 'medical_leave') return 'category-medical';
+			if (category === 'unpaid_leave') return 'category-unpaid';
+			return 'category-other';
+		}
+
+		function responsibleUrgencyLabel(request: VacationRequest) {
+			if (request.status !== 'pendiente') return '';
+			const today = todayIso();
+			const tomorrow = addDaysIso(today, 1);
+			if (request.from < today) return 'Fecha iniciada';
+			if (request.from === today) return 'Empieza hoy';
+			if (request.from === tomorrow) return 'Empieza mañana';
+			if (request.createdAt) {
+				const daysPending = diffDays(request.createdAt.slice(0, 10), today);
+				if (daysPending >= 7) return `Pendiente hace ${daysPending} días`;
+			}
+			return '';
+		}
+
+		function responsibleCategoryFilterButton(label: string, category: ResponsibleAbsenceCategoryFilter, count: number) {
+			return `
+				<button
+					class="button request-filter-button responsible-category-filter ${responsibleAbsenceCategoryFilter === category ? 'is-active' : ''}"
+					type="button"
+					data-action="responsible-category-filter"
+					data-category="${category}"
+				>
+					<span>${label}</span>
+					<strong>${count}</strong>
+				</button>
+			`;
 		}
 
 		function renderResponsibleRequestCard(
@@ -2274,10 +2366,12 @@ import '../styles/responsible-v2.css';
 			const scope = employee ? departmentEmployees(employee.department) : EMPLOYEES;
 			const conflicts = absenceConflictRequests(request, scope, vacations, holidays, ABSENCE_TYPES);
 			const hasDocument = Boolean(request.attachmentName);
+			const type = findAbsenceType(request, ABSENCE_TYPES);
+			const urgency = responsibleUrgencyLabel(request);
 
 			return `
 				<button
-					class="responsible-v2-request-card ${selected ? 'is-active' : ''}"
+					class="responsible-v2-request-card ${responsibleCategoryClass(request)} ${selected ? 'is-active' : ''}"
 					type="button"
 					data-action="select-vacation"
 					data-id="${request.id}"
@@ -2287,15 +2381,32 @@ import '../styles/responsible-v2.css';
 						<strong>${employeeName(request.employeeId)}</strong>
 						<small>${escapeHtml(employee?.department || 'Sin departamento')}</small>
 					</span>
-					<span class="responsible-v2-request-type">${escapeHtml(absenceTypeName(request))}</span>
+					<span class="responsible-v2-request-type">
+						<strong>${escapeHtml(absenceTypeName(request))}</strong>
+						<small>${type ? absenceCategoryLabel(type.category) : 'Vacaciones'}</small>
+					</span>
 					<span class="responsible-v2-request-meta">${responsibleRequestDateLabel(request)} · ${responsibleRequestDurationLabel(request)}</span>
 					<span class="responsible-v2-request-footer">
 						${pill(request.status)}
+						${urgency ? `<small class="responsible-v2-urgency">${urgency}</small>` : ''}
 						<small>${hasDocument ? 'Justificante indicado' : 'Sin justificante'}</small>
 						<small>${conflicts.length} coincidencias</small>
-						<small>${formatDate(request.createdAt.slice(0, 10))}</small>
 					</span>
 				</button>
+			`;
+		}
+
+		function renderResponsibleMobileDetailNav(selected: VacationRequest, requests: VacationRequest[]) {
+			const index = Math.max(requests.findIndex((request) => request.id === selected.id), 0);
+			return `
+				<div class="responsible-v2-mobile-detail-nav">
+					<button class="button button-tertiary" type="button" data-action="responsible-back-to-requests">Volver</button>
+					<div>
+						<button class="button button-secondary button-small" type="button" data-action="responsible-previous-request" ${index <= 0 ? 'disabled' : ''}>Anterior</button>
+						<span>${requests.length ? index + 1 : 0} de ${requests.length}</span>
+						<button class="button button-secondary button-small" type="button" data-action="responsible-next-request" ${index >= requests.length - 1 ? 'disabled' : ''}>Siguiente</button>
+					</div>
+				</div>
 			`;
 		}
 
@@ -2477,14 +2588,12 @@ import '../styles/responsible-v2.css';
 
 		function renderValidatorRequests() {
 			const requests = vacations.slice().sort(responsibleRequestSort);
-			const filteredRequests = validatorRequestFilter === 'all'
-				? requests
-				: requests.filter((request) => request.status === validatorRequestFilter);
+			const filteredRequests = responsibleFilteredRequests();
 			const selected =
 				filteredRequests.find((request) => request.id === selectedVacationId) ||
-				filteredRequests[0] ||
-				requests.find((request) => request.id === selectedVacationId);
+				filteredRequests[0];
 			selectedVacationId = selected?.id || '';
+			if (!selected) responsibleMobileDetailOpen = false;
 			const pendingCount = requests.filter((request) => request.status === 'pendiente').length;
 			const filterButtons: Array<{ filter: VacationStatus | 'all'; label: string }> = [
 				{ filter: 'pendiente', label: 'Pendientes' },
@@ -2499,9 +2608,23 @@ import '../styles/responsible-v2.css';
 					return validatorFilterButton(label, filter, validatorRequestFilter, count);
 				})
 				.join('');
+			const baseForCategory = requests.filter((request) => validatorRequestFilter === 'all' || request.status === validatorRequestFilter);
+			const categoryButtons = [
+				{ category: 'all' as const, label: 'Todas' },
+				{ category: 'vacation' as const, label: 'Vacaciones' },
+				{ category: 'paid_leave' as const, label: 'Permisos retribuidos' },
+				{ category: 'other' as const, label: 'Otras ausencias' },
+			]
+				.map(({ category, label }) => {
+					const count = category === 'all'
+						? baseForCategory.length
+						: baseForCategory.filter((request) => responsibleRequestMatchesCategory(request, category)).length;
+					return responsibleCategoryFilterButton(label, category, count);
+				})
+				.join('');
 
 			return `
-				<div class="responsible-v2-page responsible-v2-requests-page">
+				<div class="responsible-v2-page responsible-v2-requests-page ${responsibleMobileDetailOpen && selected ? 'is-mobile-detail-open' : ''}">
 					<header class="responsible-v2-header">
 						<div>
 							<h1>Solicitudes</h1>
@@ -2512,6 +2635,9 @@ import '../styles/responsible-v2.css';
 
 					<div class="responsible-v2-filters" aria-label="Filtrar solicitudes">
 						${filterButtons}
+					</div>
+					<div class="responsible-v2-filters responsible-v2-category-filters" aria-label="Filtrar por tipo de ausencia">
+						${categoryButtons}
 					</div>
 
 					<div class="responsible-v2-inbox">
@@ -2526,7 +2652,7 @@ import '../styles/responsible-v2.css';
 						</section>
 
 						<section class="responsible-v2-detail" ${selected ? `data-selected-vacation-id="${selected.id}"` : ''}>
-							${selected ? renderResponsibleRequestDetail(selected) : emptyState('Selecciona una solicitud.')}
+							${selected ? `${renderResponsibleMobileDetailNav(selected, filteredRequests)}${renderResponsibleRequestDetail(selected)}` : emptyState('Selecciona una solicitud.')}
 						</section>
 					</div>
 				</div>
@@ -5393,6 +5519,7 @@ import '../styles/responsible-v2.css';
 
 		function selectVacation(id: string) {
 			selectedVacationId = id;
+			responsibleMobileDetailOpen = true;
 			renderPage();
 		}
 
@@ -5443,6 +5570,37 @@ import '../styles/responsible-v2.css';
 				? (filter as VacationStatus)
 				: 'all';
 			selectedVacationId = '';
+			responsibleMobileDetailOpen = false;
+			renderPage();
+		}
+
+		function setResponsibleCategoryFilter(category: string) {
+			responsibleAbsenceCategoryFilter = ['all', 'vacation', 'paid_leave', 'other'].includes(category)
+				? (category as ResponsibleAbsenceCategoryFilter)
+				: 'all';
+			selectedVacationId = '';
+			responsibleMobileDetailOpen = false;
+			renderPage();
+		}
+
+		function responsibleBackToRequests() {
+			responsibleMobileDetailOpen = false;
+			renderPage();
+		}
+
+		function moveResponsibleRequest(offset: number) {
+			const requests = responsibleFilteredRequests();
+			if (!requests.length) {
+				selectedVacationId = '';
+				responsibleMobileDetailOpen = false;
+				renderPage();
+				return;
+			}
+
+			const currentIndex = Math.max(requests.findIndex((request) => request.id === selectedVacationId), 0);
+			const nextIndex = Math.min(Math.max(currentIndex + offset, 0), requests.length - 1);
+			selectedVacationId = requests[nextIndex].id;
+			responsibleMobileDetailOpen = true;
 			renderPage();
 		}
 
@@ -5507,6 +5665,11 @@ import '../styles/responsible-v2.css';
 			);
 			saveAll();
 			showToast(`${status === 'aprobada' ? 'Solicitud aprobada.' : 'Solicitud denegada.'} La solicitud se ha actualizado en la demo.`);
+			if (responsibleMobileDetailOpen) {
+				const nextRequests = responsibleFilteredRequests();
+				selectedVacationId = nextRequests[0]?.id || '';
+				responsibleMobileDetailOpen = Boolean(selectedVacationId);
+			}
 			renderPage();
 		}
 

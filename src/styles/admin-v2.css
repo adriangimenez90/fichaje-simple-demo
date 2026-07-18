@@ -1302,11 +1302,64 @@
 	}
 
 	.app-shell[data-role="admin_global"] .app-main {
-		padding: 16px 14px calc(96px + env(safe-area-inset-bottom));
+		padding: 16px 14px calc(112px + env(safe-area-inset-bottom));
 	}
 
 	.app-shell[data-role="admin_global"] .mobile-nav {
+		position: fixed;
+		right: 10px;
+		bottom: 10px;
+		left: 10px;
+		z-index: 50;
+		display: flex;
+		gap: 6px;
+		min-height: calc(72px + env(safe-area-inset-bottom));
+		padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+		border: 1px solid rgba(20, 33, 30, 0.1);
+		border-radius: 18px;
+		background: rgba(255, 255, 255, 0.97);
+		box-shadow: 0 16px 36px rgba(20, 33, 30, 0.16);
+		overflow-x: auto;
+		overflow-y: hidden;
+		scroll-snap-type: x proximity;
+		scrollbar-width: none;
+		backdrop-filter: blur(12px);
+	}
+
+	.app-shell[data-role="admin_global"] .mobile-nav::-webkit-scrollbar {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .mobile-nav .nav-button {
+		flex: 0 0 92px;
+		scroll-snap-align: center;
 		display: grid;
+		justify-items: center;
+		align-content: center;
+		gap: 4px;
+		min-height: 56px;
+		padding: 6px 4px;
+		border-radius: 13px;
+		color: #3f504b;
+		background: transparent;
+	}
+
+	.app-shell[data-role="admin_global"] .mobile-nav .nav-button[aria-current="page"] {
+		color: #0f5d4d;
+		background: #dff4ee;
+		box-shadow: inset 0 0 0 1px rgba(20, 115, 95, 0.16);
+	}
+
+	.app-shell[data-role="admin_global"] .mobile-nav .nav-button span {
+		font-size: 0.76rem;
+		font-weight: 720;
+		line-height: 1.1;
+		text-align: center;
+	}
+
+	.app-shell[data-role="admin_global"] .mobile-nav .admin-v2-nav-icon {
+		width: 20px;
+		height: 20px;
 	}
 }
 
