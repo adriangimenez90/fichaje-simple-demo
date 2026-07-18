@@ -194,10 +194,17 @@ import '../styles/responsible-v2.css';
 		let adminRecordsSearch = '';
 		let adminRecordsDepartment = 'all';
 		let adminRecordsStatus = 'all';
+		type AdminAbsencePeriod = 'all' | 'today' | 'upcoming' | 'past';
+		let adminAbsenceSearch = '';
+		let adminAbsenceStatus: VacationStatus | 'all' = 'all';
+		let adminAbsenceType = 'all';
+		let adminAbsenceDepartment = 'all';
+		let adminAbsencePeriod: AdminAbsencePeriod = 'all';
 		let selectedAdminUserId = '';
 		let selectedAdminPersonId = '';
 		let selectedAdminRecordEmployeeId = '';
 		let selectedAdminRecordDate = '';
+		let selectedAdminAbsenceId = '';
 		let selectedTimesheetSummaryKey = '';
 
 		let timeEntries: TimeEntry[] = [];
@@ -330,6 +337,8 @@ import '../styles/responsible-v2.css';
 				if (action === 'admin-records-prev-day') changeAdminRecordsDay(-1);
 				if (action === 'admin-records-next-day') changeAdminRecordsDay(1);
 				if (action === 'admin-records-today') setAdminRecordsDate(todayIso());
+				if (action === 'select-admin-absence') selectAdminAbsence(actionButton.dataset.id || '');
+				if (action === 'clear-admin-absence-filters') clearAdminAbsenceFilters();
 				if (action === 'logout') {
 					localStorage.removeItem(KEYS.session);
 					window.location.href = '/';
@@ -454,6 +463,17 @@ import '../styles/responsible-v2.css';
 						search?.setSelectionRange(cursor, cursor);
 					});
 				}
+				if (input.id === 'admin-absence-search') {
+					const cursor = input.selectionStart || input.value.length;
+					adminAbsenceSearch = input.value;
+					selectedAdminAbsenceId = '';
+					renderPage();
+					queueMicrotask(() => {
+						const search = document.querySelector<HTMLInputElement>('#admin-absence-search');
+						search?.focus();
+						search?.setSelectionRange(cursor, cursor);
+					});
+				}
 			});
 
 			document.addEventListener('change', (event) => {
@@ -471,6 +491,26 @@ import '../styles/responsible-v2.css';
 				if (field.id === 'admin-records-status') {
 					adminRecordsStatus = field.value || 'all';
 					selectedAdminRecordEmployeeId = '';
+					renderPage();
+				}
+				if (field.id === 'admin-absence-status') {
+					adminAbsenceStatus = (field.value || 'all') as VacationStatus | 'all';
+					selectedAdminAbsenceId = '';
+					renderPage();
+				}
+				if (field.id === 'admin-absence-type') {
+					adminAbsenceType = field.value || 'all';
+					selectedAdminAbsenceId = '';
+					renderPage();
+				}
+				if (field.id === 'admin-absence-department') {
+					adminAbsenceDepartment = field.value || 'all';
+					selectedAdminAbsenceId = '';
+					renderPage();
+				}
+				if (field.id === 'admin-absence-period') {
+					adminAbsencePeriod = (field.value || 'all') as AdminAbsencePeriod;
+					selectedAdminAbsenceId = '';
 					renderPage();
 				}
 			});
@@ -1971,11 +2011,374 @@ import '../styles/responsible-v2.css';
 		}
 
 		function renderAdminVacations() {
-			const visibleEmployees = adminVacationEmployees();
+			const requests = adminAbsenceRequests();
+			const selectedRequest = adminSelectedAbsence(requests);
+			const metrics = adminAbsenceMetrics();
+
 			return `
-				${sectionTitle('Vacaciones', 'Quién está de vacaciones y cómo queda el equipo.')}
-				${renderAdminVacationCalendar(visibleEmployees)}
+				<section class="admin-v2-absence">
+					<header class="admin-v2-absence-header">
+						<div class="admin-v2-page-header">
+							<span>Ausencias</span>
+							<h1>Ausencias</h1>
+							<p>Consulta vacaciones, permisos y disponibilidad de la empresa.</p>
+						</div>
+					</header>
+
+					<div class="admin-v2-absence-metrics">
+						${adminAbsenceMetric('Pendientes', String(metrics.pending), 'Solicitudes por revisar', metrics.pending ? 'warning' : 'neutral')}
+						${adminAbsenceMetric('Ausentes hoy', String(metrics.absentToday), 'Aprobadas activas hoy', metrics.absentToday ? 'info' : 'neutral')}
+						${adminAbsenceMetric('Próximas', String(metrics.upcoming), 'Ausencias aprobadas futuras', metrics.upcoming ? 'success' : 'neutral')}
+						${adminAbsenceMetric('Tipos utilizados', String(metrics.usedTypes), 'Tipos presentes en solicitudes', 'neutral')}
+					</div>
+
+					<div class="admin-v2-panel admin-v2-absence-toolbar">
+						<label class="field">
+							<span>Buscar</span>
+							<input id="admin-absence-search" type="search" placeholder="Buscar persona o departamento" value="${escapeHtml(adminAbsenceSearch)}" />
+						</label>
+						<label class="field">
+							<span>Estado</span>
+							<select id="admin-absence-status">
+								<option value="all" ${adminAbsenceStatus === 'all' ? 'selected' : ''}>Todos</option>
+								<option value="pendiente" ${adminAbsenceStatus === 'pendiente' ? 'selected' : ''}>Pendientes</option>
+								<option value="aprobada" ${adminAbsenceStatus === 'aprobada' ? 'selected' : ''}>Aprobadas</option>
+								<option value="denegada" ${adminAbsenceStatus === 'denegada' ? 'selected' : ''}>Denegadas</option>
+								<option value="cancelada" ${adminAbsenceStatus === 'cancelada' ? 'selected' : ''}>Canceladas</option>
+							</select>
+						</label>
+						<label class="field">
+							<span>Tipo</span>
+							<select id="admin-absence-type">
+								<option value="all" ${adminAbsenceType === 'all' ? 'selected' : ''}>Todos los tipos</option>
+								${ABSENCE_TYPES.filter((type) => type.active).map((type) => `
+									<option value="${type.id}" ${adminAbsenceType === type.id ? 'selected' : ''}>${escapeHtml(type.name)}</option>
+								`).join('')}
+							</select>
+						</label>
+						<label class="field">
+							<span>Departamento</span>
+							<select id="admin-absence-department">
+								<option value="all" ${adminAbsenceDepartment === 'all' ? 'selected' : ''}>Todos los departamentos</option>
+								${departmentList().map((department) => `<option value="${department}" ${adminAbsenceDepartment === department ? 'selected' : ''}>${department}</option>`).join('')}
+							</select>
+						</label>
+						<label class="field">
+							<span>Periodo</span>
+							<select id="admin-absence-period">
+								<option value="all" ${adminAbsencePeriod === 'all' ? 'selected' : ''}>Todas</option>
+								<option value="today" ${adminAbsencePeriod === 'today' ? 'selected' : ''}>Hoy</option>
+								<option value="upcoming" ${adminAbsencePeriod === 'upcoming' ? 'selected' : ''}>Próximas</option>
+								<option value="past" ${adminAbsencePeriod === 'past' ? 'selected' : ''}>Pasadas</option>
+							</select>
+						</label>
+						<strong>${requests.length} solicitudes</strong>
+					</div>
+
+					<div class="admin-v2-absence-layout">
+						<section class="admin-v2-panel admin-v2-absence-list">
+							<div class="admin-v2-panel-head">
+								<div>
+									<h2>Solicitudes</h2>
+									<p>Seguimiento global de ausencias.</p>
+								</div>
+							</div>
+							${requests.length ? requests.map((request) => renderAdminAbsenceCard(request, selectedRequest?.id === request.id)).join('') : `
+								<div class="empty-state">
+									<p>No hay ausencias que coincidan con los filtros.</p>
+									<button class="button button-secondary" type="button" data-action="clear-admin-absence-filters">Limpiar filtros</button>
+								</div>
+							`}
+						</section>
+
+						<section class="admin-v2-panel admin-v2-absence-detail">
+							${selectedRequest ? renderAdminAbsenceDetail(selectedRequest) : emptyState('Selecciona una ausencia para ver el detalle.')}
+						</section>
+					</div>
+
+					${renderAdminAbsentToday()}
+
+					<section class="admin-v2-absence-planning">
+						${renderAdminVacationCalendar(adminVacationEmployees())}
+					</section>
+				</section>
 			`;
+		}
+
+		function adminAbsenceMetrics() {
+			const today = todayIso();
+			const usedTypes = new Set(vacations.map((request) => resolveAbsenceTypeId(request))).size;
+			return {
+				pending: vacations.filter((request) => request.status === 'pendiente').length,
+				absentToday: vacations.filter((request) => request.status === 'aprobada' && isDateWithin(today, request.from, request.to)).length,
+				upcoming: vacations.filter((request) => request.status === 'aprobada' && request.from > today).length,
+				usedTypes,
+			};
+		}
+
+		function adminAbsenceMetric(label: string, value: string, hint: string, tone: string) {
+			return `
+				<div class="admin-v2-absence-metric metric-${tone}">
+					<span>${label}</span>
+					<strong>${value}</strong>
+					<small>${hint}</small>
+				</div>
+			`;
+		}
+
+		function adminAbsenceRequests() {
+			return vacations
+				.slice()
+				.filter(adminAbsenceMatchesFilters)
+				.sort(adminAbsenceSort);
+		}
+
+		function adminAbsenceMatchesFilters(request: VacationRequest) {
+			const employee = employeeById(request.employeeId);
+			const user = adminAbsenceUser(request.employeeId);
+			const query = adminAbsenceSearch.trim().toLowerCase();
+
+			if (adminAbsenceStatus !== 'all' && request.status !== adminAbsenceStatus) return false;
+			if (adminAbsenceType !== 'all' && resolveAbsenceTypeId(request) !== adminAbsenceType) return false;
+			if (adminAbsenceDepartment !== 'all' && employee?.department !== adminAbsenceDepartment) return false;
+			if (adminAbsencePeriod === 'today' && !isDateWithin(todayIso(), request.from, request.to)) return false;
+			if (adminAbsencePeriod === 'upcoming' && request.from <= todayIso()) return false;
+			if (adminAbsencePeriod === 'past' && request.to >= todayIso()) return false;
+
+			if (!query) return true;
+
+			return [
+				employee?.name || employeeName(request.employeeId),
+				employee?.department || '',
+				user?.email || '',
+			].some((value) => value.toLowerCase().includes(query));
+		}
+
+		function adminAbsenceSort(first: VacationRequest, second: VacationRequest) {
+			const rank = (request: VacationRequest) => {
+				if (request.status === 'pendiente') return 0;
+				if (request.status === 'aprobada' && request.from > todayIso()) return 1;
+				return 2;
+			};
+			const rankDiff = rank(first) - rank(second);
+			if (rankDiff) return rankDiff;
+			if (rank(first) === 1) {
+				const dateDiff = first.from.localeCompare(second.from);
+				if (dateDiff) return dateDiff;
+			}
+			return second.createdAt.localeCompare(first.createdAt);
+		}
+
+		function adminSelectedAbsence(requests: VacationRequest[]) {
+			if (!requests.length) {
+				selectedAdminAbsenceId = '';
+				return undefined;
+			}
+			const selected = requests.find((request) => request.id === selectedAdminAbsenceId);
+			if (selected) return selected;
+			selectedAdminAbsenceId = requests[0].id;
+			return requests[0];
+		}
+
+		function renderAdminAbsenceCard(request: VacationRequest, selected: boolean) {
+			const employee = employeeById(request.employeeId);
+			const type = findAbsenceType(request, ABSENCE_TYPES);
+			const hasDocument = Boolean(request.attachmentName);
+
+			return `
+				<button
+					class="admin-v2-absence-item ${selected ? 'is-active' : ''}"
+					type="button"
+					data-action="select-admin-absence"
+					data-id="${request.id}"
+					aria-current="${selected ? 'page' : 'false'}"
+				>
+					<span class="admin-v2-absence-avatar">${adminAbsenceInitials(employee?.name || employeeName(request.employeeId))}</span>
+					<span class="admin-v2-absence-item-main">
+						<strong>${escapeHtml(employee?.name || employeeName(request.employeeId))}</strong>
+						<small>${escapeHtml(employee?.department || 'Sin departamento')}</small>
+						<em>${escapeHtml(absenceTypeName(request))} · ${adminAbsenceDateLabel(request)}</em>
+					</span>
+					<span class="admin-v2-absence-item-side">
+						${pill(request.status)}
+						<small>${adminAbsenceDurationLabel(request)}</small>
+						<small>${hasDocument ? 'Justificante indicado' : adminAbsenceDocumentRequirementLabel(type?.documentRequirement || 'none')}</small>
+					</span>
+				</button>
+			`;
+		}
+
+		function renderAdminAbsenceDetail(request: VacationRequest) {
+			const employee = employeeById(request.employeeId);
+			const type = findAbsenceType(request, ABSENCE_TYPES);
+			const deductsVacation = absenceDeductsVacationBalance(request, ABSENCE_TYPES);
+			const balance = deductsVacation ? vacationBalance(request.employeeId) : undefined;
+
+			return `
+				<div class="admin-v2-absence-detail-inner">
+					<div class="admin-v2-absence-detail-head">
+						<div>
+							<span>Solicitud seleccionada</span>
+							<h2>${escapeHtml(employee?.name || employeeName(request.employeeId))}</h2>
+							<p>${escapeHtml(employee?.department || 'Sin departamento')}</p>
+						</div>
+						${pill(request.status)}
+					</div>
+
+					<div class="admin-v2-absence-detail-grid">
+						<section>
+							<h3>Tipo de ausencia</h3>
+							${summaryRow('Nombre', escapeHtml(absenceTypeName(request)))}
+							${summaryRow('Categoría', type ? absenceCategoryLabel(type.category) : 'Vacaciones')}
+							${summaryRow('Duración', adminAbsenceDurationLabel(request))}
+							${summaryRow('Saldo', deductsVacation ? 'Descuenta vacaciones' : 'No descuenta vacaciones')}
+							${summaryRow('Aprobación', type?.requiresApproval === false ? 'No requiere aprobación' : 'Requiere aprobación')}
+						</section>
+						<section>
+							<h3>Periodo</h3>
+							${absenceUsesHours(request, ABSENCE_TYPES)
+								? `
+									${summaryRow('Fecha', formatDate(request.from))}
+									${summaryRow('Horario', `${request.startTime || '--:--'} - ${request.endTime || '--:--'}`)}
+									${summaryRow('Horas', adminAbsenceDurationLabel(request))}
+								`
+								: `
+									${summaryRow('Desde', formatDate(request.from))}
+									${summaryRow('Hasta', formatDate(request.to))}
+									${summaryRow('Días', adminAbsenceDurationLabel(request))}
+								`
+							}
+						</section>
+					</div>
+
+					<section class="admin-v2-absence-section">
+						<h3>Solicitud</h3>
+						${summaryRow('Comentario', escapeHtml(request.comment || 'Sin comentario'))}
+						${summaryRow('Creada', formatDateTime(request.createdAt))}
+						${summaryRow('Decisión', request.decidedAt ? formatDateTime(request.decidedAt) : 'Sin decisión registrada')}
+						${request.denialReason ? summaryRow('Motivo de denegación', escapeHtml(request.denialReason)) : ''}
+					</section>
+
+					${renderAdminAbsenceDocument(request)}
+					${balance ? renderAdminAbsenceBalance(balance) : ''}
+					${renderAdminAbsenceConflicts(request)}
+				</div>
+			`;
+		}
+
+		function renderAdminAbsenceDocument(request: VacationRequest) {
+			const type = findAbsenceType(request, ABSENCE_TYPES);
+			const requirement = type?.documentRequirement || 'none';
+			return `
+				<section class="admin-v2-absence-document">
+					<h3>Justificante</h3>
+					${request.attachmentName
+						? `
+							<strong>${escapeHtml(request.attachmentName)}</strong>
+							<p>En esta demo solo se conserva el nombre del archivo.</p>
+						`
+						: `<p>${adminAbsenceDocumentRequirementLabel(requirement)}</p>`
+					}
+				</section>
+			`;
+		}
+
+		function renderAdminAbsenceBalance(balance: ReturnType<typeof vacationBalance>) {
+			return `
+				<section class="admin-v2-absence-balance">
+					<h3>Saldo de vacaciones</h3>
+					<div>
+						${summaryRow('Disponibles', `${balance.available} días`)}
+						${summaryRow('Disfrutadas', `${balance.enjoyed} días`)}
+						${summaryRow('Aprobadas futuras', `${balance.futureApproved} días`)}
+						${summaryRow('Pendientes', `${balance.pending} días`)}
+					</div>
+				</section>
+			`;
+		}
+
+		function renderAdminAbsenceConflicts(request: VacationRequest) {
+			const employee = employeeById(request.employeeId);
+			const scope = employee ? departmentEmployees(employee.department) : EMPLOYEES;
+			const conflicts = absenceConflictRequests(request, scope, vacations, holidays, ABSENCE_TYPES)
+				.slice(0, 5);
+
+			return `
+				<section class="admin-v2-absence-conflicts">
+					<h3>Coincidencias en el equipo</h3>
+					${conflicts.length ? conflicts.map((item) => `
+						<div class="admin-v2-absence-conflict status-border-${statusClass(item.status)}">
+							<strong>${employeeName(item.employeeId)}</strong>
+							<span>${escapeHtml(absenceTypeName(item))}</span>
+							<small>${adminAbsenceDateLabel(item)} · ${adminAbsenceDurationLabel(item)}</small>
+							${pill(item.status)}
+						</div>
+					`).join('') : '<p class="helper-text">Sin ausencias coincidentes.</p>'}
+				</section>
+			`;
+		}
+
+		function renderAdminAbsentToday() {
+			const today = todayIso();
+			const active = vacations
+				.slice()
+				.filter((request) => request.status === 'aprobada' && isDateWithin(today, request.from, request.to))
+				.sort((first, second) => employeeName(first.employeeId).localeCompare(employeeName(second.employeeId), 'es'));
+			const visible = active.slice(0, 6);
+			const extra = Math.max(active.length - visible.length, 0);
+
+			return `
+				<section class="admin-v2-panel admin-v2-absence-today">
+					<div class="admin-v2-panel-head">
+						<div>
+							<h2>Ausentes hoy</h2>
+							<p>Personas con una ausencia aprobada activa.</p>
+						</div>
+					</div>
+					${visible.length ? `
+						<div class="admin-v2-absence-today-list">
+							${visible.map((request) => {
+								const employee = employeeById(request.employeeId);
+								return `
+									<article>
+										<strong>${employeeName(request.employeeId)}</strong>
+										<span>${escapeHtml(employee?.department || 'Sin departamento')}</span>
+										<small>${escapeHtml(absenceTypeName(request))} · ${absenceUsesHours(request, ABSENCE_TYPES) ? `${request.startTime || '--:--'}-${request.endTime || '--:--'}` : 'Todo el día'}</small>
+									</article>
+								`;
+							}).join('')}
+							${extra ? `<p class="helper-text">+ ${extra} más</p>` : ''}
+						</div>
+					` : emptyState('No hay ausencias aprobadas para hoy.')}
+				</section>
+			`;
+		}
+
+		function adminAbsenceDateLabel(request: VacationRequest) {
+			return absenceRequestDateLabel(request);
+		}
+
+		function adminAbsenceDurationLabel(request: VacationRequest) {
+			return absenceRequestDurationLabel(request);
+		}
+
+		function adminAbsenceDocumentRequirementLabel(requirement: string) {
+			if (requirement === 'required') return 'Justificante obligatorio pendiente';
+			if (requirement === 'optional') return 'Justificante opcional';
+			return 'No requiere justificante';
+		}
+
+		function adminAbsenceUser(employeeId: string) {
+			return users.find((user) => user.employeeId === employeeId);
+		}
+
+		function adminAbsenceInitials(name: string) {
+			return name
+				.split(' ')
+				.filter(Boolean)
+				.slice(0, 2)
+				.map((part) => part[0]?.toUpperCase() || '')
+				.join('');
 		}
 
 		function renderAdminVacationCalendar(employees: Employee[]) {
@@ -1989,8 +2392,8 @@ import '../styles/responsible-v2.css';
 				<section class="panel admin-vacation-calendar-panel">
 					<div class="panel-heading">
 						<div>
-							<h2>Calendario de vacaciones</h2>
-							<p class="helper-text">Solo muestra vacaciones aprobadas, festivos y fines de semana.</p>
+							<h2>Planificación</h2>
+							<p class="helper-text">Vista mensual de vacaciones aprobadas, pendientes, festivos y fines de semana.</p>
 						</div>
 					</div>
 					<form id="admin-vacation-filter-form" class="form-grid admin-vacation-controls">
@@ -2024,7 +2427,9 @@ import '../styles/responsible-v2.css';
 		function adminVacationLegend() {
 			return `
 				<div class="comparison-legend team-vacation-legend">
-					<span><i class="team-legend-approved"></i> Vacaciones aprobadas</span>
+					<span><i class="team-legend-approved"></i> Aprobadas</span>
+					<span><i class="team-legend-pending"></i> Pendientes</span>
+					<span><i class="team-legend-mixed"></i> Mixto</span>
 					<span><i class="team-legend-free"></i> Libre</span>
 					<span><i class="team-legend-weekend"></i> Fin de semana</span>
 					<span><i class="team-legend-holiday"></i> Festivo</span>
@@ -2095,12 +2500,18 @@ import '../styles/responsible-v2.css';
 						${summaryRow('Festivo', holiday ? `${escapeHtml(holiday.name)} · ${escapeHtml(holiday.center)}` : 'No')}
 						${summaryRow('Fin de semana', isWeekend(date) ? 'Sí' : 'No')}
 					</div>
-					${dayData.approved.length ? `
-						<div>
-							<h4>Personas de vacaciones</h4>
-							${renderTeamVacationList(dayData.approved)}
+					${dayData.approved.length || dayData.pending.length ? `
+						<div class="grid grid-2">
+							<div>
+								<h4>Aprobadas</h4>
+								${renderTeamVacationList(dayData.approved)}
+							</div>
+							<div>
+								<h4>Pendientes</h4>
+								${renderTeamVacationList(dayData.pending)}
+							</div>
 						</div>
-					` : emptyState('Sin vacaciones registradas.')}
+					` : emptyState('Sin ausencias registradas.')}
 					${renderAdminDepartmentAvailability(date, employees)}
 				</section>
 			`;
@@ -2218,8 +2629,8 @@ import '../styles/responsible-v2.css';
 
 			const employeeIds = new Set(employees.map((employee) => employee.id));
 			return vacations
+				.filter(isActiveVacationRequest)
 				.filter((request) => employeeIds.has(request.employeeId))
-				.filter((request) => request.status === 'aprobada')
 				.filter((request) => isDateWithin(date, request.from, request.to));
 		}
 
@@ -5475,6 +5886,21 @@ import '../styles/responsible-v2.css';
 			adminRecordsDepartment = 'all';
 			adminRecordsStatus = 'all';
 			selectedAdminRecordEmployeeId = '';
+			renderPage();
+		}
+
+		function selectAdminAbsence(id: string) {
+			selectedAdminAbsenceId = id;
+			renderPage();
+		}
+
+		function clearAdminAbsenceFilters() {
+			adminAbsenceSearch = '';
+			adminAbsenceStatus = 'all';
+			adminAbsenceType = 'all';
+			adminAbsenceDepartment = 'all';
+			adminAbsencePeriod = 'all';
+			selectedAdminAbsenceId = '';
 			renderPage();
 		}
 
