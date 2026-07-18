@@ -191,8 +191,13 @@ import '../styles/responsible-v2.css';
 		let adminUserSearch = '';
 		let adminPeopleSearch = '';
 		let adminPeopleDepartment = 'all';
+		let adminRecordsSearch = '';
+		let adminRecordsDepartment = 'all';
+		let adminRecordsStatus = 'all';
 		let selectedAdminUserId = '';
 		let selectedAdminPersonId = '';
+		let selectedAdminRecordEmployeeId = '';
+		let selectedAdminRecordDate = '';
 		let selectedTimesheetSummaryKey = '';
 
 		let timeEntries: TimeEntry[] = [];
@@ -320,6 +325,11 @@ import '../styles/responsible-v2.css';
 				if (action === 'clear-admin-people-filters') clearAdminPeopleFilters();
 				if (action === 'select-timesheet-summary') selectTimesheetSummary(actionButton.dataset.id || '');
 				if (action === 'admin-incident-filter') setAdminIncidentFilter(actionButton.dataset.filter || 'pendiente');
+				if (action === 'select-admin-record') selectAdminRecord(actionButton.dataset.employeeId || '', actionButton.dataset.date || '');
+				if (action === 'clear-admin-record-filters') clearAdminRecordFilters();
+				if (action === 'admin-records-prev-day') changeAdminRecordsDay(-1);
+				if (action === 'admin-records-next-day') changeAdminRecordsDay(1);
+				if (action === 'admin-records-today') setAdminRecordsDate(todayIso());
 				if (action === 'logout') {
 					localStorage.removeItem(KEYS.session);
 					window.location.href = '/';
@@ -433,6 +443,17 @@ import '../styles/responsible-v2.css';
 						search?.setSelectionRange(cursor, cursor);
 					});
 				}
+				if (input.id === 'admin-records-search') {
+					const cursor = input.selectionStart || input.value.length;
+					adminRecordsSearch = input.value;
+					selectedAdminRecordEmployeeId = '';
+					renderPage();
+					queueMicrotask(() => {
+						const search = document.querySelector<HTMLInputElement>('#admin-records-search');
+						search?.focus();
+						search?.setSelectionRange(cursor, cursor);
+					});
+				}
 			});
 
 			document.addEventListener('change', (event) => {
@@ -440,6 +461,16 @@ import '../styles/responsible-v2.css';
 				if (field.id === 'admin-people-department') {
 					adminPeopleDepartment = field.value || 'all';
 					selectedAdminPersonId = '';
+					renderPage();
+				}
+				if (field.id === 'admin-records-department') {
+					adminRecordsDepartment = field.value || 'all';
+					selectedAdminRecordEmployeeId = '';
+					renderPage();
+				}
+				if (field.id === 'admin-records-status') {
+					adminRecordsStatus = field.value || 'all';
+					selectedAdminRecordEmployeeId = '';
 					renderPage();
 				}
 			});
@@ -1403,57 +1434,320 @@ import '../styles/responsible-v2.css';
 		}
 
 		function renderAdminTimesheets() {
-			const rows = filteredTimeEntries();
+			const date = adminRecordsDate();
+			if (timeFilters.from !== date || timeFilters.to !== date) {
+				timeFilters = {
+					...timeFilters,
+					from: date,
+					to: date,
+				};
+			}
+			const records = adminRecordRows();
+			const selected =
+				records.find((item) => item.employee.id === selectedAdminRecordEmployeeId && item.date === selectedAdminRecordDate) ||
+				records[0];
+			if (selected) {
+				selectedAdminRecordEmployeeId = selected.employee.id;
+				selectedAdminRecordDate = selected.date;
+			}
+			const summary = adminRecordsSummary(records);
+			const departments = departmentList();
 
 			return `
-				${sectionTitle('Fichajes', 'Revisa registros e incidencias.')}
-				<section class="panel">
-					<form id="time-filter-form" class="form-grid admin-filters">
+				<div class="admin-v2-records">
+					<header class="admin-v2-page-header admin-v2-records-header">
+						<div>
+							<span>Registros</span>
+							<h1>Registros</h1>
+							<p>Consulta jornadas, fichajes e incidencias.</p>
+						</div>
+						<button class="button button-secondary" type="button" data-action="export-timesheets">Exportar CSV</button>
+					</header>
+
+					<section class="admin-v2-panel admin-v2-records-date-nav">
+						<button class="button button-secondary button-small" type="button" data-action="admin-records-prev-day">Día anterior</button>
+						<strong>${formatDate(date)}</strong>
+						<button class="button button-secondary button-small" type="button" data-action="admin-records-next-day" ${date >= todayIso() ? 'disabled' : ''}>Día siguiente</button>
+						<button class="button button-tertiary button-small" type="button" data-action="admin-records-today">Hoy</button>
+					</section>
+
+					<div class="admin-v2-records-summary">
+						${adminRecordsState('Trabajando', summary.working, 'trabajando')}
+						${adminRecordsState('En pausa', summary.paused, 'pausa')}
+						${adminRecordsState('Finalizados', summary.finished, 'correcto')}
+						${adminRecordsState('Sin fichar', summary.missing, 'pendiente')}
+						${adminRecordsState('Incidencias', summary.incidents, 'incidencia')}
+					</div>
+
+					<section class="admin-v2-panel admin-v2-records-toolbar">
 						<label class="field">
-							<span>Empleado</span>
-							<select name="employeeId">
-								<option value="all" ${timeFilters.employeeId === 'all' ? 'selected' : ''}>Todos los empleados</option>
-								${EMPLOYEES.map((employee) => `
-									<option value="${employee.id}" ${timeFilters.employeeId === employee.id ? 'selected' : ''}>${employee.name}</option>
-								`).join('')}
-							</select>
-						</label>
-						<label class="field">
-							<span>Fecha desde</span>
-							<input type="date" name="from" value="${timeFilters.from}" />
-						</label>
-						<label class="field">
-							<span>Fecha hasta</span>
-							<input type="date" name="to" value="${timeFilters.to}" />
+							<span>Buscar</span>
+							<input id="admin-records-search" type="search" value="${escapeHtml(adminRecordsSearch)}" placeholder="Buscar persona o departamento" />
 						</label>
 						<label class="field">
 							<span>Estado</span>
-							<select name="status">
-								<option value="all" ${timeFilters.status === 'all' ? 'selected' : ''}>Todos</option>
-								<option value="correcto" ${timeFilters.status === 'correcto' ? 'selected' : ''}>Correcto</option>
-								<option value="incidencia" ${timeFilters.status === 'incidencia' ? 'selected' : ''}>Incidencia</option>
-								<option value="pendiente" ${timeFilters.status === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+							<select id="admin-records-status">
+								<option value="all" ${adminRecordsStatus === 'all' ? 'selected' : ''}>Todos</option>
+								<option value="trabajando" ${adminRecordsStatus === 'trabajando' ? 'selected' : ''}>Trabajando</option>
+								<option value="pausa" ${adminRecordsStatus === 'pausa' ? 'selected' : ''}>En pausa</option>
+								<option value="correcto" ${adminRecordsStatus === 'correcto' ? 'selected' : ''}>Finalizados</option>
+								<option value="sin-fichar" ${adminRecordsStatus === 'sin-fichar' ? 'selected' : ''}>Sin fichar</option>
+								<option value="incidencia" ${adminRecordsStatus === 'incidencia' ? 'selected' : ''}>Con incidencia</option>
+								<option value="vacaciones" ${adminRecordsStatus === 'vacaciones' ? 'selected' : ''}>Ausentes</option>
 							</select>
 						</label>
-						<div class="table-actions">
-							<button class="button button-secondary" type="submit">Aplicar filtros</button>
-							<button class="button button-tertiary" type="button" data-action="admin-go-view" data-view="informes">Ir a Informes</button>
-						</div>
-					</form>
-				</section>
-				${renderAdminIncidentSummary()}
-				<section class="panel top-gap">
-					<div class="panel-heading">
-						<div>
-							<h2>Resumen por persona</h2>
-							<p class="helper-text">Selecciona una persona para revisar sus fichajes del periodo.</p>
-						</div>
+						<label class="field">
+							<span>Departamento</span>
+							<select id="admin-records-department">
+								<option value="all" ${adminRecordsDepartment === 'all' ? 'selected' : ''}>Todos los departamentos</option>
+								${departments.map((department) => `<option value="${escapeHtml(department)}" ${adminRecordsDepartment === department ? 'selected' : ''}>${escapeHtml(department)}</option>`).join('')}
+							</select>
+						</label>
+						<strong>${records.length} personas</strong>
+					</section>
+
+					<div class="admin-v2-records-layout">
+						<section class="admin-v2-panel admin-v2-records-list">
+							${records.length ? renderAdminRecordsTable(records) : `
+								${emptyState('No hay registros que coincidan con los filtros.')}
+								<button class="button button-secondary" type="button" data-action="clear-admin-record-filters">Limpiar filtros</button>
+							`}
+						</section>
+						<section class="admin-v2-panel admin-v2-record-detail">
+							${selected ? renderAdminRecordDetail(selected) : emptyState('Selecciona un registro.')}
+						</section>
 					</div>
-					${renderTimesheetSummary(rows)}
-				</section>
-				<section class="panel top-gap admin-timesheet-detail-panel">
-					${renderTimesheetDetail(rows)}
-				</section>
+				</div>
+			`;
+		}
+
+		function adminRecordsDate() {
+			return selectedAdminRecordDate || todayIso();
+		}
+
+		function adminRecordRows() {
+			const date = adminRecordsDate();
+			const query = adminRecordsSearch.trim().toLowerCase();
+			return EMPLOYEES
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map((employee) => {
+					const entry = findEntry(employee.id, date);
+					const dayIncidents = incidentsForEmployeeDate(employee.id, date);
+					const absence = adminFullDayAbsence(employee.id, date);
+					const status = adminRecordStatus(entry, dayIncidents, absence);
+					return { employee, entry, incidents: dayIncidents, absence, status, date };
+				})
+				.filter((row) => adminRecordsDepartment === 'all' || row.employee.department === adminRecordsDepartment)
+				.filter((row) => {
+					if (!query) return true;
+					return [row.employee.name, row.employee.department].some((value) => value.toLowerCase().includes(query));
+				})
+				.filter((row) => adminRecordsStatus === 'all' || row.status.key === adminRecordsStatus);
+		}
+
+		function adminRecordsSummary(rows: ReturnType<typeof adminRecordRows>) {
+			return {
+				working: rows.filter((row) => row.status.key === 'trabajando').length,
+				paused: rows.filter((row) => row.status.key === 'pausa').length,
+				finished: rows.filter((row) => row.status.key === 'correcto').length,
+				missing: rows.filter((row) => row.status.key === 'sin-fichar').length,
+				incidents: rows.filter((row) => row.incidents.length).length,
+			};
+		}
+
+		function adminRecordsState(label: string, value: number, status: string) {
+			return `
+				<div class="admin-v2-records-state">
+					<span>${label}</span>
+					<strong>${value}</strong>
+					${pill(label, status)}
+				</div>
+			`;
+		}
+
+		function incidentsForEmployeeDate(employeeId: string, date: string) {
+			return incidents
+				.filter((incident) => incident.employeeId === employeeId && incident.date === date)
+				.slice()
+				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+		}
+
+		function adminFullDayAbsence(employeeId: string, date: string) {
+			return vacations.find(
+				(request) =>
+					request.employeeId === employeeId &&
+					request.status === 'aprobada' &&
+					!absenceUsesHours(request, ABSENCE_TYPES) &&
+					isDateWithin(date, request.from, request.to),
+			);
+		}
+
+		function adminRecordStatus(
+			entry: TimeEntry | undefined,
+			dayIncidents: Incident[],
+			absence?: VacationRequest,
+		) {
+			if (absence) return { label: `Ausente · ${absenceTypeName(absence)}`, key: 'vacaciones' };
+			if (dayIncidents.some((incident) => incident.status === 'pendiente') || entry?.status === 'incidencia') {
+				return { label: 'Con incidencia', key: 'incidencia' };
+			}
+			const status = dateStatusForEntry(entry);
+			if (status.key === 'sin-fichaje') return { label: 'Sin fichar', key: 'sin-fichar' };
+			return status;
+		}
+
+		function dateStatusForEntry(entry?: TimeEntry) {
+			if (!entry?.start) return { label: 'Sin iniciar', key: 'sin-fichaje' };
+			if (entry.end) return { label: 'Finalizada', key: 'correcto' };
+			if (activeBreak(entry)) return { label: 'En pausa', key: 'pausa' };
+			return { label: 'Trabajando', key: 'trabajando' };
+		}
+
+		function renderAdminRecordsTable(rows: ReturnType<typeof adminRecordRows>) {
+			return `
+				<div class="table-wrap admin-v2-records-table-wrap">
+					<table class="admin-v2-records-table">
+						<thead>
+							<tr>
+								<th>Persona</th>
+								<th>Departamento</th>
+								<th>Entrada</th>
+								<th>Pausas</th>
+								<th>Salida</th>
+								<th>Trabajado</th>
+								<th>Estado</th>
+								<th>Incidencias</th>
+								<th>Acción</th>
+							</tr>
+						</thead>
+						<tbody>
+							${rows.map(renderAdminRecordTableRow).join('')}
+						</tbody>
+					</table>
+				</div>
+				<div class="admin-v2-record-mobile-list">
+					${rows.map(renderAdminRecordMobileCard).join('')}
+				</div>
+			`;
+		}
+
+		function renderAdminRecordTableRow(row: ReturnType<typeof adminRecordRows>[number]) {
+			return `
+				<tr class="${row.incidents.length ? 'has-incident' : ''}">
+					<td>
+						<div class="admin-v2-record-person">
+							<span class="admin-v2-person-avatar" aria-hidden="true">${escapeHtml(personInitials(row.employee.name))}</span>
+							<strong>${escapeHtml(row.employee.name)}</strong>
+						</div>
+					</td>
+					<td>${escapeHtml(row.employee.department)}</td>
+					<td>${row.entry?.start || '—'}</td>
+					<td>${adminRecordBreakSummary(row.entry)}</td>
+					<td>${row.entry?.end || '—'}</td>
+					<td>${formatMinutes(workedMinutes(row.entry))}</td>
+					<td>${pill(row.status.label, row.status.key)}</td>
+					<td>${row.incidents.length ? pill(String(row.incidents.length), 'incidencia') : '—'}</td>
+					<td>${adminRecordViewButton(row.employee.id, row.date, 'Ver')}</td>
+				</tr>
+			`;
+		}
+
+		function renderAdminRecordMobileCard(row: ReturnType<typeof adminRecordRows>[number]) {
+			return `
+				<article class="admin-v2-record-mobile-card ${row.incidents.length ? 'has-incident' : ''}">
+					<div class="admin-v2-record-card-head">
+						<div>
+							<strong>${escapeHtml(row.employee.name)}</strong>
+							<span>${escapeHtml(row.employee.department)}</span>
+						</div>
+						${pill(row.status.label, row.status.key)}
+					</div>
+					<div class="admin-card-grid">
+						${summaryRow('Horario', `${row.entry?.start || '—'} → ${row.entry?.end || '—'}`)}
+						${summaryRow('Trabajado', formatMinutes(workedMinutes(row.entry)))}
+						${summaryRow('Pausas', adminRecordBreakSummary(row.entry))}
+						${summaryRow('Incidencias', row.incidents.length ? String(row.incidents.length) : 'Sin incidencias')}
+					</div>
+					${adminRecordViewButton(row.employee.id, row.date, 'Ver detalle')}
+				</article>
+			`;
+		}
+
+		function adminRecordViewButton(employeeId: string, date: string, label: string) {
+			return `<button class="button button-secondary button-small" type="button" data-action="select-admin-record" data-employee-id="${employeeId}" data-date="${date}">${label}</button>`;
+		}
+
+		function adminRecordBreakSummary(entry?: TimeEntry) {
+			if (!entry?.breaks.length) return '—';
+			return `${formatMinutes(breakMinutes(entry))} · ${entry.breaks.length} pausa${entry.breaks.length === 1 ? '' : 's'}`;
+		}
+
+		function renderAdminRecordDetail(row: ReturnType<typeof adminRecordRows>[number]) {
+			return `
+				<div class="admin-v2-record-detail-inner">
+					<div class="admin-v2-record-detail-head">
+						<div>
+							<span>${formatDate(row.date)}</span>
+							<h2>${escapeHtml(row.employee.name)}</h2>
+							<p>${escapeHtml(row.employee.department)}</p>
+						</div>
+						${pill(row.status.label, row.status.key)}
+					</div>
+
+					<div class="admin-v2-record-detail-grid">
+						<section>
+							<h3>Jornada</h3>
+							${summaryRow('Entrada', row.entry?.start || '—')}
+							${summaryRow('Salida', row.entry?.end || '—')}
+							${summaryRow('Trabajado', formatMinutes(workedMinutes(row.entry)))}
+							${summaryRow('Estado', pill(row.status.label, row.status.key))}
+							${row.absence ? summaryRow('Ausencia', escapeHtml(absenceTypeName(row.absence))) : ''}
+						</section>
+						<section>
+							<h3>Pausas</h3>
+							${renderAdminRecordBreaks(row.entry)}
+						</section>
+					</div>
+
+					<section class="admin-v2-record-incidents">
+						<h3>Incidencias</h3>
+						${row.incidents.length ? row.incidents.map(renderAdminRecordIncident).join('') : '<p class="helper-text">Sin incidencias asociadas.</p>'}
+					</section>
+
+					<details class="admin-v2-record-adjust">
+						<summary>Ajustar jornada</summary>
+						${manualAdjustmentForm(row.date, 'calendar', row.employee.id)}
+					</details>
+				</div>
+			`;
+		}
+
+		function renderAdminRecordBreaks(entry?: TimeEntry) {
+			if (!entry?.breaks.length) return '<p class="helper-text">Sin pausas registradas.</p>';
+			return `
+				<div class="admin-v2-record-breaks">
+					${entry.breaks.map((item) => `
+						<div>
+							<strong>${escapeHtml(breakLabel(item))}</strong>
+							<span>${item.start || '—'} → ${item.end || 'abierta'}</span>
+							<small>${item.end ? formatMinutes(elapsedMinutes(item.start, item.end)) : 'En curso'}</small>
+						</div>
+					`).join('')}
+				</div>
+			`;
+		}
+
+		function renderAdminRecordIncident(incident: Incident) {
+			return `
+				<article class="admin-v2-record-incident status-border-${statusClass(incident.status)}">
+					<div>
+						<strong>${escapeHtml(incident.type)}</strong>
+						<span>${escapeHtml(incident.detail)}</span>
+					</div>
+					${pill(incident.status)}
+					${incident.status === 'pendiente' ? `<button class="button button-secondary button-small" type="button" data-action="review-incident" data-id="${incident.id}">Marcar revisada</button>` : ''}
+				</article>
 			`;
 		}
 
@@ -3669,8 +3963,8 @@ import '../styles/responsible-v2.css';
 			`;
 		}
 
-		function manualAdjustmentForm(date = todayIso(), source: 'punch' | 'calendar' = 'punch') {
-			const employee = currentEmployee();
+		function manualAdjustmentForm(date = todayIso(), source: 'punch' | 'calendar' = 'punch', employeeId = currentEmployee().id) {
+			const employee = employeeById(employeeId) || currentEmployee();
 			const entry = findEntry(employee.id, date);
 			const salidaNextDay = Boolean(entry?.start && entry?.end && timeToMinutes(entry.end) < timeToMinutes(entry.start));
 			const isCalendarSource = source === 'calendar';
@@ -3729,6 +4023,7 @@ import '../styles/responsible-v2.css';
 					</div>
 					<input type="hidden" name="date" value="${date}" />
 					<input type="hidden" name="source" value="${source}" />
+					<input type="hidden" name="employeeId" value="${employee.id}" />
 					<div class="manual-editor-grid">
 						<label class="field">
 							<span>Hora de entrada</span>
@@ -4739,8 +5034,8 @@ import '../styles/responsible-v2.css';
 		}
 
 		function saveManualAdjustment(form: HTMLFormElement) {
-			const employee = currentEmployee();
 			const formData = new FormData(form);
+			const employee = employeeById(String(formData.get('employeeId') || currentEmployee().id)) || currentEmployee();
 			const date = String(formData.get('date') || todayIso());
 			const source = String(formData.get('source') || 'punch');
 			const start = String(formData.get('start') || '').trim();
@@ -5150,6 +5445,36 @@ import '../styles/responsible-v2.css';
 
 		function selectTimesheetSummary(id: string) {
 			selectedTimesheetSummaryKey = id;
+			renderPage();
+		}
+
+		function selectAdminRecord(employeeId: string, date: string) {
+			selectedAdminRecordEmployeeId = employeeId;
+			selectedAdminRecordDate = date;
+			renderPage();
+		}
+
+		function setAdminRecordsDate(date: string) {
+			const clamped = clampDateIso(date, `${DEMO_YEAR}-01-01`, todayIso());
+			timeFilters = {
+				...timeFilters,
+				from: clamped,
+				to: clamped,
+			};
+			selectedAdminRecordDate = clamped;
+			selectedAdminRecordEmployeeId = '';
+			renderPage();
+		}
+
+		function changeAdminRecordsDay(offset: number) {
+			setAdminRecordsDate(addDaysIso(adminRecordsDate(), offset));
+		}
+
+		function clearAdminRecordFilters() {
+			adminRecordsSearch = '';
+			adminRecordsDepartment = 'all';
+			adminRecordsStatus = 'all';
+			selectedAdminRecordEmployeeId = '';
 			renderPage();
 		}
 

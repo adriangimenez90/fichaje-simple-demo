@@ -481,6 +481,226 @@
 	gap: 8px;
 }
 
+.app-shell[data-role="admin_global"] .admin-v2-records {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-header .button {
+	min-height: 48px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-date-nav {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-date-nav strong {
+	flex: 1;
+	text-align: center;
+	font-size: 1.1rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-summary {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-state {
+	display: grid;
+	gap: 6px;
+	padding: 12px;
+	border: 1px solid rgba(20, 33, 30, 0.08);
+	border-radius: 14px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-state span {
+	color: #66736f;
+	font-size: 0.86rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-state strong {
+	font-size: 1.4rem;
+	font-weight: 740;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-toolbar {
+	display: grid;
+	grid-template-columns: minmax(240px, 1fr) minmax(180px, 240px) minmax(220px, 280px) auto;
+	align-items: end;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-toolbar > strong {
+	padding: 13px 14px;
+	border-radius: 12px;
+	background: #edf6f2;
+	color: #0f6b58;
+	text-align: center;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+	gap: 16px;
+	align-items: start;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-list,
+.app-shell[data-role="admin_global"] .admin-v2-record-detail {
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-table-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-table {
+	width: 100%;
+	border-collapse: collapse;
+	min-width: 900px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-table th,
+.app-shell[data-role="admin_global"] .admin-v2-records-table td {
+	padding: 11px 10px;
+	border-bottom: 1px solid #e4ebe8;
+	text-align: left;
+	vertical-align: middle;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-table th {
+	color: #66736f;
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-records-table tr.has-incident td {
+	background: #fff9ef;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-person {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-mobile-list {
+	display: none;
+	gap: 10px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-mobile-card {
+	display: grid;
+	gap: 12px;
+	padding: 12px;
+	border: 1px solid #e4ebe8;
+	border-radius: 14px;
+	background: #fbfdfc;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-mobile-card.has-incident {
+	border-color: #f0c984;
+	background: #fff9ef;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-card-head,
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-card-head span,
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-head span,
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-head p {
+	color: #66736f;
+	font-size: 0.88rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-inner {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-head h2 {
+	margin: 2px 0;
+	font-size: 1.35rem;
+	font-weight: 740;
+	overflow-wrap: anywhere;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-grid section,
+.app-shell[data-role="admin_global"] .admin-v2-record-incidents,
+.app-shell[data-role="admin_global"] .admin-v2-record-adjust {
+	display: grid;
+	gap: 10px;
+	min-width: 0;
+	padding: 14px;
+	border-radius: 14px;
+	background: #f8fbfa;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-detail-grid h3,
+.app-shell[data-role="admin_global"] .admin-v2-record-incidents h3 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-breaks {
+	display: grid;
+	gap: 8px;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-breaks div,
+.app-shell[data-role="admin_global"] .admin-v2-record-incident {
+	display: grid;
+	gap: 4px;
+	padding: 10px;
+	border: 1px solid #e4ebe8;
+	border-radius: 12px;
+	background: #ffffff;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-breaks span,
+.app-shell[data-role="admin_global"] .admin-v2-record-breaks small,
+.app-shell[data-role="admin_global"] .admin-v2-record-incident span {
+	color: #66736f;
+	font-size: 0.88rem;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-adjust summary {
+	min-height: 48px;
+	cursor: pointer;
+	font-weight: 720;
+}
+
+.app-shell[data-role="admin_global"] .admin-v2-record-adjust .manual-editor {
+	margin-top: 0;
+}
+
 @media (max-width: 1100px) {
 	.app-shell[data-role="admin_global"] .admin-v2-metrics {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -495,7 +715,9 @@
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-people-form,
-	.app-shell[data-role="admin_global"] .admin-v2-people-layout {
+	.app-shell[data-role="admin_global"] .admin-v2-people-layout,
+	.app-shell[data-role="admin_global"] .admin-v2-records-layout,
+	.app-shell[data-role="admin_global"] .admin-v2-records-toolbar {
 		grid-template-columns: 1fr;
 	}
 
@@ -531,7 +753,9 @@
 	.app-shell[data-role="admin_global"] .admin-v2-team-summary,
 	.app-shell[data-role="admin_global"] .admin-v2-people-summary,
 	.app-shell[data-role="admin_global"] .admin-v2-people-toolbar,
-	.app-shell[data-role="admin_global"] .admin-v2-person-sections {
+	.app-shell[data-role="admin_global"] .admin-v2-person-sections,
+	.app-shell[data-role="admin_global"] .admin-v2-records-summary,
+	.app-shell[data-role="admin_global"] .admin-v2-record-detail-grid {
 		grid-template-columns: 1fr;
 	}
 
@@ -539,7 +763,11 @@
 	.app-shell[data-role="admin_global"] .admin-v2-upcoming article,
 	.app-shell[data-role="admin_global"] .admin-v2-panel-head,
 	.app-shell[data-role="admin_global"] .admin-v2-people-header,
-	.app-shell[data-role="admin_global"] .admin-v2-person-main {
+	.app-shell[data-role="admin_global"] .admin-v2-person-main,
+	.app-shell[data-role="admin_global"] .admin-v2-records-header,
+	.app-shell[data-role="admin_global"] .admin-v2-record-card-head,
+	.app-shell[data-role="admin_global"] .admin-v2-record-detail-head,
+	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav {
 		align-items: stretch;
 		flex-direction: column;
 	}
@@ -547,7 +775,10 @@
 	.app-shell[data-role="admin_global"] .admin-v2-attention-item .button,
 	.app-shell[data-role="admin_global"] .admin-v2-panel-head .button,
 	.app-shell[data-role="admin_global"] .admin-v2-person-access .button,
-	.app-shell[data-role="admin_global"] .admin-v2-people-header .button {
+	.app-shell[data-role="admin_global"] .admin-v2-people-header .button,
+	.app-shell[data-role="admin_global"] .admin-v2-records-header .button,
+	.app-shell[data-role="admin_global"] .admin-v2-record-mobile-card .button,
+	.app-shell[data-role="admin_global"] .admin-v2-records-date-nav .button {
 		min-height: 48px;
 		width: 100%;
 	}
@@ -559,5 +790,13 @@
 	.app-shell[data-role="admin_global"] .admin-v2-person-item .status-pill {
 		grid-column: 2;
 		justify-self: start;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-records-table-wrap {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-record-mobile-list {
+		display: grid;
 	}
 }
