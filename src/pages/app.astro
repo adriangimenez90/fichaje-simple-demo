@@ -204,6 +204,9 @@ import '../styles/responsible-v2.css';
 		let selectedAdminRecordEmployeeId = '';
 		let selectedAdminRecordDate = '';
 		let selectedAdminAbsenceId = '';
+		let adminPeopleMobileDetailOpen = false;
+		let adminRecordsMobileDetailOpen = false;
+		let adminAbsenceMobileDetailOpen = false;
 
 		let timeEntries: TimeEntry[] = [];
 		let vacations: VacationRequest[] = [];
@@ -327,13 +330,22 @@ import '../styles/responsible-v2.css';
 				if (action === 'open-pending-incidents') openPendingIncidents();
 				if (action === 'select-admin-person') selectAdminPerson(actionButton.dataset.id || '');
 				if (action === 'clear-admin-people-filters') clearAdminPeopleFilters();
+				if (action === 'admin-people-back') adminPeopleBack();
+				if (action === 'admin-people-previous') moveAdminPeopleSelection(-1);
+				if (action === 'admin-people-next') moveAdminPeopleSelection(1);
 				if (action === 'select-admin-record') selectAdminRecord(actionButton.dataset.employeeId || '', actionButton.dataset.date || '');
 				if (action === 'clear-admin-record-filters') clearAdminRecordFilters();
+				if (action === 'admin-records-back') adminRecordsBack();
+				if (action === 'admin-records-previous') moveAdminRecordSelection(-1);
+				if (action === 'admin-records-next') moveAdminRecordSelection(1);
 				if (action === 'admin-records-prev-day') changeAdminRecordsDay(-1);
 				if (action === 'admin-records-next-day') changeAdminRecordsDay(1);
 				if (action === 'admin-records-today') setAdminRecordsDate(todayIso());
 				if (action === 'select-admin-absence') selectAdminAbsence(actionButton.dataset.id || '');
 				if (action === 'clear-admin-absence-filters') clearAdminAbsenceFilters();
+				if (action === 'admin-absence-back') adminAbsenceBack();
+				if (action === 'admin-absence-previous') moveAdminAbsenceSelection(-1);
+				if (action === 'admin-absence-next') moveAdminAbsenceSelection(1);
 				if (action === 'admin-report-type') setAdminReportType(actionButton.dataset.type || 'time');
 				if (action === 'export-admin-report') exportAdminReport();
 				if (action === 'admin-settings-section') setAdminSettingsSection(actionButton.dataset.section || 'company');
@@ -418,6 +430,7 @@ import '../styles/responsible-v2.css';
 					const cursor = input.selectionStart || input.value.length;
 					adminPeopleSearch = input.value;
 					selectedAdminPersonId = '';
+					adminPeopleMobileDetailOpen = false;
 					renderPage();
 					queueMicrotask(() => {
 						const search = document.querySelector<HTMLInputElement>('#admin-people-search');
@@ -429,6 +442,7 @@ import '../styles/responsible-v2.css';
 					const cursor = input.selectionStart || input.value.length;
 					adminRecordsSearch = input.value;
 					selectedAdminRecordEmployeeId = '';
+					adminRecordsMobileDetailOpen = false;
 					renderPage();
 					queueMicrotask(() => {
 						const search = document.querySelector<HTMLInputElement>('#admin-records-search');
@@ -440,6 +454,7 @@ import '../styles/responsible-v2.css';
 					const cursor = input.selectionStart || input.value.length;
 					adminAbsenceSearch = input.value;
 					selectedAdminAbsenceId = '';
+					adminAbsenceMobileDetailOpen = false;
 					renderPage();
 					queueMicrotask(() => {
 						const search = document.querySelector<HTMLInputElement>('#admin-absence-search');
@@ -460,36 +475,43 @@ import '../styles/responsible-v2.css';
 				if (field.id === 'admin-people-department') {
 					adminPeopleDepartment = field.value || 'all';
 					selectedAdminPersonId = '';
+					adminPeopleMobileDetailOpen = false;
 					renderPage();
 				}
 				if (field.id === 'admin-records-department') {
 					adminRecordsDepartment = field.value || 'all';
 					selectedAdminRecordEmployeeId = '';
+					adminRecordsMobileDetailOpen = false;
 					renderPage();
 				}
 				if (field.id === 'admin-records-status') {
 					adminRecordsStatus = field.value || 'all';
 					selectedAdminRecordEmployeeId = '';
+					adminRecordsMobileDetailOpen = false;
 					renderPage();
 				}
 				if (field.id === 'admin-absence-status') {
 					adminAbsenceStatus = (field.value || 'all') as VacationStatus | 'all';
 					selectedAdminAbsenceId = '';
+					adminAbsenceMobileDetailOpen = false;
 					renderPage();
 				}
 				if (field.id === 'admin-absence-type') {
 					adminAbsenceType = field.value || 'all';
 					selectedAdminAbsenceId = '';
+					adminAbsenceMobileDetailOpen = false;
 					renderPage();
 				}
 				if (field.id === 'admin-absence-department') {
 					adminAbsenceDepartment = field.value || 'all';
 					selectedAdminAbsenceId = '';
+					adminAbsenceMobileDetailOpen = false;
 					renderPage();
 				}
 				if (field.id === 'admin-absence-period') {
 					adminAbsencePeriod = (field.value || 'all') as AdminAbsencePeriod;
 					selectedAdminAbsenceId = '';
+					adminAbsenceMobileDetailOpen = false;
 					renderPage();
 				}
 				if (field.id === 'admin-report-period') {
@@ -756,6 +778,32 @@ import '../styles/responsible-v2.css';
 
 			const left = active.offsetLeft - Math.max((mobileNav.clientWidth - active.clientWidth) / 2, 0);
 			mobileNav.scrollTo({ left: Math.max(left, 0), behavior: 'smooth' });
+		}
+
+		function renderAdminMobileDetailNavigation(
+			backAction: string,
+			previousAction: string,
+			nextAction: string,
+			index: number,
+			total: number,
+		) {
+			return `
+				<div class="admin-v2-mobile-detail-nav">
+					<button class="button button-tertiary admin-v2-mobile-detail-back" type="button" data-action="${backAction}">← Volver</button>
+					<div class="admin-v2-mobile-detail-pagination">
+						<button class="button button-secondary button-small" type="button" data-action="${previousAction}" aria-label="Anterior" ${index <= 0 ? 'disabled' : ''}>‹</button>
+						<span>${total ? index + 1 : 0} de ${total}</span>
+						<button class="button button-secondary button-small" type="button" data-action="${nextAction}" aria-label="Siguiente" ${index >= total - 1 ? 'disabled' : ''}>›</button>
+					</div>
+				</div>
+			`;
+		}
+
+		function scrollAdminMobileDetailToTop() {
+			if (!window.matchMedia('(max-width: 860px)').matches) return;
+			document.querySelector<HTMLElement>('[data-admin-mobile-detail]')?.scrollIntoView({
+				block: 'start',
+			});
 		}
 
 		function renderPunchClock() {
@@ -1225,25 +1273,17 @@ import '../styles/responsible-v2.css';
 
 		function renderUsers() {
 			const departments = departmentList();
-			const query = adminPeopleSearch.trim().toLowerCase();
 			const linkedAccessCount = EMPLOYEES.filter((employee) => userForEmployee(employee)?.active).length;
-			const filteredPeople = EMPLOYEES
-				.slice()
-				.sort((a, b) => a.name.localeCompare(b.name))
-				.filter((employee) => adminPeopleDepartment === 'all' || employee.department === adminPeopleDepartment)
-				.filter((employee) => {
-					const access = userForEmployee(employee);
-					if (!query) return true;
-					return [employee.name, employee.department, access?.email || '']
-						.some((value) => value.toLowerCase().includes(query));
-				});
+			const filteredPeople = adminFilteredPeople();
 			const selectedPerson =
 				filteredPeople.find((employee) => employee.id === selectedAdminPersonId) ||
 				filteredPeople[0];
 			if (selectedPerson) selectedAdminPersonId = selectedPerson.id;
+			if (!selectedPerson) adminPeopleMobileDetailOpen = false;
+			const selectedIndex = selectedPerson ? filteredPeople.findIndex((employee) => employee.id === selectedPerson.id) : -1;
 
 			return `
-				<div class="admin-v2-people">
+				<div class="admin-v2-people ${adminPeopleMobileDetailOpen && selectedPerson ? 'admin-v2-mobile-detail-mode' : 'admin-v2-mobile-list-mode'}">
 					<header class="admin-v2-page-header admin-v2-people-header">
 						<div>
 							<span>Personas</span>
@@ -1315,11 +1355,30 @@ import '../styles/responsible-v2.css';
 						</section>
 
 						<section class="admin-v2-panel admin-v2-person-detail">
-							${selectedPerson ? renderAdminPersonDetail(selectedPerson) : emptyState('Selecciona una persona.')}
+							${selectedPerson ? `
+								<div data-admin-mobile-detail>
+									${renderAdminMobileDetailNavigation('admin-people-back', 'admin-people-previous', 'admin-people-next', selectedIndex, filteredPeople.length)}
+									${renderAdminPersonDetail(selectedPerson)}
+								</div>
+							` : emptyState('Selecciona una persona.')}
 						</section>
 					</div>
 				</div>
 			`;
+		}
+
+		function adminFilteredPeople() {
+			const query = adminPeopleSearch.trim().toLowerCase();
+			return EMPLOYEES
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.filter((employee) => adminPeopleDepartment === 'all' || employee.department === adminPeopleDepartment)
+				.filter((employee) => {
+					const access = userForEmployee(employee);
+					if (!query) return true;
+					return [employee.name, employee.department, access?.email || '']
+						.some((value) => value.toLowerCase().includes(query));
+				});
 		}
 
 		function renderAdminTimesheets() {
@@ -1339,11 +1398,15 @@ import '../styles/responsible-v2.css';
 				selectedAdminRecordEmployeeId = selected.employee.id;
 				selectedAdminRecordDate = selected.date;
 			}
+			if (!selected) adminRecordsMobileDetailOpen = false;
+			const selectedIndex = selected
+				? records.findIndex((item) => item.employee.id === selected.employee.id && item.date === selected.date)
+				: -1;
 			const summary = adminRecordsSummary(records);
 			const departments = departmentList();
 
 			return `
-				<div class="admin-v2-records">
+				<div class="admin-v2-records ${adminRecordsMobileDetailOpen && selected ? 'admin-v2-mobile-detail-mode' : 'admin-v2-mobile-list-mode'}">
 					<header class="admin-v2-page-header admin-v2-records-header">
 						<div>
 							<span>Registros</span>
@@ -1403,7 +1466,12 @@ import '../styles/responsible-v2.css';
 							`}
 						</section>
 						<section class="admin-v2-panel admin-v2-record-detail">
-							${selected ? renderAdminRecordDetail(selected) : emptyState('Selecciona un registro.')}
+							${selected ? `
+								<div data-admin-mobile-detail>
+									${renderAdminMobileDetailNavigation('admin-records-back', 'admin-records-previous', 'admin-records-next', selectedIndex, records.length)}
+									${renderAdminRecordDetail(selected)}
+								</div>
+							` : emptyState('Selecciona un registro.')}
 						</section>
 					</div>
 				</div>
@@ -1679,10 +1747,12 @@ import '../styles/responsible-v2.css';
 		function renderAdminVacations() {
 			const requests = adminAbsenceRequests();
 			const selectedRequest = adminSelectedAbsence(requests);
+			if (!selectedRequest) adminAbsenceMobileDetailOpen = false;
+			const selectedIndex = selectedRequest ? requests.findIndex((request) => request.id === selectedRequest.id) : -1;
 			const metrics = adminAbsenceMetrics();
 
 			return `
-				<section class="admin-v2-absence">
+				<section class="admin-v2-absence ${adminAbsenceMobileDetailOpen && selectedRequest ? 'admin-v2-mobile-detail-mode' : 'admin-v2-mobile-list-mode'}">
 					<header class="admin-v2-absence-header">
 						<div class="admin-v2-page-header">
 							<span>Ausencias</span>
@@ -1758,7 +1828,12 @@ import '../styles/responsible-v2.css';
 						</section>
 
 						<section class="admin-v2-panel admin-v2-absence-detail">
-							${selectedRequest ? renderAdminAbsenceDetail(selectedRequest) : emptyState('Selecciona una ausencia para ver el detalle.')}
+							${selectedRequest ? `
+								<div data-admin-mobile-detail>
+									${renderAdminMobileDetailNavigation('admin-absence-back', 'admin-absence-previous', 'admin-absence-next', selectedIndex, requests.length)}
+									${renderAdminAbsenceDetail(selectedRequest)}
+								</div>
+							` : emptyState('Selecciona una ausencia para ver el detalle.')}
 						</section>
 					</div>
 
@@ -5419,6 +5494,7 @@ import '../styles/responsible-v2.css';
 				to: String(formData.get('to') || todayIso()),
 				status: String(formData.get('status') || 'all'),
 			};
+			adminRecordsMobileDetailOpen = false;
 			showToast('Filtros aplicados.');
 			renderPage();
 		}
@@ -5436,6 +5512,7 @@ import '../styles/responsible-v2.css';
 				...timeFilters,
 				status: 'incidencia',
 			};
+			adminRecordsMobileDetailOpen = false;
 			renderNav();
 			renderPage();
 		}
@@ -5450,20 +5527,46 @@ import '../styles/responsible-v2.css';
 
 		function selectAdminPerson(id: string) {
 			selectedAdminPersonId = id;
+			adminPeopleMobileDetailOpen = true;
 			renderPage();
+			queueMicrotask(scrollAdminMobileDetailToTop);
 		}
 
 		function clearAdminPeopleFilters() {
 			adminPeopleSearch = '';
 			adminPeopleDepartment = 'all';
 			selectedAdminPersonId = '';
+			adminPeopleMobileDetailOpen = false;
 			renderPage();
+		}
+
+		function adminPeopleBack() {
+			adminPeopleMobileDetailOpen = false;
+			renderPage();
+		}
+
+		function moveAdminPeopleSelection(offset: number) {
+			const people = adminFilteredPeople();
+			if (!people.length) {
+				selectedAdminPersonId = '';
+				adminPeopleMobileDetailOpen = false;
+				renderPage();
+				return;
+			}
+			const currentIndex = Math.max(people.findIndex((employee) => employee.id === selectedAdminPersonId), 0);
+			const nextIndex = Math.min(Math.max(currentIndex + offset, 0), people.length - 1);
+			selectedAdminPersonId = people[nextIndex].id;
+			adminPeopleMobileDetailOpen = true;
+			renderPage();
+			queueMicrotask(scrollAdminMobileDetailToTop);
 		}
 
 		function selectAdminRecord(employeeId: string, date: string) {
 			selectedAdminRecordEmployeeId = employeeId;
 			selectedAdminRecordDate = date;
+			adminRecordsMobileDetailOpen = true;
 			renderPage();
+			queueMicrotask(scrollAdminMobileDetailToTop);
 		}
 
 		function setAdminRecordsDate(date: string) {
@@ -5475,6 +5578,7 @@ import '../styles/responsible-v2.css';
 			};
 			selectedAdminRecordDate = clamped;
 			selectedAdminRecordEmployeeId = '';
+			adminRecordsMobileDetailOpen = false;
 			renderPage();
 		}
 
@@ -5487,12 +5591,40 @@ import '../styles/responsible-v2.css';
 			adminRecordsDepartment = 'all';
 			adminRecordsStatus = 'all';
 			selectedAdminRecordEmployeeId = '';
+			adminRecordsMobileDetailOpen = false;
 			renderPage();
+		}
+
+		function adminRecordsBack() {
+			adminRecordsMobileDetailOpen = false;
+			renderPage();
+		}
+
+		function moveAdminRecordSelection(offset: number) {
+			const records = adminRecordRows();
+			if (!records.length) {
+				selectedAdminRecordEmployeeId = '';
+				adminRecordsMobileDetailOpen = false;
+				renderPage();
+				return;
+			}
+			const currentIndex = Math.max(
+				records.findIndex((row) => row.employee.id === selectedAdminRecordEmployeeId && row.date === selectedAdminRecordDate),
+				0,
+			);
+			const nextIndex = Math.min(Math.max(currentIndex + offset, 0), records.length - 1);
+			selectedAdminRecordEmployeeId = records[nextIndex].employee.id;
+			selectedAdminRecordDate = records[nextIndex].date;
+			adminRecordsMobileDetailOpen = true;
+			renderPage();
+			queueMicrotask(scrollAdminMobileDetailToTop);
 		}
 
 		function selectAdminAbsence(id: string) {
 			selectedAdminAbsenceId = id;
+			adminAbsenceMobileDetailOpen = true;
 			renderPage();
+			queueMicrotask(scrollAdminMobileDetailToTop);
 		}
 
 		function clearAdminAbsenceFilters() {
@@ -5502,7 +5634,29 @@ import '../styles/responsible-v2.css';
 			adminAbsenceDepartment = 'all';
 			adminAbsencePeriod = 'all';
 			selectedAdminAbsenceId = '';
+			adminAbsenceMobileDetailOpen = false;
 			renderPage();
+		}
+
+		function adminAbsenceBack() {
+			adminAbsenceMobileDetailOpen = false;
+			renderPage();
+		}
+
+		function moveAdminAbsenceSelection(offset: number) {
+			const requests = adminAbsenceRequests();
+			if (!requests.length) {
+				selectedAdminAbsenceId = '';
+				adminAbsenceMobileDetailOpen = false;
+				renderPage();
+				return;
+			}
+			const currentIndex = Math.max(requests.findIndex((request) => request.id === selectedAdminAbsenceId), 0);
+			const nextIndex = Math.min(Math.max(currentIndex + offset, 0), requests.length - 1);
+			selectedAdminAbsenceId = requests[nextIndex].id;
+			adminAbsenceMobileDetailOpen = true;
+			renderPage();
+			queueMicrotask(scrollAdminMobileDetailToTop);
 		}
 
 		function reviewIncident(id: string) {

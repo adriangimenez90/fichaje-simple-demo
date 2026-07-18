@@ -127,6 +127,10 @@
 	overflow-x: hidden;
 }
 
+.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-nav {
+	display: none;
+}
+
 .app-shell[data-role="admin_global"] .admin-v2-home {
 	display: grid;
 	gap: 18px;
@@ -1361,6 +1365,73 @@
 		width: 20px;
 		height: 20px;
 	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-nav {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		margin-bottom: 12px;
+		padding: 10px;
+		border: 1px solid #dde8e4;
+		border-radius: 14px;
+		background: #f8fbfa;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-back {
+		min-height: 46px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-pagination {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-pagination .button {
+		min-width: 46px;
+		min-height: 46px;
+		padding: 6px 10px;
+		font-size: 1.15rem;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-pagination span {
+		color: #5f6f6a;
+		font-size: 0.86rem;
+		font-weight: 740;
+		white-space: nowrap;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-people.admin-v2-mobile-detail-mode > .admin-v2-people-header,
+	.app-shell[data-role="admin_global"] .admin-v2-people.admin-v2-mobile-detail-mode > .admin-v2-people-summary,
+	.app-shell[data-role="admin_global"] .admin-v2-people.admin-v2-mobile-detail-mode > .admin-v2-people-create,
+	.app-shell[data-role="admin_global"] .admin-v2-people.admin-v2-mobile-detail-mode > .admin-v2-people-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-people.admin-v2-mobile-detail-mode .admin-v2-people-list,
+	.app-shell[data-role="admin_global"] .admin-v2-records.admin-v2-mobile-detail-mode > .admin-v2-records-header,
+	.app-shell[data-role="admin_global"] .admin-v2-records.admin-v2-mobile-detail-mode > .admin-v2-records-date-nav,
+	.app-shell[data-role="admin_global"] .admin-v2-records.admin-v2-mobile-detail-mode > .admin-v2-records-summary,
+	.app-shell[data-role="admin_global"] .admin-v2-records.admin-v2-mobile-detail-mode > .admin-v2-records-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-records.admin-v2-mobile-detail-mode .admin-v2-records-list,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-detail-mode > .admin-v2-absence-header,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-detail-mode > .admin-v2-absence-metrics,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-detail-mode > .admin-v2-absence-toolbar,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-detail-mode .admin-v2-absence-list,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-detail-mode > .admin-v2-absence-today,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-detail-mode > .admin-v2-absence-planning {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-people.admin-v2-mobile-list-mode .admin-v2-person-detail,
+	.app-shell[data-role="admin_global"] .admin-v2-records.admin-v2-mobile-list-mode .admin-v2-record-detail,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-list-mode .admin-v2-absence-detail {
+		display: none;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-people.admin-v2-mobile-detail-mode .admin-v2-people-layout,
+	.app-shell[data-role="admin_global"] .admin-v2-records.admin-v2-mobile-detail-mode .admin-v2-records-layout,
+	.app-shell[data-role="admin_global"] .admin-v2-absence.admin-v2-mobile-detail-mode .admin-v2-absence-layout {
+		display: block;
+	}
 }
 
 @media (max-width: 560px) {
@@ -1384,6 +1455,25 @@
 	.app-shell[data-role="admin_global"] .admin-v2-settings-grid,
 	.app-shell[data-role="admin_global"] .admin-v2-settings-summary {
 		grid-template-columns: 1fr;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-home .admin-v2-metrics {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-home .admin-v2-metric {
+		min-height: 0;
+		padding: 12px;
+		border-radius: 14px;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-home .admin-v2-metric strong {
+		font-size: 1.55rem;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-home .admin-v2-metric small {
+		display: none;
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-attention-item,
@@ -1417,6 +1507,15 @@
 	.app-shell[data-role="admin_global"] .admin-v2-settings-danger .button {
 		min-height: 48px;
 		width: 100%;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-nav {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.app-shell[data-role="admin_global"] .admin-v2-mobile-detail-pagination {
+		justify-content: space-between;
 	}
 
 	.app-shell[data-role="admin_global"] .admin-v2-absence-item-side {
